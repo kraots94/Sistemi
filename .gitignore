@@ -1,2 +1,3 @@
 # Erlang compiled files
 *.beam
+/ebin/
