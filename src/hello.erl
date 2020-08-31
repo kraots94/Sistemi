@@ -1,5 +1,6 @@
 -module(hello).
+-import('my_util', [println/1]).
 -export([hello_world/0]).
 
 hello_world() ->
-	io:format("Hello, World!~n", []).
+	my_util:println("Hello, World!").
