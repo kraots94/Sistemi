@@ -4,6 +4,7 @@
 %test modifica da pc fisso
 %mod 2 fisso
 %mod 3 fisso qwdqwd qwdqwdqwd qdwdqwdqwd
+%mod 4
 
 -module(hello).
 -import('my_util', [println/1]).
