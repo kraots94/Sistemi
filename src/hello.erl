@@ -10,6 +10,9 @@
 errore dal portatile
 dfwf
 wefwefefweffwefwefwefewefw
+
+asdasdas
+
 errore dal fisso
 
 errore dal portatile 2
