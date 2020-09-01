@@ -7,6 +7,8 @@
 %mod 4
 %qwqwdqwd
  
+wdqwd
+
 errore dal portatile
   
 errore dal fisso
