@@ -6,7 +6,8 @@
 %mod 3 fisso qwdqwd qwdqwdqwd qdwdqwdqwd
 %mod 4
 %qwqwdqwd
-wdqdwqdq
+ 
+errore dal portatile
   
 -module(hello).
 -import('my_util', [println/1]).
