@@ -11,6 +11,9 @@ wdqwd
 
 errore dal portatile
   
+qwqwdmi 
+penis penis 
+penis
 errore dal fisso
 
 errore dal portatile 2
