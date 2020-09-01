@@ -8,7 +8,8 @@
 %qwqwdqwd
  
 errore dal portatile
-  
+dfwf
+wefwefefweffwefwefwefewefw
 errore dal fisso
 
 errore dal portatile 2
