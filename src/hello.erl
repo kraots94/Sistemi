@@ -10,6 +10,9 @@
 errore dal portatile
   
 errore dal fisso
+
+errore dal portatile 2
+
 -module(hello).
 -import('my_util', [println/1]).
 -export([hello_world/0]).
