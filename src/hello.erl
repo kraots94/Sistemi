@@ -6,16 +6,6 @@
 %mod 3 fisso qwdqwd qwdqwdqwd qdwdqwdqwd
 %mod 4
 %qwqwdqwd
- 
-errore dal portatile
-dfwf
-wefwefefweffwefwefwefewefw
-
-asdasdas
-
-errore dal fisso
-
-errore dal portatile 2
 
 -module(hello).
 -import('my_util', [println/1]).
