@@ -11,7 +11,7 @@ prod(A,B) ->
 	A * B.
 
 temperature_converter({Current_scale, T}, Target_scale) ->
-	temperature_converter(Current_scale, T, Target_scale).
+	{Target_scale, temperature_converter(Current_scale, T, Target_scale)}.
 
 temperature_converter(kelvin, T, kelvin) -> T;
 temperature_converter(kelvin, T, celsius) ->  T - 273.15;
