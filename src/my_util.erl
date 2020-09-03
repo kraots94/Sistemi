@@ -30,7 +30,7 @@ temperature_converter(fahrenheit, T, fahrenheit) -> T.
 %il match avviene con entrambe le funzioni ma viene selezionata la prima che matcha in ordine di scrittura 
 test_patternMatchingConPluriMatch({preciso, T}) -> println(T);
 %underscore inserito per non avere warning di mancato utilizzo var input
-test_patternMatchingConPluriMatch(_Tupla) -> println("non preciso").
+test_patternMatchingConPluriMatch({_,_}) -> println("non preciso").
 
 %dimostrazione che case (ma anche if) è una espressione e in quanto tale torna un valore
 %come in scheme e tutti i linguaggi funz.
