@@ -5,7 +5,8 @@
 		 test_patternMatchingConPluriMatch/1,test_caseRitornaValore/1, 
 		 len/1, acc_len/1, acc_fact/1, duplicate/2, reverse/1, acc_reverse/1, sublist/2, acc_sublist/2,
 		 zip/2, acc_zip/2,
-		 boosted_quicksort/1]).
+		 boosted_quicksort/1,
+		 get_even_numbers/1]).
 
 println(What) -> 
 	io:format("Messaggio: ~p~n", [What]).
@@ -99,7 +100,7 @@ zip([H1 | T1], [H2 | T2]) -> [{H1, H2}] ++ zip(T1, T2).
 acc_zip(L1, L2) -> acc_reverse(acc_zip(L1,L2,[])).
 
 acc_zip([], _, Acc_List) -> Acc_List;
-acc_zip(_, [], Acc_List) -> Acc_List;
+acc_zip(_, [] , Acc_List) -> Acc_List;
 acc_zip([H1 | T1], [H2 | T2], Acc_List) -> acc_zip(T1,T2, [{H1, H2} | Acc_List]).
 
 boosted_quicksort([]) -> [];
@@ -113,3 +114,13 @@ partition(Pivot, [H | T], Smaller, Equal, Larger) ->
 	   H < Pivot  -> partition(Pivot, T, [H | Smaller], Equal, Larger);
 	   H == Pivot -> partition(Pivot, T, Smaller, [H | Equal], Larger)
 	end.
+
+% NewList = [Expression || Pattern <- List, Condition1, Condition2, ... ConditionN]
+get_even_numbers(L) ->
+	[X || X <- L, X rem 2 =:= 0].
+
+
+create_stack() -> [].
+push_stack(El, S) -> [El | S].
+pop_stack([H | T]) -> {H, T}.
+
