@@ -119,8 +119,3 @@ partition(Pivot, [H | T], Smaller, Equal, Larger) ->
 get_even_numbers(L) ->
 	[X || X <- L, X rem 2 =:= 0].
 
-
-create_stack() -> [].
-push_stack(El, S) -> [El | S].
-pop_stack([H | T]) -> {H, T}.
-
