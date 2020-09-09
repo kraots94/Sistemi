@@ -1,3 +1,17 @@
 # Erlang compiled files
 *.beam
 /ebin/
+
+#latex useless files
+*.aux
+*.ini
+*.lof
+*.log
+*.toc
+*.gz
+*.pdf
+*.out
+
+#python cache
+__pycache__
+*.pyc

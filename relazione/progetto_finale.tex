@@ -1,0 +1,192 @@
+
+%!TEX encoding = UTF-8 Unicode
+
+\documentclass[12pt,a4paper,twoside,english,italian]{book}
+\usepackage[utf8]{inputenc}
+\usepackage[italian]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{enumerate}
+\usepackage{pdfpages}
+\usepackage{afterpage}
+\usepackage{xcolor}
+\usepackage{sectsty}
+\usepackage{color}
+\usepackage{uniudtesi}
+
+\makeatletter
+\newcommand\BeraMonottfamily{%
+	\def\fvm@Scale{0.85}% scales the font down
+	\fontfamily{fvm}\selectfont% selects the Bera Mono font
+}
+\makeatother
+
+\definecolor{gray}{rgb}{0.4,0.4,0.4}
+\definecolor{darkblue}{rgb}{0.0,0.0,0.6}
+\definecolor{cyan}{rgb}{0.0,0.6,0.6}
+\definecolor{maroon}{rgb}{0.5,0,0}
+\definecolor{darkgreen}{rgb}{0,0.5,0}
+
+\lstset{
+	basicstyle=\ttfamily,
+	columns=fullflexible,
+	showstringspaces=false,
+	commentstyle=\color{gray}\upshape,
+	aboveskip=20pt,
+	belowskip=20pt,
+	breaklines=true,
+}
+
+\lstdefinelanguage{XML}
+{
+	basicstyle=\ttfamily,
+	morestring=[s]{"}{"},
+	morecomment=[s]{?}{?},
+	morecomment=[s]{!--}{--},
+	commentstyle=\color{darkgreen},
+	moredelim=[s][\color{black}]{>}{<},
+	moredelim=[s][\color{red}]{\ }{=},
+	stringstyle=\color{blue},
+	identifierstyle=\color{maroon},
+	breaklines=true,
+	postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
+	captionpos=b,
+	frame=tb,
+}
+
+% Col pacchetto tocbibind compariranno nell'indice anche
+% la bibliografia ed eventualmente l'indice analitico
+\usepackage[nottoc]{tocbibind}
+
+% Il pacchetto indentfirst abolisce la fastidiosa convenzione
+% anglosassone di fa cominciare la prima riga di un
+% capitolo o sezione a margine sinistro, senza rientro:
+\usepackage{indentfirst}
+
+% \usepackage{graphicx} % gia' caricato da uniudtesi
+\graphicspath{{./figure/}}
+
+\usepackage{amsmath,amsfonts,amssymb,amsthm}
+\usepackage{latexsym}
+
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+
+\DeclareMathOperator{\traccia}{tr}
+\DeclareMathOperator{\sen}{sen}
+\DeclareMathOperator{\arcsen}{arcsen}
+\DeclareMathOperator*{\maxlim}{max\,lim}
+\DeclareMathOperator*{\minlim}{min\,lim}
+\DeclareMathOperator*{\deepinf}{\phantom{\makebox[0pt]{p}}inf}
+
+\newcommand{\varsum}[3]{\sum_{#2}^{#3}\!
+	{\vphantom{\sum}}_{#1}\;}
+\newcommand{\varprod}[3]{\sum_{#2}^{#3}\!
+	{\vphantom{\sum}}_{#1}\;}
+
+
+\theoremstyle{plain}
+\newtheorem{teorema}{Teorema}[chapter]
+\newtheorem{proposizione}[teorema]{Proposizione}
+\newtheorem{lemma}[teorema]{Lemma}
+\newtheorem{corollario}[teorema]{Corollario}
+
+\theoremstyle{definition}
+\newtheorem{definizione}[teorema]{Definizione}
+\newtheorem{esempio}[teorema]{Esempio}
+
+\theoremstyle{remark}
+\newtheorem{osservazione}[teorema]{Osservazione}
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE,RO]{\bfseries\thepage}
+\fancyhead[LO]{\bfseries\rightmark}
+\fancyhead[RE]{\bfseries\leftmark}
+\renewcommand{\headrulewidth}{0.5pt}
+\renewcommand{\footrulewidth}{0pt}
+\setlength{\headheight}{14.5pt}
+
+\begin{document}
+\frontmatter
+%\maketitle
+\begin{titlepage}
+	\begin{sffamily}
+		\begin{large}
+			\begin{center}
+				\vbox to0pt{%
+					\vbox to\textheight{\vfil
+						\includegraphics[width=\textwidth]{polloPallido}%
+						\vfil}\vss}
+			\end{center}
+			\begin{center}
+				\begin{Large}
+					\uppercase{Universit\`a degli Studi di Udine}
+				\end{Large}\\
+				\rule{9cm}{.4pt}\\
+				\smallskip
+				 Dipartimento di Scienze Matematiche, Informatiche e Fisiche\\
+				\medskip
+				\rule{9cm}{.4pt}\\
+				Corso di Sistemi Distribuiti\\
+				\bigskip\vfill
+				\bigskip
+				\bigskip
+				{\vfil
+					\begin{Huge}
+					Relazione del progetto 
+					\end{Huge}%
+					\begin{LARGE}
+
+							
+					\end{LARGE}}
+				\bigskip\vfill
+				\end{center}
+			\begin{center}
+				\vfill
+				\rule{9cm}{.4pt}\\
+				\bigskip
+				\uppercase{Docente}: Marino Miculan\\
+				\medskip
+				\uppercase{Studente}: Andreussi Angelo\\
+				\uppercase{Studente}: Forgiarini Alessandro\\
+			\end{center}
+			\begin{center}
+				\vfill
+				\rule{9cm}{.4pt}\\
+				\medskip
+				\uppercase{Anno Accademico 2019 - 2020}\\
+			\end{center}
+		\end{large}
+	\end{sffamily}
+	\clearemptydoublepage
+\end{titlepage}
+
+
+
+\renewcommand{\theequation}{\arabic{equation}}%consigliato per migliorare i numeri di equazione nell'introduzione
+\renewcommand{\thesection}{\arabic{section}}%consigliato per migliorare i numeri di equazione nell'introduzione
+
+\include{introduzione}
+
+\tableofcontents
+\listoffigures
+
+\mainmatter
+\include{analisi}
+\include{progetto}
+\include{implementazione}
+\include{validazione}
+\include{conclusioni}
+\include{considerazioni_finali}
+\backmatter
+\appendix
+\input{appendici}
+\include{biblio}
+
+\end{document}
