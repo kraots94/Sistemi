@@ -1,6 +1,57 @@
 \chapter{Introduzione}
 
+Il problema da risolvere consiste nella gestione dei taxi e assegnazione di essi agli utenti che ne fanno richiesta per spostarsi all'interno di una città. Si vuole creare un sistema distribuito in modo che non sia necessario un server centralizzato, in tal modo sono le vetture che si accordano tra di loro per decidere chi può soddisfare la richiesta del cliente.
+
+La soluzione proposta consiste in:
+\begin{itemize}
+	\item L'utente invia la richiesta di spostamento al taxi a lui più vicino indicando la propria posizione e destinazione.
+	\item La vettura riceve la richiesta e, comunicando con gli altri taxi, viene deciso quale veicolo è il più adatto per soddisfare il bisogno dell'utente.
+	\item Per decidere quale sia la vettura più adatta, si prende in considerazione diversi parametri, tra cui: distanza dall'utente, carica rimanente e se la vettura al momento è già occupata.
+	\item Il veicolo scelto si sposta verso l'utente e lo trasporta verso la direzione richiesta.
+\end{itemize}
+
+Alcuni problemi che potrebbero emergere dal punto di vista di un Sistema Distribuito sono la possibilità di rottura di un veicolo, il cambio destinazione di un utente, la rottura di una strada della città.
+Nella realtà, potrebbe capitare che un veicolo, a seguito di un guasto o spostamento, si isoli e non sia più in grado di comunicare con le altre vetture, oppure che, a seguito dell'inagibilità di una strada, una parte della città resti isolata dal resto di essa. In entrambi i casi i grafi che rappresentano le comunicazioni tra veicoli e la mappa della città non sarebbero più connessi, tuttavia queste situazioni non vengono prese in considerazione. 
+Questa scelta progettuale è dettata dal fatto che in uno scenario reale la disconnessione della città o delle macchine è praticamente impossibile poiché vi sono ripetitori e strade alternative.
+
+Un altra possibilità nel mondo reale è che l'utente non possa comunicare con alcun veicolo, anche questa situazione viene ignorata poiché idealmente un utente reale si sposta alla ricerca della ricezione con uno di questi veicoli.
+
+Le componenti presenti nel problema sono principalmente tre:
+\begin{itemize}
+	\item Macchina: rappresenta una vettura che ha i compiti sopra descritti.
+	\item Utente: rappresenta una persona che vuole spostarsi all'interno della città. Comunica con un veicolo e aspetta.
+	\item Ambiente: interviene su macchine, strade e utenti emulando le comunicazioni wireless, gli eventi di rottura delle macchine e inagibilità delle strade, crea gli utenti e le macchine.
+\end{itemize}
+
+L'architettura scelta per il progetto è quella peer-to-peer, quindi le macchine comunicano fra di loro in una rete mesh, con nodi idem-potenti attraverso scambi di messaggi tramite connessioni affidabili.
+
+Per chiarezza, l'ambiente sopperisce alla mancanza di fattori presenti in un contesto reale: connessioni wireless tra macchine, eventi casuali che possano causare diversi tipi di errori nella rete, sostituzione di una macchina, variazione dei clienti. In tal senso, l'ambiente non offre nessun servizio alle altre entità se non quello ottenibile tramite i fattori appena descritti.
+
+Per questo tipo di progetto, sono state considerate le seguenti trasparenze: 
+\begin{itemize}
+	\item Location transparency: non è necessario che il cliente sappia dove si trovino le risorse dell'architettura che corrispondono alle automobili. Per interagire con esse, infatti, è sufficiente utilizzare l'interfaccia fornita, la quale chiede solo posizione e destinazione. Le vetture possono spostarsi all'interno della città e il cliente non è necessario sia conoscenza della loro locazione.
+	\item Failure transparency: come già accennato, le possibili eventi di fallimento vengono gestiti automaticamente dal sistema senza precludere al cliente la possibilità di utilizzo del servizio. Nel caso di tale evento, il cliente viene avvisato dal sistema riguardo alla presa in carico e gestione del problema.
+	\item Mobility transparency: questa trasperenza viene intrinsecamente garantita, considerando che la comunicazione delle entità avviene in modalità wireless e lo scopo dell'applicativo stesso è spostare alcune entità (utente e macchine).
+	\item Scaling transparency: l'aumento di clienti o di macchine non appesantisce il sistema poiché gli algoritmi utilizzati sono fin da subito scalabili, per esempio: anche in un ipotetico contesto con moltissime macchine quelle effettivamente coinvolte saranno un piccolo sottoinsieme. 
+\end{itemize}
+
+Per la selezione del veicolo da inviare al cliente che richiede il servizio, è stato scelto un algoritmo di elezione che seleziona il leader secondo la ottimizzazione di alcuni parametri, come per esempio la vicinanza e quanto già descritto.
+
+Per testare il sistema, utilizzeremo l'entità Ambiente utilizzerà un grafo per rappresentare la città e, con un gran numero di macchine e utenti sottoporremo ad essi diversi eventi tra cui: rottura di strade, rimozione di veicoli, l'utente cambia destinazione, la macchina si rompe ma continua a trasmettere.
+
+Lo sviluppo dell'applicazione verrà suddiviso in diverse versioni via via estese con le diverse funzionalità. In particolare si seguirà questo ordine:
+\begin{enumerate}
+	\item Ogni macchina potrà parlare con tutte le altre macchine; l'utente invia la richiesta di trasporto alla macchina più vicina a lui; se un veicolo è impegnato con un cliente non partecipa alla selezione del leader per il trasporto; la comunicazione tra i veicoli è diretta, quindi ogni taxi può parlare con chiunque.
+	\item Vengono aggiunte le colonnine di ricarica, alle quali le macchine devono far rifornimento se hanno esaurito le batterie; le macchine possono guastarsi; l'utente può decidere di cambiare destinazione.
+	\item La macchina partecipa all'elezione anche se al momento è già impegnata, tuttavia si considera disponibile solo dopo aver compiuto il tragitto già attivo, rottura delle strade ma senza disconnessione del grafo stradale.
+	\item Implementazione del car-sharing fino a 3 clienti.
+	\item Le macchine possono comunicare solo con quelle vicine, viene fornita al cliente una lista di possibili candidati.
+	\item Le connessioni tra le macchine possono perdere andare perse mentre si elegge il leader.
+	\item panino alla guida
+\end{enumerate}
+
 In this chapter you describe the main problem, and an idea of the solution. It is not necessary to be very detailed or formal, but it is important to explain which are the main aims and issues from the point of view of Distributed Systems:
+
 
 \begin{itemize}
 	\item A description of the application.
