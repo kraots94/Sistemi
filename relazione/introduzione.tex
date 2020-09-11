@@ -12,9 +12,9 @@ La soluzione proposta consiste in:
 
 Alcuni problemi che potrebbero emergere in questo contesto, interessanti da affrontare nella costruzione del sistema distribuito, sono la possibilità di rottura di un veicolo, il cambio destinazione di un utente, la rottura di una strada della città.
 Si potrebbe pensare che nella realtà, un veicolo, a seguito di uno spostamento, si isoli e non sia più in grado di comunicare con le altre vetture, oppure che, a seguito dell'inagibilità di una strada, una parte della città sia isolata dal resto. In entrambi i casi i grafi che rappresentano le comunicazioni tra veicoli e la mappa della città non sarebbero più connessi; tuttavia queste situazioni non vengono prese in considerazione. 
-Questa scelta progettuale è dettata dal fatto che in uno scenario reale la disconnessione delle macchine o della città è praticamente impossibile poiché vi sono ripetitori che garantiscono una copertura pressoché totale, nel primo caso, e strade alternative nel secondo. In ultima analisi, i 2 suddetti problemi di disconnessione sono stati evitati con scelte progettuali adeguate.
+Questa scelta progettuale è dettata dal fatto che in uno scenario reale la disconnessione delle macchine o della città è praticamente impossibile poiché vi sono ripetitori che garantiscono una copertura pressoché totale, nel primo caso, e strade alternative nel secondo. In ultima analisi, i due suddetti problemi di disconnessione sono stati evitati con scelte progettuali adeguate.
 
-Un'altra possibilità, considerando sempre il mondo reale, è che l'utente non possa comunicare con alcun veicolo, a causa della limitata copertura wireless del suo terminale, anche questa situazione viene ignorata poiché per lo stesso motivo sopra descritto si assume la presenza di almeno un ripetitore, il quale permetta di rimbalzare la sua richiesta alla fitta rete di auto. (senza contare il fatto che esso potrebbe sempre spostarsi alla ricerca della ricezione con uno di questi veicoli, come una persona alla ricerca di un normale taxi all'interno di una città).
+Un altra possibilità, considerando sempre il mondo reale, è che l'utente non possa comunicare con alcun veicolo, a causa della limitata copertura wireless del suo terminale: anche questa situazione viene ignorata poiché per lo stesso motivo sopra descritto si assume la presenza di almeno un ripetitore, il quale permetta di rimbalzare la sua richiesta alla fitta rete di auto (senza contare il fatto che egli potrebbe spostarsi alla ricerca della ricezione con uno di questi veicoli, come una persona alla ricerca di un normale taxi all'interno di una città).
 
 Le componenti individuate nella modellazione del problema sono principalmente tre:
 \begin{itemize}
@@ -34,7 +34,8 @@ Per questo tipo di progetto, sono state considerate le seguenti trasparenze:
 	\item Mobility transparency: questa trasperenza viene intrinsecamente garantita, considerando che la comunicazione delle entità avviene in modalità wireless e lo scopo dell'applicativo stesso è spostare alcune entità (utente e macchine).
 	\item Scaling transparency: l'aumento di clienti o di macchine non appesantisce il sistema poiché gli algoritmi utilizzati sono fin da subito scalabili, per esempio: anche in un ipotetico contesto con moltissime macchine quelle effettivamente coinvolte (e che comunicano fra loro per trovare la candidata) sono un piccolo sottoinsieme. 
 \end{itemize}
-le trasparenze "non considerate" non riguardano le richieste del progetto in esame, pertanto non sono state inserite.
+
+Le trasparenze "Access", "Concurrency", "Replication" e "Performance" non riguardano le richieste del progetto in esame, pertanto non sono state inserite.
 
 Per la selezione del veicolo da inviare al cliente che richiede il servizio, è stato scelto un algoritmo di elezione che seleziona il leader secondo la minimizzazione di alcuni parametri, come per esempio la vicinanza e quanto già descritto. Un sottoinsieme di veicoli, i più vicini all'utente, concordano quindi sulla macchina candidata da inviare con l'algoritmo /nomeALgElection.
 
