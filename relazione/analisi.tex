@@ -5,6 +5,34 @@ ments of a solution for the problem.
 \section{Requisiti Funzionali}
 Which functions must be offered to users / other programs? Which are the input data and the output data? Which is the expected effect?
 
+Richiesta macchina
+Input: Pos iniziale, Pos finale, id utente
+Out: Macchina scelta
+Effetto:
+La macchina scelta si sposta dal punto 1 al punto 2
+
+Trasporto
+Input: Utente in pos A
+Out: Utente in pos B
+Eff: la poszione dell'utente e della macchina alla fine coincidono con B
+
+Utente cambia destinazione
+In: utente, taxi, nuova destinazione
+Out: Se possibile, confema del cambio
+	Altrimenti soluzione alternativa, scelta dall'utente tra: porto a B e porto a C punto più vicino alla nuova destinazione
+
+Eff: macchina e utenti spostati in C punto più vicino alla nuova destinazione
+
+Rompe una macchina
+In: taxi
+Out: taxi fuori gioco
+Eff: nel caso di utente sopra la macchina, riparte l'algoritmo di selezione del taxi
+
+Rompe strada: 
+In: strada rotta
+Out: nuova mappa
+Eff: Aggiorno mappa di ogni taxi, ogni taxi con persone sopra ricalcolano il percorso.
+
 \section{Requisiti Non Funzionali}
 Everything about mode and transparencies: availability, mobility, security, fault tolerance, etc. 
 

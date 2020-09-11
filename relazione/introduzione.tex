@@ -3,18 +3,20 @@
 Il problema in esame consiste nella gestione dei taxi elettrici e assegnazione di essi agli utenti che ne fanno richiesta per spostarsi all'interno di una città. Si vuole creare un sistema distribuito in modo che non sia necessario un server centralizzato, in tal modo sono le vetture che si accordano tra di loro, attraverso un meccanismo di comunicazione wireless, per decidere la migliore vettura che possa soddisfare la richiesta del cliente. Allo stesso modo, il cliente richiede il servizio comunicando direttamente con una di queste macchine, con lo stesso metodo di comunicazione senza fili. 
 
 La soluzione proposta consiste in:
-\begin{itemize}
+\begin{enumerate}
 	\item L'utente invia la richiesta di spostamento al taxi a lui più vicino indicando la propria posizione e destinazione.
 	\item La vettura riceve la richiesta e, comunicando con gli altri taxi, viene deciso quale veicolo è il più adatto per soddisfare il bisogno dell'utente.
 	\item Per decidere quale sia la vettura più adatta, si prendono in considerazione diversi parametri, tra cui: distanza dall'utente, carica rimanente e se la vettura al momento è già occupata.
+	\item Notifica al cliente da parte della macchina di essere stata scelta per il trasporto.
 	\item Il veicolo scelto si sposta verso l'utente e lo trasporta verso la direzione richiesta.
-\end{itemize}
+\end{enumerate}
 
 Alcuni problemi che potrebbero emergere in questo contesto, interessanti da affrontare nella costruzione del sistema distribuito, sono la possibilità di rottura di un veicolo, il cambio destinazione di un utente, la rottura di una strada della città.
-Si potrebbe pensare che nella realtà, un veicolo, a seguito di uno spostamento, si isoli e non sia più in grado di comunicare con le altre vetture, oppure che, a seguito dell'inagibilità di una strada, una parte della città sia isolata dal resto. In entrambi i casi i grafi che rappresentano le comunicazioni tra veicoli e la mappa della città non sarebbero più connessi; tuttavia queste situazioni non vengono prese in considerazione. 
-Questa scelta progettuale è dettata dal fatto che in uno scenario reale la disconnessione delle macchine o della città è praticamente impossibile poiché vi sono ripetitori che garantiscono una copertura pressoché totale, nel primo caso, e strade alternative nel secondo. In ultima analisi, i due suddetti problemi di disconnessione sono stati evitati con scelte progettuali adeguate.
+Si potrebbe pensare che nella realtà, a seguito dell'inagibilità di una strada, una parte della città sia isolata dal resto. Questa situazione non viene presa in considerazione, infatti in uno scenario reale la disconnessione della città è praticamente impossibile poiché vi sono strade alternative che garantiscono un percorso.
 
-Un altra possibilità, considerando sempre il mondo reale, è che l'utente non possa comunicare con alcun veicolo, a causa della limitata copertura wireless del suo terminale: anche questa situazione viene ignorata poiché per lo stesso motivo sopra descritto si assume la presenza di almeno un ripetitore, il quale permetta di rimbalzare la sua richiesta alla fitta rete di auto (senza contare il fatto che egli potrebbe spostarsi alla ricerca della ricezione con uno di questi veicoli, come una persona alla ricerca di un normale taxi all'interno di una città).
+Si potrebbe anche pensare che un veicolo, a seguito di uno spostamento, si isoli e non sia più in grado di comunicare con le altre vetture. Questa situazione è realistica, tuttavia non è problematica visto che gli algoritmi utilizzati non prevedono una connessione completa del grafo di comunicazione delle macchine.
+
+I clienti che richiedono il servizio inoltrano la propria richiesta a delle speciali celle riservate alla comunicazione cliente-taxi, simili a dei ripetitori, che hanno come unico scopo quello di inoltrare le richieste a una macchina connessa ad essi. In tal modo non capita mai la situazione in cui un cliente non possa comunicare con alcun veicolo. 
 
 Le componenti individuate nella modellazione del problema sono principalmente tre:
 \begin{itemize}
@@ -39,26 +41,23 @@ Le trasparenze "Access", "Concurrency", "Replication" e "Performance" non riguar
 
 Per la selezione del veicolo da inviare al cliente che richiede il servizio, è stato scelto un algoritmo di elezione che seleziona il leader secondo la minimizzazione di alcuni parametri, come per esempio la vicinanza e quanto già descritto. Un sottoinsieme di veicoli, i più vicini all'utente, concordano quindi sulla macchina candidata da inviare con l'algoritmo /nomeALgElection.
 
-Per testare il sistema, l'entità Ambiente utilizzerà un grafo casuale, precedentemente generato, rappresentante una città, e inserirà in esso un gran numero di macchine e utenti, i quali sottoporranno richieste di spostamenti, inoltre l'entità introdurrà una componente di stress attraverso eventi randomici come: rottura di strade, rimozione di veicoli, variazioni richieste utenti, rottura di veicoli che però continuano ad essere nodi attivi nella rete p2p. 
+Per testare il sistema, l'entità Ambiente utilizzerà un grafo casuale, precedentemente generato, rappresentante una città, e inserirà in esso un gran numero di macchine e utenti, i quali sottoporranno richieste di spostamenti, inoltre l'entità introdurrà una componente di stress attraverso eventi casuali come: rottura di strade, rimozione di veicoli, variazioni richieste utenti, rottura di veicoli che però continuano ad essere nodi attivi nella rete p2p. 
 
-Lo sviluppo dell'applicazione verrà suddiviso in diverse versioni via via estese con le diverse funzionalità. In particolare si seguirà questo ordine:
+Lo sviluppo del progetto seguirà le seguenti fasi:
 \begin{enumerate}
-	\item Ogni macchina potrà parlare con tutte le altre macchine; l'utente invia la richiesta di trasporto alla macchina più vicina a lui; se un veicolo è impegnato con un cliente non partecipa alla selezione del leader per il trasporto; la comunicazione tra i veicoli è diretta, quindi ogni taxi può parlare con chiunque.
-	\item Vengono aggiunte le colonnine di ricarica, alle quali le macchine devono far rifornimento se hanno esaurito le batterie; le macchine possono guastarsi; l'utente può decidere di cambiare destinazione.
-	\item La macchina partecipa all'elezione anche se al momento è già impegnata, tuttavia si considera disponibile solo dopo aver compiuto il tragitto già attivo, rottura delle strade ma senza disconnessione del grafo stradale.
-	\item Implementazione del car-sharing fino a 3 clienti.
-	\item Le macchine possono comunicare solo con quelle vicine, viene fornita al cliente una lista di possibili candidati.
-	\item Le connessioni tra le macchine possono perdere andare perse mentre si elegge il leader.
-	\item panino alla guida
+	\item Identificazione delle diverse entità che interagiscono all'interno del sistema.
+	\item Analisi del problema e creazione di diversi casi d'uso per comprendere le possibili problematiche da modellare.
+	\item Specificazione delle comunicazioni che possono avvenire tra le diverse entità.
+	\item Scelta degli algoritmi per la risoluzione dei problemi: 
+		\begin{itemize}
+			\item comunicazione cliente-macchina.
+			\item comunicazione macchina-macchina per elezione.
+			\item comunicazione macchina-cliente per assegnazione.
+			\item comunicazione ambiente-entità presenti.
+			\item Calcolo del percorso di costo minimo.
+		\end{itemize}
+	\item Strutturazione dell'implementazione in Erlang.
+	\item Implementazione
+	\item Test del sistema e validazione.
 \end{enumerate}
 
-In this chapter you describe the main problem, and an idea of the solution. It is not necessary to be very detailed or formal, but it is important to explain which are the main aims and issues from the point of view of Distributed Systems:
-
-
-\begin{itemize}
-	\item A description of the application.
-	\item The overall structure of the implementation: how resources are deployed, which are the players, the roles.
-	\item The distributed system features (and the transparencies) and algorithms you intend to implement.
-	\item Your plan for testing the system.
-	\item A schedule for how you plan to carry our your design and implementation
-\end{itemize}

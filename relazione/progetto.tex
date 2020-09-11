@@ -13,3 +13,14 @@ Which nodes and platforms involved, and where each component is deployed.
 
 \section{Piano di Sviluppo}
 Since it is diffcult to predict just how hard implementing a new system will be, you should formulate as a set of "tiers", where the basic tier is something youre sure you can complete, and the additional tiers add more features, at both the application and the system level.
+
+Lo sviluppo dell'applicazione verrà suddiviso in diverse versioni via via estese con le diverse funzionalità. In particolare si seguirà questo ordine:
+\begin{enumerate}
+	\item Ogni macchina potrà parlare con tutte le altre macchine; l'utente invia la richiesta di trasporto alla macchina più vicina a lui; se un veicolo è impegnato con un cliente non partecipa alla selezione del leader per il trasporto; la comunicazione tra i veicoli è diretta, quindi ogni taxi può parlare con chiunque.
+	\item Vengono aggiunte le colonnine di ricarica, alle quali le macchine devono far rifornimento se hanno esaurito le batterie; le macchine possono guastarsi; l'utente può decidere di cambiare destinazione.
+	\item La macchina partecipa all'elezione anche se al momento è già impegnata, tuttavia si considera disponibile solo dopo aver compiuto il tragitto già attivo, rottura delle strade ma senza disconnessione del grafo stradale.
+	\item Implementazione del car-sharing fino a 3 clienti.
+	\item Le macchine possono comunicare solo con quelle vicine, viene fornita al cliente una lista di possibili candidati.
+	\item Le connessioni tra le macchine possono perdere andare perse mentre si elegge il leader.
+	\item panino alla guida
+\end{enumerate}
