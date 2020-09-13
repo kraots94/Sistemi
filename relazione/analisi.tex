@@ -1,41 +1,89 @@
+%!TEX TS-program = pdflatex
+%!TEX root = progetto_finale.tex
+%!TEX encoding = UTF-8 Unicode
+
 \chapter{Analisi}
 In this chapter, we describe in detail functional and non-functional require-
 ments of a solution for the problem.
 
-\section{Requisiti Funzionali}
+\section{Requisiti Funzionali}\label{diocane}
 Which functions must be offered to users / other programs? Which are the input data and the output data? Which is the expected effect?
 
-Richiesta macchina
-Input: Pos iniziale, Pos finale, id utente
-Out: Macchina scelta
-Effetto:
-La macchina scelta si sposta dal punto 1 al punto 2
+Analizzando le richieste del progetto, sono stati individuati diversi requisiti, sia funzionali che non.
+\subsection{Requisiti Funzionali}
 
-Trasporto
-Input: Utente in pos A
-Out: Utente in pos B
-Eff: la poszione dell'utente e della macchina alla fine coincidono con B
+I requisiti funzionali comprendono le possibilità offerte all'utente e agli altri programmi.
 
-Utente cambia destinazione
-In: utente, taxi, nuova destinazione
-Out: Se possibile, confema del cambio
-	Altrimenti soluzione alternativa, scelta dall'utente tra: porto a B e porto a C punto più vicino alla nuova destinazione
+\begin{enumerate}
+	\item Richiesta macchina: tramite questa funzionalità l'utente può chiedere al sistema un veicolo per spostarsi. Essa comprende anche lo spostamento del taxi scelto dalla propria posizione a quella del cliente.
+	\item Trasporto: il veicolo scelto come più adatto per le esigenze del cliente lo porta dalla posizione di partenza a quella di arrivo.
+	\item Utente cambia destinazione: il cliente ha la possibilità di modificare in un qualsiasi momento la propria destinazione, previa notifica del taxi designato. Il sistema si adatta a questa nuova modifica valutandone la possibilità.
+	\item Possibili incidenti delle macchine: viene considerata l'eventualità di situazioni in cui un mezzo non è in grado di portare a termine il proprio compito.
+	\item Possibilità della rimozione di strade: a seguito di incidenti o altri eventi, è possibile che una strada non possa essere percorsa. Tuttavia si assume che esista sempre un percorso per connettere due diversi punti della città.
+\end{enumerate}
 
-Eff: macchina e utenti spostati in C punto più vicino alla nuova destinazione
+Più nello specifico, ogni requisito è caratterizzato da tre proprietà: dati in input, dati in output ed effetto desiderato.
 
-Rompe una macchina
-In: taxi
-Out: taxi fuori gioco
-Eff: nel caso di utente sopra la macchina, riparte l'algoritmo di selezione del taxi
+\begin{enumerate}
+	\item Richiesta macchina
+		\begin{itemize}
+			\item Input:  Pos iniziale, Pos finale, id utente
+			\item Output: Macchina scelta
+			\item Effetto: La macchina scelta si sposta dal punto 1 al punto 2
+		\end{itemize}
 
-Rompe strada: 
-In: strada rotta
-Out: nuova mappa
-Eff: Aggiorno mappa di ogni taxi, ogni taxi con persone sopra ricalcolano il percorso.
+	\item Trasporto
+		\begin{itemize}
+			\item Input: Utente in pos A
+			\item Output: Utente in pos B
+			\item Effetto: la poszione dell'utente e della macchina alla fine coincidono con B
+		\end{itemize}
+
+	\item Utente cambia destinazione
+		\begin{itemize}
+			\item Input: utente, taxi, nuova destinazione
+			\item Output: Se possibile, confema del cambio
+			Altrimenti soluzione alternativa, scelta dall'utente tra: porto a B e porto a C punto più vicino alla nuova destinazione
+			\item Effetto:  macchina e utenti spostati in C o B punto più vicino alla nuova destinazione
+		\end{itemize}
+
+	\item Si rompe una macchina / incidente
+		\begin{itemize}
+			\item Input: taxi
+			\item Output: taxi fuori gioco
+			\item Effetto: nel caso di utente sopra la macchina, riparte l'algoritmo di selezione del taxi
+		\end{itemize}
+
+	\item Si rompe una strada
+		\begin{itemize}
+			\item Input: strada rotta
+			\item Output: nuova mappa
+			\item Effetto: Aggiorno mappa di ogni taxi, ogni taxi con persone sopra ricalcolano il percorso se il percorso attuale perccore quella rotta.
+		\end{itemize}
+
+\end{enumerate}
 
 \section{Requisiti Non Funzionali}
-Everything about mode and transparencies: availability, mobility, security, fault tolerance, etc. 
+Sono stati individuati diversi requisiti non fuzionali: Adattabilità, Prestazioni e Limiti di tempo. Come conseguenza del CAP Theorem sono stati trovati, inoltre, altri requisiti.
+Le trasparenze sono già state discusse nell'introduzione al punto \ref{intro_trasparenze}.
 
-Are there execution time bounds? 
+\subsection{Vari Requisiti}
+\begin{itemize}
+	\item Adattabilità: il sistema prevede di poter gestire l'aumento o diminuzione dei veicoli disponibili e delle richieste dei clienti.
+	\item Prestazioni: si vuole utilizzare il numero di messaggi minimo per le comunicazioni tra utenti e macchine e tra veicoli per ottenere una risposta celere. I tempi di applicazione degli algoritmi devono essere bassi per garantire tempi di risposta rapidi considerato che la città può avere molti nodi, visto il requisito di scalabilità. Si vuole inoltre garantire che la macchina scelta sia la più veloce tra quelle in gioco nell'utilizzo dell'algoritmo.
+	\item Limiti di tempo: data la possibilità della disconnessione del grafo delle comunicazioni tra veicoli, è necessario definire un limite temporale per l'elezione del leader.
+\end{itemize}
 
-Minimum data rates? If requested, specific platforms/languages/middlewares requirements for the implementation can be decided here. (E.g.: if the project is on a SOA, we may request that functions are offered via SOAP or RESTful services).
+\subsection{CAP Theorem}
+Come conseguenza del CAP Theorem, e quindi dell'impossibilità di garantire consistenza, disponibilità e tolleranza alle partizioni assieme, si è valutato, per il progetto in esame, di considerare disponibilità e gestione delle partizioni.
+
+Riguardo la consistenza, è necessario considerare due grafi: mappa della città e mappa delle comunicazioni tra i veicoli. 
+
+\subsubsection{Consistenza}
+La consistenza riguardo le mappe non può essere garantita poiché i nodi in movimento hanno una visione locale dei nodi vicini e delle eventuali modifiche alle strade. Per semplicità del progetto, tuttavia, si assume che la mappa della città sia sempre aggiornata per ogni macchina. In un caso reale, sarebbero i veicoli a comunicare agli altri le strade non più agibili o quelle nuove disponibili. I clienti, infine, hanno una visione parziale delle macchine disponibili poiché possono comunicare solo con quella più vicina a loro.
+
+\subsubsection{Disponibilità}
+Essa è garantita dal fatto che si assume l'utente possa sempre comunicare con almeno un veicolo, il quale è l'iniziatore dell'algoritmo di elezione, pertanto nel caso peggiore non viene trovato un vincitore e l'utente viene sempre notificato sulla disponibilità del servizio. Di questo si era già accennato nell'introduzione nelle problematiche distribuite \ref{problematiche_distribuite}.
+
+\subsubsection{Tolleranza alle Partizioni}
+Il partizionamento della mappa delle macchine, la rete del sistema distribuito, non rappresenta un problema per il corretto funzionamento del servizio:  soltanto nel caso di totale fallimento dei veicoli il sistema non risponde correttamente, visto e considerato che per la notifica al cliente è sufficiente una partizione di auto nelle sue vicinanze. Di questo si era già accennato nell'introduzione nelle parte relativa agli algoritmi \ref{intro_algo}.

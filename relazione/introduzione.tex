@@ -1,3 +1,7 @@
+%!TEX TS-program = pdflatex
+%!TEX root = progetto_finale.tex
+%!TEX encoding = UTF-8 Unicode
+
 \chapter{Introduzione}
 
 Il problema in esame consiste nella gestione dei taxi elettrici e assegnazione di essi agli utenti che ne fanno richiesta per spostarsi all'interno di una città. Si vuole creare un sistema distribuito in modo che non sia necessario un server centralizzato, in tal modo sono le vetture che si accordano tra di loro, attraverso un meccanismo di comunicazione wireless, per decidere la migliore vettura che possa soddisfare la richiesta del cliente. Allo stesso modo, il cliente richiede il servizio comunicando direttamente con una di queste macchine, con lo stesso metodo di comunicazione senza fili. 
@@ -11,14 +15,20 @@ La soluzione proposta consiste in:
 	\item Il veicolo scelto si sposta verso l'utente e lo trasporta verso la direzione richiesta.
 \end{enumerate}
 
+\section{Problemi del sistema distribuito} \label{problematiche_distribuite}
+
 Alcuni problemi che potrebbero emergere in questo contesto, interessanti da affrontare nella costruzione del sistema distribuito, sono la possibilità di rottura di un veicolo, il cambio destinazione di un utente, la rottura di una strada della città.
+
 Si potrebbe pensare che nella realtà, a seguito dell'inagibilità di una strada, una parte della città sia isolata dal resto. Questa situazione non viene presa in considerazione, infatti in uno scenario reale la disconnessione della città è praticamente impossibile poiché vi sono strade alternative che garantiscono un percorso.
 
 Si potrebbe anche pensare che un veicolo, a seguito di uno spostamento, si isoli e non sia più in grado di comunicare con le altre vetture. Questa situazione è realistica, tuttavia non è problematica visto che gli algoritmi utilizzati non prevedono una connessione completa del grafo di comunicazione delle macchine.
 
 I clienti che richiedono il servizio inoltrano la propria richiesta a delle speciali celle riservate alla comunicazione cliente-taxi, simili a dei ripetitori, che hanno come unico scopo quello di inoltrare le richieste a una macchina connessa ad essi. In tal modo non capita mai la situazione in cui un cliente non possa comunicare con alcun veicolo. 
 
+\section{Componenti del sistema}
+
 Le componenti individuate nella modellazione del problema sono principalmente tre:
+
 \begin{itemize}
 	\item Macchina: rappresenta una vettura che ha i compiti sopra descritti.
 	\item Utente: rappresenta una persona che vuole spostarsi all'interno della città. Comunica con un veicolo e aspetta che arrivi la macchina designata.
@@ -27,7 +37,13 @@ Le componenti individuate nella modellazione del problema sono principalmente tr
 
 Per chiarezza, l'ambiente sopperisce alla mancanza di fattori presenti in un contesto reale: schede di rete che permettano connessioni wireless tra macchine, eventi casuali che possano causare diversi tipi di errori nel sistema, sostituzione di una macchina, variazione dei clienti. In tal senso, l'ambiente non offre nessun servizio alle altre entità equiparabile a quello di un server, se non quelli ottenibili tramite i fattori appena descritti.
 
+\newpage
+
+\section{Architettura}
+
 L'architettura scelta per il progetto è quella peer-to-peer, quindi le macchine comunicano fra di loro in una rete mesh, con nodi idem-potenti, attraverso scambi di messaggi tramite connessioni affidabili (ossia reti che utilizzano ack per una conferma di ricezione e ritrasmissione in caso di errore).
+
+\section{Trasparenze}\label{intro_trasparenze}
 
 Per questo tipo di progetto, sono state considerate le seguenti trasparenze: 
 \begin{itemize}
@@ -39,13 +55,18 @@ Per questo tipo di progetto, sono state considerate le seguenti trasparenze:
 
 Le trasparenze "Access", "Concurrency", "Replication" e "Performance" non riguardano le richieste del progetto in esame, pertanto non sono state inserite.
 
+\section{Algoritmi} \label{intro_algo}
+
 Per la selezione del veicolo da inviare al cliente che richiede il servizio, è stato scelto un algoritmo di elezione che seleziona il leader secondo la minimizzazione di alcuni parametri, come per esempio la vicinanza e quanto già descritto. Un sottoinsieme di veicoli, i più vicini all'utente, concordano quindi sulla macchina candidata da inviare con l'algoritmo /nomeALgElection.
+
+\section{Testing del sistema}
 
 Per testare il sistema, l'entità Ambiente utilizzerà un grafo casuale, precedentemente generato, rappresentante una città, e inserirà in esso un gran numero di macchine e utenti, i quali sottoporranno richieste di spostamenti, inoltre l'entità introdurrà una componente di stress attraverso eventi casuali come: rottura di strade, rimozione di veicoli, variazioni richieste utenti, rottura di veicoli che però continuano ad essere nodi attivi nella rete p2p. 
 
+\section{Fasi dello sviluppo}
 Lo sviluppo del progetto seguirà le seguenti fasi:
 \begin{enumerate}
-	\item Identificazione delle diverse entità che interagiscono all'interno del sistema.
+	\item Selezione delle diverse entità che interagiscono all'interno del sistema.
 	\item Analisi del problema e creazione di diversi casi d'uso per comprendere le possibili problematiche da modellare.
 	\item Specificazione delle comunicazioni che possono avvenire tra le diverse entità.
 	\item Scelta degli algoritmi per la risoluzione dei problemi: 
@@ -54,7 +75,7 @@ Lo sviluppo del progetto seguirà le seguenti fasi:
 			\item comunicazione macchina-macchina per elezione.
 			\item comunicazione macchina-cliente per assegnazione.
 			\item comunicazione ambiente-entità presenti.
-			\item Calcolo del percorso di costo minimo.
+			\item calcolo del percorso di costo minimo.
 		\end{itemize}
 	\item Strutturazione dell'implementazione in Erlang.
 	\item Implementazione
