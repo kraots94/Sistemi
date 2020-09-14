@@ -15,50 +15,60 @@ Analizzando le richieste del progetto, sono stati individuati diversi requisiti,
 I requisiti funzionali comprendono le possibilità offerte all'utente e agli altri programmi.
 
 \begin{enumerate}
-	\item Richiesta macchina: tramite questa funzionalità l'utente può chiedere al sistema un veicolo per spostarsi. Essa comprende anche lo spostamento del taxi scelto dalla propria posizione a quella del cliente.
+	\item Richiesta taxi: tramite questa funzionalità l'utente può chiedere al sistema un veicolo per spostarsi. Essa comprende anche lo spostamento del taxi designato dalla propria posizione a quella del cliente.
 	\item Trasporto: il veicolo scelto come più adatto per le esigenze del cliente lo porta dalla posizione di partenza a quella di arrivo.
-	\item Utente cambia destinazione: il cliente ha la possibilità di modificare in un qualsiasi momento la propria destinazione, previa notifica del taxi designato. Il sistema si adatta a questa nuova modifica valutandone la possibilità.
+	\item Utente cambia destinazione: il cliente ha la possibilità di modificare in un qualsiasi momento la propria destinazione, previa notifica del taxi designato. Il sistema si adatta a questa nuova modifica valutandone la possibilità, nel caso in cui il taxi designato non riesca a portarlo nella destinazione scelta questo farà una nuova richiesta di trasporto, in modo completamente trasparente per l'utente.
 	\item Possibili incidenti delle macchine: viene considerata l'eventualità di situazioni in cui un mezzo non è in grado di portare a termine il proprio compito.
-	\item Possibilità della rimozione di strade: a seguito di incidenti o altri eventi, è possibile che una strada non possa essere percorsa. Tuttavia si assume che esista sempre un percorso per connettere due diversi punti della città.
+	\item Possibilità di disattivazione delle strade: a seguito di incidenti o altri eventi, è possibile che una strada non possa essere percorsa. Tuttavia si assume che esista sempre un percorso per connettere due diversi punti della città.
 \end{enumerate}
 
-Più nello specifico, ogni requisito è caratterizzato da tre proprietà: dati in input, dati in output ed effetto desiderato.
+Più nello specifico, ogni requisito è caratterizzato da tre componenti: dati in input, dati in output ed effetto desiderato.
 
 \begin{enumerate}
-	\item Richiesta macchina
+	\item Richiesta taxi
 		\begin{itemize}
-			\item Input:  Pos iniziale, Pos finale, id utente
-			\item Output: Macchina scelta
-			\item Effetto: La macchina scelta si sposta dal punto 1 al punto 2
+			\item Input:  <Posizione iniziale, Posizione finale, id utente>
+			\item Output: Se presente taxi che possa raggiungere 'posizione finale' -> <id Taxi designato> \\
+						  altrimenti -> avviso assenza taxi disponibile
+			\item Effetto: il Taxi con id = 'id Taxi designato' (quello più adatto all'utente, secondo diversi parametri) si sposta dalla sua posizione a 'Posizione iniziale'. Successivamente avviene il Trasporto (vedasi prossimo requisito) di 'id utente' verso la 'Pozione finale'. 'id Taxi designato' potrebbe variare nel caso di incidenti o variazioni della città. Non vi è una garanzia di tempo entro il quale avverrà il Trasporto, imprevisti vari possono ritardare il servizio con tempistiche indefinite, tuttavia nel caso di tali imprevisti il servizio garantisce la presa in carico dello spostamento dell'utente secondo le sue richieste.
 		\end{itemize}
 
 	\item Trasporto
 		\begin{itemize}
-			\item Input: Utente in pos A
-			\item Output: Utente in pos B
-			\item Effetto: la poszione dell'utente e della macchina alla fine coincidono con B
+			\item Input:  <Utente situato in posizione A>
+			\item Output: <Utente situato in posizione B>
+			\item Effetto: la posizione dell'utente, dopo un lasso di tempo proporzionale alla lunghezza del tragitto e assumendo assenza di imprevisti che ritardino i tempi, si trova nella posizione B.
 		\end{itemize}
 
 	\item Utente cambia destinazione
 		\begin{itemize}
-			\item Input: utente, taxi, nuova destinazione
-			\item Output: Se possibile, confema del cambio
-			Altrimenti soluzione alternativa, scelta dall'utente tra: porto a B e porto a C punto più vicino alla nuova destinazione
-			\item Effetto:  macchina e utenti spostati in C o B punto più vicino alla nuova destinazione
+			\item Input: <id utente, id taxi designato, posizione B>
+			\item Output: Se possibile cambio dest. -> avviso possibilità spostamento \\
+						  altrimenti -> avviso impossibilità spostamento con 'id taxi designato'
+			\item Effetto: il Taxi nel quale si trova l'utente valuta se è possibile portarlo al nuovo target = 'posizione B', se si cercherà di trasportarlo alla nuova destinazione, altrimenti prenderà in carico la richiesta dell'utente cerchando un taxi che soddisfi i nuovi bisogni.
 		\end{itemize}
+	
+	Qui di seguito verranno elencati alcuni requisiti non direttamente interessanti per l'utente ma che sono importanti da definire per la progettazione, oltre al fatto che rappresentano un interesse indiretto per l'utilizzatore del servizio, in quanto minano il perfetto funzionamento del servizio.
 
-	\item Si rompe una macchina / incidente
+	\item Morte di un taxi
 		\begin{itemize}
-			\item Input: taxi
-			\item Output: taxi fuori gioco
-			\item Effetto: nel caso di utente sopra la macchina, riparte l'algoritmo di selezione del taxi
+			\item Input: <id taxi>
+			\item Output: <eliminazione del taxi dalla mappa>
+			\item Effetto: un generico evento di rottura catastrofico, il taxi scompare dalla città. NB: Si assume che il taxi da uccidere, ossia con id = 'id taxi', non stia lavorando per il servizio, ossia che si trovi in una situazione "a riposo", nella quale non trasporta clienti, non si sta dirigendo verso un cliente, non contribuisce alla ricerca di un taxi designato.
 		\end{itemize}
+	
+	\item Incidente di un taxi
+	\begin{itemize}
+		\item Input: <id taxi>
+		\item Output: <taxi impossibilitato al movimento>
+		\item Effetto: un generico evento di rottura non catastrofico, come per esempio una gomma bucata o un problema al motore, la stazione Wi-Fi del taxi continua a funzionare. Nel caso in cui il taxi stia trasportando un cliente, si prenderà la briga di trovare un nuovo taxi per garantire il servizio all'utente.
+	\end{itemize}
 
-	\item Si rompe una strada
+	\item Modifica della topologia cittadina
 		\begin{itemize}
-			\item Input: strada rotta
-			\item Output: nuova mappa
-			\item Effetto: Aggiorno mappa di ogni taxi, ogni taxi con persone sopra ricalcolano il percorso se il percorso attuale percorre quella rotta.
+			\item Input: <topologia cittadina attuale>
+			\item Output: <topologia cittadina con strada inagibile oppure con nuova via>
+			\item Effetto: ogni taxi aggiorna la propria mappa. Se il taxi sta trasportando una persona e il percorso da compiere viene intaccato da questa modifica allora ne viene valutata la fattibilità, infatti viene ricalcolato un nuovo percorso e se questo è percorribile allora l'utente a bordo verrà notificato dell'esistenza di un nuovo tragitto, altrimenti verrà fatto uscire dal veicolo che si prenderà in carico la ricerca di un nuovo taxi che lo porti a destinazione.
 		\end{itemize}
 
 \end{enumerate}
