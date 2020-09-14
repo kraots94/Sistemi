@@ -2,8 +2,71 @@
 %!TEX root = progetto_finale.tex
 %!TEX encoding = UTF-8 Unicode
 
-\chapter{Sorgenti e Varie} \label{appendice_Codice}
+\chapter{Appendice A}
   
 \index{appendici}
 
-In the Appendix you can put code snippets, snapshots, installation instructions, etc.
+\section{Messaggi scambiati all'interno del sistema} \label{messaggi_scambiati_appendix}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=10cm]{messaggi_utente_trasporto.jpg}
+	\caption{Messaggi scambiati per il trasporto dell'utente.}
+	\label{fig:messaggi_utente_trasporto}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=15cm]{messaggi_utente_chiede_macchina.jpg}
+	\caption{Messaggi scambiati per la richiesta di un trasporto.}
+	\label{fig:messaggi_utente_chiede_macchina}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=15cm]{messaggi_utente_cambio_direzione_waiting.jpg}
+	\caption{Messaggi scambiati per la richiesta di cambiamento di destinazione mentre il taxi è in viaggio verso l'utente.}
+	\label{fig:messaggi_utente_cambio_direzione_waiting}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=15cm]{messaggi_utente_cambio_direzione_moving.jpg}
+	\caption{Messaggi scambiati per la richiesta di cambiamento di destinazione mentre il taxi sta trasportando l'utente.}
+	\label{fig:messaggi_utente_cambio_direzione_moving}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=15cm]{messaggi_macchina_partecipazione_elezione.jpg}
+	\caption{Partecipazione di una macchina non iniziatrice all'algoritmo dell'elezione.}
+	\label{fig:messaggi_macchina_partecipazione_elezione}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=15cm]{messaggi_macchina_crash.jpg}
+	\caption{Incidente e notifica all'utente.}
+	\label{fig:messaggi_macchina_crash}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=15cm]{messaggi_macchina_batteria_morte_mappaIdle.jpg}
+	\caption{Messaggi per la gestione della ricarica, della rimozione e aggiornamento della mappa di un taxi.}
+	\label{fig:messaggi_macchina_batteria_morte_mappaIdle}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=15cm]{messaggi_macchina_aggiornamento_mappa_to_client.jpg}
+	\caption{Messaggi per l'aggiornamento della mappa della città mentre il taxi è in viaggio verso un utente.}
+	\label{fig:messaggi_macchina_aggiornamento_mappa_to_client}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=15cm]{messaggi_macchina_aggiornamento_mappa_to_target.jpg}
+	\caption{Messaggi per l'aggiornamento della mappa della città mentre il taxi trasporta un utente.}
+	\label{fig:messaggi_macchina_aggiornamento_mappa_to_target}
+\end{figure}

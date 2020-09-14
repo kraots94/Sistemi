@@ -36,7 +36,29 @@ Describe the components of your systems: modules/objects/components/services. Fo
 
 \end{itemize}
 
-Per rappresentare il comportamento delle entità coinvolte in base ai possibili eventi, sono stati creati due automi che rappresentano i possibili stati delle macchine e degli utenti. In essi, gli stati sono rappresentati da degli ovali, mentre gli eventi da dei riquadri di colore verde o blu. Queste tonalità esprimono il tipo di messaggio: ricezione ed invio.
+Per rappresentare il comportamento delle entità coinvolte in base ai possibili eventi, sono stati creati due automi che rappresentano i possibili stati delle macchine e degli utenti. In essi, gli stati sono rappresentati da degli ovali, mentre gli eventi da dei riquadri di colore blu o rosso. Queste tonalità esprimono il tipo di messaggio: ricezione ed invio.
+
+L'immagine \ref{fig:automa_utente} rappresenta l'automa degli stati dell'entità utente e come esso cambia il proprio stato in base agli eventi e messaggi.
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=15cm]{automa_utente.jpg}
+	\caption{Rappresentazione degli stati possibili dell'entità utente.}
+	\label{fig:automa_utente}
+\end{figure}
+
+L'immagine \ref{fig:automa_macchina} rappresenta l'automa degli stati dell'entità macchina e come esso cambia il proprio stato in base agli eventi e messaggi.
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=15cm]{automa_macchina.jpg}
+	\caption{Rappresentazione degli stati possibili dell'entità macchina.}
+	\label{fig:automa_macchina}
+\end{figure}
+
+\newpage
 
 \section{Protocolli e algoritmi}
 Communication between components. UML sequence diagrams go here. Also, put here a detailed description of distributed algorithms used to solve specific problems of the project.
@@ -45,7 +67,20 @@ Communication between components. UML sequence diagrams go here. Also, put here 
 per l'elezione
 
 \subsection{Diagrammi di sequenza dei messaggi}
-Qui di seguito, sono presenti i diagrammi di sequenza dei messaggi che vengono scambiati tra i diversi moduli per permettere le funzionalità del sistema.
+All'appendice \ref{messaggi_scambiati_appendix}, sono presenti i diagrammi di sequenza dei messaggi che vengono scambiati tra i diversi moduli per permettere le funzionalità del sistema.
+
+\begin{itemize}
+	\item Movimento del taxi alla posizione dell'utente e successivo trasporto \ref{fig:messaggi_utente_trasporto}.
+	\item Richiesta da parte dell'utente del servizio di trasporto \ref{fig:messaggi_utente_chiede_macchina}.
+	\item Richiesta di cambiamento di destinazione da parte dell'utente mentre il taxi è in viaggio verso l'utente \ref{fig:messaggi_utente_cambio_direzione_waiting}.
+	\item Richiesta di cambiamento di destinazione da parte dell'utente mentre il taxi lo sta trasportando \ref{fig:messaggi_utente_cambio_direzione_moving}.
+	\item Partecipazione all'elezione di una macchina non iniziatrice \ref{fig:messaggi_macchina_partecipazione_elezione}. Poiché è possibile che la macchina si trovi in diversi stati mentre viene avviato l'algoritmo di elezione, sono stati rappresentati tre possibili scenari.
+	\item Incidente di una macchina con conseguente notifica all'utente e ricerca di un taxi alternativo \ref{fig:messaggi_macchina_crash}.
+	\item Ricarica della macchina, rimozione della macchina dal sistema e aggiornamento della mappa  \ref{fig:messaggi_macchina_batteria_morte_mappaIdle}. In queste operazioni si considera che la macchina sia nello stato 'idle'.
+	\item Aggiornamento della mappa della città mentre il taxi si sta muovendo verso il cliente \ref{fig:messaggi_macchina_aggiornamento_mappa_to_client}.
+	\item Aggiornamento della mappa della città mentre il taxi sta trasportando il cliente a destinazione \ref{fig:messaggi_macchina_aggiornamento_mappa_to_target}.
+\end{itemize}
+
 
 \section{Architettura fisica e Distribuzione}
 Per l'implementazione fisica del progetto, è necessario che ogni automobile elettrica sia dotata di una scheda Wi-Fi per la comunicazione con i veicoli vicini. Il cliente per poter comunicare con il sistema necessita di utilizzare un'applicazione dedicata per le prenotazioni. Si suppone esista già la mappa della città nel formato adatto, ogni automobile deve possederne una copia nel disco locale. Un altro requisito hardware è che le macchine dispongano di sufficiente potenza di calcolo per effettuare velocemente il calcolo dei percorsi.
@@ -57,6 +92,7 @@ Per l'implementazione fisica del progetto, è necessario che ogni automobile ele
 
 Sono stati individuati due insiemi di funzionalità che è necessario supportare.
 \subsection{Funzionalità Base}
+
 \begin{enumerate}
 %	\item Panino alla guida
 	\item Comunicazione peer to peer per la leader election.

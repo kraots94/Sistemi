@@ -37,7 +37,7 @@ Più nello specifico, ogni requisito è caratterizzato da tre componenti: dati i
 		\begin{itemize}
 			\item Input:  <Utente situato in posizione A>
 			\item Output: <Utente situato in posizione B>
-			\item Effetto: la posizione dell'utente, dopo un lasso di tempo proporzionale alla lunghezza del tragitto e assumendo assenza di imprevisti che ritardino i tempi, si trova nella posizione B.
+			\item Effetto: la posizione dell'utente dopo un lasso di tempo proporzionale alla lunghezza del tragitto, assumendo assenza di imprevisti che ritardino i tempi, si trova nella posizione B.
 		\end{itemize}
 
 	\item Utente cambia destinazione
@@ -45,23 +45,24 @@ Più nello specifico, ogni requisito è caratterizzato da tre componenti: dati i
 			\item Input: <id utente, id taxi designato, posizione B>
 			\item Output: Se possibile cambio dest. -> avviso possibilità spostamento \\
 						  altrimenti -> avviso impossibilità spostamento con 'id taxi designato'
-			\item Effetto: il Taxi nel quale si trova l'utente valuta se è possibile portarlo al nuovo target = 'posizione B', se si cercherà di trasportarlo alla nuova destinazione, altrimenti prenderà in carico la richiesta dell'utente cerchando un taxi che soddisfi i nuovi bisogni.
+			\item Effetto: il Taxi nel quale si trova l'utente valuta se è c'è la possibilità di soddisfarne la richiesta di trasporto al nuovo target = 'posizione B'. Se è nelle facoltà del taxi trasporterà il cliente alla nuova destinazione, altrimenti prenderà in carico la sua richiesta cercando un altro veicolo che possa soddisfare i nuovi bisogni del cliente.
 		\end{itemize}
 	
-	Qui di seguito verranno elencati alcuni requisiti non direttamente interessanti per l'utente ma che sono importanti da definire per la progettazione, oltre al fatto che rappresentano un interesse indiretto per l'utilizzatore del servizio, in quanto minano il perfetto funzionamento del servizio.
-
-	\item Morte di un taxi
+	Qui di seguito verranno elencati alcuni requisiti non direttamente interessanti per l'utente ma che sono importanti da definire per la progettazione in quanto rischiano di compromettere funzionamento del servizio stesso.
+	
+	% oltre al fatto che rappresentano un interesse indiretto per l'utilizzatore del servizio, 
+	\item Rimozione di un taxi
 		\begin{itemize}
 			\item Input: <id taxi>
 			\item Output: <eliminazione del taxi dalla mappa>
-			\item Effetto: un generico evento di rottura catastrofico, il taxi scompare dalla città. NB: Si assume che il taxi da uccidere, ossia con id = 'id taxi', non stia lavorando per il servizio, ossia che si trovi in una situazione "a riposo", nella quale non trasporta clienti, non si sta dirigendo verso un cliente, non contribuisce alla ricerca di un taxi designato.
+			\item Effetto: un generico evento di rottura catastrofico, il taxi scompare dalla città. NB: Si assume che il taxi da rimuovere, ossia con id = 'id taxi', non stia compiendo alcuna operazione per il servizio, ossia che si trovi in una situazione "a riposo", nella quale non trasporta clienti, non si sta dirigendo verso uno di essi e non contribuisce alla ricerca di un taxi designato.
 		\end{itemize}
 	
 	\item Incidente di un taxi
 	\begin{itemize}
 		\item Input: <id taxi>
 		\item Output: <taxi impossibilitato al movimento>
-		\item Effetto: un generico evento di rottura non catastrofico, come per esempio una gomma bucata o un problema al motore, la stazione Wi-Fi del taxi continua a funzionare. Nel caso in cui il taxi stia trasportando un cliente, si prenderà la briga di trovare un nuovo taxi per garantire il servizio all'utente.
+		\item Effetto: un generico evento di rottura non catastrofico, come per esempio una gomma bucata o un problema al motore. La stazione Wi-Fi del taxi continua a funzionare. Nel caso in cui il taxi stia trasportando un cliente, si prenderà la briga di trovare un nuovo taxi per garantire il servizio all'utente.
 	\end{itemize}
 
 	\item Modifica della topologia cittadina
