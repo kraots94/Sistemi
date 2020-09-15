@@ -9,7 +9,7 @@ Il problema in esame consiste nella gestione dei taxi elettrici e assegnazione d
 La soluzione proposta consiste in:
 \begin{enumerate}
 	\item L'utente invia la richiesta di spostamento al taxi a lui più vicino indicando la propria posizione e destinazione.
-	\item La vettura riceve la richiesta e, comunicando con gli altri taxi, viene deciso quale veicolo è il più adatto per soddisfare il bisogno dell'utente.
+	\item La vettura riceve la richiesta e, comunicando con gli altri taxi, viene deciso quale veicolo sia il più adatto a soddisfare il bisogno dell'utente.
 	\item Per decidere quale sia la vettura più adatta, si prendono in considerazione diversi parametri, tra cui: distanza dall'utente, carica rimanente e se la vettura al momento è già occupata.
 	\item Notifica al cliente da parte della macchina di essere stata scelta per il trasporto.
 	\item Il veicolo scelto si sposta verso l'utente e lo trasporta verso la direzione richiesta.
@@ -57,7 +57,7 @@ Le trasparenze "Access", "Concurrency", "Replication" e "Performance" non riguar
 
 \section{Algoritmi} \label{intro_algo}
 
-Per la selezione del veicolo da inviare al cliente che richiede il servizio, è stato scelto un algoritmo di elezione che seleziona il leader secondo la minimizzazione di alcuni parametri, come per esempio la vicinanza e quanto già descritto. Un sottoinsieme di veicoli, i più vicini all'utente, concordano quindi sulla macchina candidata da inviare con l'algoritmo /nomeALgElection.
+Per la selezione del veicolo da inviare al cliente che richiede il servizio, è stato scelto un algoritmo di elezione che seleziona il leader secondo la minimizzazione di alcuni parametri, come per esempio la vicinanza e quanto già descritto. Un sottoinsieme di veicoli, i più vicini all'utente, concordano quindi sulla macchina candidata da inviare con un tipo di algoritmo Wave. vale a dire l'Echo.
 
 \section{Testing del sistema}
 

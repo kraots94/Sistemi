@@ -61,10 +61,82 @@ L'immagine \ref{fig:automa_macchina} rappresenta l'automa degli stati dell'entit
 \newpage
 
 \section{Protocolli e algoritmi}
-Communication between components. UML sequence diagrams go here. Also, put here a detailed description of distributed algorithms used to solve specific problems of the project.
+In questa sezione vengono discusse le comunicazioni tra le diverse componenti e gli algoritmi utilizzati all'interno del sistema.
+
+\subsection{Funzioni di costo delle macchine} \label{funzioni_di_costo_macchine}
+Per la scelta della macchina più adatta, vengono considerati i seguenti parametri.
+
+\begin{itemize}
+	\item Crdt = Carica Rimanente Dopo Trasporto dell'utente.
+	\item Cc = Costo Cliente, esprime dopo quanto tempo la macchina raggiungerebbe il cliente.
+	\item Cr = Carica Rimanente espressa in unità di misura della distanza percorribile.
+	\item Prc = Percorso Rimanente Cliente espresso in unità di misura della distanza assumendo che il taxi sia occupato.
+	\item Pvcn = Percorso Verso Cliente Nuovo a partire dalla posizione dopo lo scorso cliente espresso in unità di misura della distanza.
+	\item Pvdc = Percorso Verso Destinazione Cliente a partire dalla posizione attuale del cliente espresso in unità di misura della distanza.
+	\item Pvcr = Percorso Verso Colonnina Ricarica per permettere alla macchina di ricaricarsi dopo il trasporto se necessario.
+\end{itemize}
+
+\begin{equation} \label{funzione_costo_raggiungimento_cliente}
+Cc = Prc + Pvcn
+\end{equation}
+
+\begin{equation} \label{carica_rimanente_trasporto}
+Crdt = Cr - (Cc + Pvdc + Pvcr)
+\end{equation}
+
+La scelta della macchina, verrà effettuata minimizzando il tempo del cliente \ref{funzione_costo_raggiungimento_cliente} e, in caso di parità, massimizzando la carica rimanente dopo il trasporto \ref{carica_rimanente_trasporto}. Nel caso in cui non sia univoco il vincitore, la selezione diventa casuale tra i contendenti.
+
+\subsection{Pacchetti scambiati per l'elezione}\label{descrizione_pacchetto}
+Vengono utilizzati tre tipi di pacchetti per l'algoritmo di elezione:
+\begin{itemize}
+	\item Inizio algoritmo elezione
+	\item Risultati dei calcoli
+	\item Notifica Vincitore
+\end{itemize}
+
+\subsubsection{Inizio algoritmo}
+Lo scopo di questo pacchetto è di notificare ai nodi raggiungibili dal nodo corrente l'inizio dell'elezione. Esso è formato in questo modo:
+
+\begin{lstlisting}
+[ID_self, begin_election, TTL]
+\end{lstlisting}
+
+\begin{itemize}
+	\item ID\_self: il riferimento a sé stesso per permettere l'impostazione del genitore agli altri nodi raggiunti.
+	\item TTL: Per evitare di dover visitare tutto il grafo delle comunicazioni tra le macchine, si è scelto di impostare un TTL al pacchetto affichè dopo un certo numero fisso di salti ci si fermi. Questo porta al fatto che non è garantito che la soluzione trovata sia quella ottimale, tuttavia questo fatto permette un compromesso tra una buona soluzione e una limitazione della possibile congestione dei messaggi. Inoltre permette una riduzione dei possbili conflitti tra diverse leader election.
+\end{itemize}
+
+Il sistema si aspetta che alla ricezione di questo messaggio, il nodo risponda con una notifica di acknowledgment, in tal modo il nodo inviante è sicuro che esso sia stato ricevuto.
+
+\subsubsection{Risultato dei calcoli}
+Questo pacchetto contiene i dati calcolati dai nodi raggiunti dal pacchetto "inizio algoritmo" assieme a quelli del nodo corrente. Esso verrà poi inviato al genitore e sempre tramite esso è possibile creare la tabella di routing dei nodi coinvolti nell'elezione. Tuttavia per la comunicazione del vincitore, non verrà utilizzata la suddetta tabella poiché è più efficiente effettuare un multicast.
+
+\begin{lstlisting} 
+[{ID_1, Cc_1, Crdt_1}, ..., {ID_N, Cc_N, Crdt_N}]
+\end{lstlisting}
+
+Esso contiene, in ordine, per ogni nodo i: 
+\begin{itemize}
+	\item ID\_i: riferimento al veicolo i.
+	\item Cc\_i, Crdt\_i: i costi della macchina i come descritto nella funzione di costo \ref{funzioni_di_costo_macchine}
+\end{itemize}
+
+\subsubsection{Notifica Vincitore}
+Scopo del pacchetto è di notificare il vincitore dell'elezione e rilasciare i nodi coinvolti in essa. Questo pacchetto è formato nel seguente modo:
+
+\begin{lstlisting}
+[ID_WINNER, winner]
+\end{lstlisting}
+
+Il nodo iniziatore lo crea e lo invia in multicast a tutti i nodi coinvolti nell'elezione.
 
 \subsection{Algoritmo di Elezione}
-per l'elezione
+Come già accennato nell'introduzione al punto \ref{intro_algo}, l'algoritmo di elezione scelto è di tipo Wave e ne soddisfa le proprietà. In particolare, si è optato per un Echo algoritm poichè il grafo deve essere applicato è indiretto ed è possibile che siano presenti dei cicli.
+L'algoritmo segue i seguenti passi:
+\begin{enumerate}
+	\item La macchina iniziatrice, la quale viene scelta perché la più vicina al cliente oppure in seguito a degli eventi di aggiornamento della mappa o incidente, inizia la wave creando un pacchetto da inviare ai propri vicini formato come già descritto al punto \ref{descrizione_pacchetto} calcola i propri costi come descritto nella parte \ref{funzioni_di_costo_macchine}, ed 
+	\item Ogni nodo che riceve il pacchetto di inizio elezione, si sposta nello stato relativo al calcolo del leader. A questo punto calcola i propri costi
+\end{enumerate}
 
 \subsection{Diagrammi di sequenza dei messaggi}
 All'appendice \ref{messaggi_scambiati_appendix}, sono presenti i diagrammi di sequenza dei messaggi che vengono scambiati tra i diversi moduli per permettere le funzionalità del sistema.
