@@ -13,9 +13,9 @@ I requisiti funzionali comprendono le possibilità offerte all'utente e agli alt
 \begin{enumerate}
 	\item Richiesta taxi: tramite questa funzionalità l'utente può chiedere al sistema un veicolo per spostarsi. Essa comprende anche lo spostamento del taxi designato dalla propria posizione a quella del cliente.
 	\item Trasporto: il veicolo scelto come più adatto per le esigenze del cliente lo porta dalla posizione di partenza a quella di arrivo.
-	\item Utente cambia destinazione: il cliente ha la possibilità di modificare in un qualsiasi momento la propria destinazione, previa notifica del taxi designato. Il sistema si adatta a questa nuova modifica valutandone la possibilità, nel caso in cui il taxi designato non riesca a portarlo nella destinazione scelta questo farà una nuova richiesta di trasporto, in modo completamente trasparente per l'utente.
+	\item Utente cambia destinazione: il cliente ha la possibilità di modificare in un qualsiasi momento la propria destinazione, previa notifica del taxi designato. Il sistema si adatta a questa nuova modifica valutandone la possibilità, nel caso in cui il taxi designato non riesca a portarlo nella destinazione scelta questo farà una nuova richiesta di trasporto, in modo completamente trasparente per l'utente. Questa facoltà è permessa solo nel caso in cui l'utente sia l'unico attualmente assegnato al taxi.
 	\item Possibili incidenti delle macchine: viene considerata l'eventualità di situazioni in cui un mezzo non è in grado di portare a termine il proprio compito.
-	\item Possibilità di disattivazione delle strade: a seguito di incidenti o altri eventi, è possibile che una strada non possa essere percorsa. Tuttavia si assume che esista sempre un percorso per connettere due diversi punti della città.
+	\item Possibilità di cambiamento delle strade: a seguito di incidenti o altri eventi, è possibile che una strada non possa essere percorsa oppure che appaiano nuove strade. Tuttavia si assume che esista sempre un percorso per connettere due diversi punti della città.
 \end{enumerate}
 
 Più nello specifico, ogni requisito è caratterizzato da tre componenti: dati in input, dati in output ed effetto desiderato.
@@ -65,13 +65,13 @@ Più nello specifico, ogni requisito è caratterizzato da tre componenti: dati i
 		\begin{itemize}
 			\item Input: <topologia cittadina attuale>
 			\item Output: <topologia cittadina con strada inagibile oppure con nuova via>
-			\item Effetto: ogni taxi aggiorna la propria mappa. Se il taxi sta trasportando una persona e il percorso da compiere viene intaccato da questa modifica allora ne viene valutata la fattibilità, infatti viene ricalcolato un nuovo percorso e se questo è percorribile allora l'utente a bordo verrà notificato dell'esistenza di un nuovo tragitto, altrimenti verrà fatto uscire dal veicolo che si prenderà in carico la ricerca di un nuovo taxi che lo porti a destinazione.
+			\item Effetto: ogni taxi aggiorna la propria mappa. Se la modifica comprende parti del percorso che il taxi sta percorrendo, il veicolo cerca un percorso alternativo. Se questa nuova strada non è percorribile da questo taxi per via della sua eccessiva lunghezza, esso inoltra una richiesta al sistema di trovare un nuovo taxi in grado di soddisfare i bisogni dell'utente. Nel caso in cui ci siano più utenti serviti dallo stesso taxi, si darà precedenza a quelli che hanno effettuato prima la loro prenotazione. Gli altri verranno notificati dell'impossibilità del trasporto.
 		\end{itemize}
 
 \end{enumerate}
 
 \section{Requisiti Non Funzionali} \label{requisiti_non_funzionali}
-Sono stati individuati diversi requisiti non fuzionali: Adattabilità, Prestazioni e Limiti di tempo. Come conseguenza del CAP Theorem sono stati trovati, inoltre, altri requisiti.
+Sono stati individuati diversi requisiti non funzionali: Adattabilità, Prestazioni e Limiti di tempo. Come conseguenza del CAP Theorem sono stati trovati, inoltre, altri requisiti.
 Le trasparenze sono già state discusse nell'introduzione al punto \ref{intro_trasparenze}.
 
 \subsection{Vari Requisiti}

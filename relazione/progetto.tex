@@ -108,7 +108,7 @@ Lo scopo di questo pacchetto è di notificare ai nodi raggiungibili dal nodo cor
 
 Il sistema si aspetta che alla ricezione di questo messaggio, il nodo risponda con una notifica di acknowledgment, in tal modo il nodo inviante è sicuro che esso sia stato ricevuto.
 
-\subsubsection{Risultato dei calcoli}
+\subsubsection{Risultato dei calcoli} \label{pacchetto_calcolato}
 Questo pacchetto contiene i dati calcolati dai nodi raggiunti dal pacchetto "inizio algoritmo" assieme a quelli del nodo corrente. Esso verrà poi inviato al genitore e sempre tramite esso è possibile creare la tabella di routing dei nodi coinvolti nell'elezione. Tuttavia per la comunicazione del vincitore, non verrà utilizzata la suddetta tabella poiché è più efficiente effettuare un multicast.
 
 \begin{lstlisting} 
@@ -121,7 +121,7 @@ Esso contiene, in ordine, per ogni nodo i:
 	\item Cc\_i, Crdt\_i: i costi della macchina i come descritto nella funzione di costo \ref{funzioni_di_costo_macchine}
 \end{itemize}
 
-\subsubsection{Notifica Vincitore}
+\subsubsection{Notifica Vincitore}\label{pacchetto_vincitore}
 Scopo del pacchetto è di notificare il vincitore dell'elezione e rilasciare i nodi coinvolti in essa. Questo pacchetto è formato nel seguente modo:
 
 \begin{lstlisting}
@@ -130,13 +130,63 @@ Scopo del pacchetto è di notificare il vincitore dell'elezione e rilasciare i n
 
 Il nodo iniziatore lo crea e lo invia in multicast a tutti i nodi coinvolti nell'elezione.
 
+\subsection{Creazione dello Spanning Tree}
+
+Per l'elezione è necessaria la creazione di uno Spanning Tree dei nodi partecipanti ad essa per le comunicazioni. L'Echo algoritm che viene utilizzato ne permette la creazione man mano che i nodi ricevono i messaggi di inizio elezione.
+
+Ogni nodo che partecipa riceve dal genitore padre la notifica di inizio elezione e in tal modo viene creata una relazione padre-figlio tramite la quale possono comunicare. Se un nodo riceve lo stesso tipo di notifica ma possiede già un padre, risponde al mittente di non poter partecipare e non inoltra ai propri vicini la notifica.
+
+La radice dello spanning tree è il nodo iniziatore.
+
 \subsection{Algoritmo di Elezione}
-Come già accennato nell'introduzione al punto \ref{intro_algo}, l'algoritmo di elezione scelto è di tipo Wave e ne soddisfa le proprietà. In particolare, si è optato per un Echo algoritm poichè il grafo deve essere applicato è indiretto ed è possibile che siano presenti dei cicli.
+Come già accennato nell'introduzione al punto \ref{intro_algo}, l'algoritmo di elezione scelto è di tipo Wave e ne soddisfa le proprietà. In particolare, si è optato per un Echo algoritm poichè il grafo su cui deve essere applicato è indiretto ed è possibile che siano presenti dei cicli.
 L'algoritmo segue i seguenti passi:
 \begin{enumerate}
-	\item La macchina iniziatrice, la quale viene scelta perché la più vicina al cliente oppure in seguito a degli eventi di aggiornamento della mappa o incidente, inizia la wave creando un pacchetto da inviare ai propri vicini formato come già descritto al punto \ref{descrizione_pacchetto} calcola i propri costi come descritto nella parte \ref{funzioni_di_costo_macchine}, ed 
-	\item Ogni nodo che riceve il pacchetto di inizio elezione, si sposta nello stato relativo al calcolo del leader. A questo punto calcola i propri costi
+	\item La macchina iniziatrice, la quale viene scelta perché la più vicina al cliente oppure in seguito a degli eventi di aggiornamento della mappa o incidente, inizia la wave creando un pacchetto da inviare ai propri vicini formato come già descritto al punto \ref{descrizione_pacchetto}, poi calcola i propri costi come descritto nella parte \ref{funzioni_di_costo_macchine}, ed aspetta i dati dei nodi che hanno risposto in modo positivo con l'acknowledgment al pacchetto di inizio elezione.
+	\item Ogni nodo che riceve il pacchetto di inizio elezione, se non sta già partecipando a un'altra elezione, si sposta nello stato relativo al calcolo del leader. In ogni caso, risponde al nodo inviante se partecipa oppure no all'elezione. In caso negativo, non inoltra il pacchetto di inizio elezione ricevuto ai suoi vicini. In caso positivo, invece, se il TTL è superiore a 0, ne riduce il valore di un'unità e lo inoltra ai propri vicini. Successivamente, come per il nodo padre, si mette in attesa degli ack dei vicini.
+	\item Il nodo che riceve il pacchetto di starting election con TTL pari a zero, dopo avere inviato l'ack al genitore, non inoltra ulteriormente l'inizio dell'elezione ai vicini.
+	\item Ogni nodo, dopo aver ricevuto l'ack da parte dei figli alla partecipazione dell'elezione, calcola i propri costi e si mette in attesa che i propri figli, se presenti, gli mandino i costi calcolati. Alla ricezione di tutti i costi dei figli esso crea un pacchetto unico concatenando i costi ricevuti al proprio. Successivamente inoltre il pacchetto risultate al padre. Per la struttura di esso si faccia riferimenti a \ref{pacchetto_calcolato}.
+	\item Dopo aver inviato al padre i dati relativi ai costi, ogni nodo si mette in attesa di conoscere chi è il leader.
+	\item Quando il nodo iniziatore riceve tutti i dati calcola il leader in base alle proprietà descritte nella parte \ref{funzioni_di_costo_macchine}. 
+	\item Infine l'iniziatore invia il messaggio contentente il leader in multicasting a tutti i partecipanti all'elezione. Si faccia rifermento alla parte \ref{pacchetto_vincitore} per la descrizione del pacchetto.
+	\item Tutti i nodi ricevono la notifica del leader e in base al risultato compiono le azioni più opportune. In ogni caso escono dallo stato di elezione eliminando tutte le informazioni calcolate.
 \end{enumerate}
+
+\subsection{Possibili errori durante l'elezione}
+
+I problemi durante l'esecuzione dell'algoritmo nel sistema sono i seguenti:
+\begin{itemize}
+	\item Aggiornamento della mappa.
+\end{itemize}
+
+I problemi possibili ma assenti per via dell'implementazione del sistema sono i seguenti:
+\begin{itemize}
+	\item Rimozione di una macchina
+	\item Perdita di pacchetti
+\end{itemize}
+
+\subsubsection{Aggiornamento della mappa}
+Viene discussa nella sezione Aggiornamento Mappa \ref{aggiornamento_mappa}.
+
+\subsubsection{Rimozione di una macchina}
+Sebbene il sistema venga costruito in modo che un nodo possa essere rimosso solamente se si trova nello stato "idle", è bene gestire i casi in cui l'eliminazione avvenga in ogni possibile stato, compresa l'elezione. Per risolvere il problema di attesa della risposta da un nodo ormai rimosso, ogni nodo invia dei messaggi di tipo "hello" per controllare lo stato del nodo collegato. In tal modo se non ricevono risposta entro un tempo ragionevole lo considerano rimosso e continuano l'algoritmo di elezione.
+
+\subsubsection{Perdita di pacchetti}
+Nel caso in cui vengano persi dei pacchetti durante qualsiasi fase dell'elezione, è possibile accorgersene poichè non ritornano i messaggi di ack. Una possibile soluzione per questo problema è l'utilizzo del protocollo TCP.
+
+\subsection{Aggiornamento della mappa}\label{aggiornamento_mappa}
+
+Questa casistica comporta che i percorsi calcolati, nel caso utilizzino degli archi deprecati, non siano più validi. 
+
+L'aggiornamento può avvenire in diversi momenti e stati della macchina. 
+
+\begin{itemize}
+	\item Macchina in stato IDLE: Semplice aggiornamento, non comporta alcun problema.
+	\item Macchina in stato Running Election: al termine dell'elezione effettua l'aggiornamento. Se risulta vincitrice ed è necessario, ricalcola il percorso.
+	\item Macchina in stato Moving to Client o Moving to Target con un solo cliente: il veicolo effettua l'aggiornamento della mappa e, se necessario, ricarcola il percorso. Se è in grado di soddisfare l'utente, lo notifica del ritardo e torna nello stato precedente. Altrimenti notifica l'utente e inizia una leader election per l'utente.
+	\item Macchina in stato Moving to Client o Moving to Target con più clienti in coda: Effettua l'aggiornamento e calcola il massimo percorso che riesce a soddifare con la carica rimanente. In tal modo, nel caso in cui alcuni clienti non possano venir soddifatti li notifica con un messaggio di avviare autonomamente una nuova richiesta al sistema e li rimuove dalla coda. In questo caso non parte alcuna leader election. Nel caso peggiore in cui non riesca a soddisfare nemmeno il cliente corrente l'approccio è come al punto precedente.
+	\item Macchina in stato Running Election Bridge Mode: come detto precedentemente, esegue comunque il calcolo del leader e poi si comporta in base al numero di utenti in coda.
+\end{itemize}
 
 \subsection{Diagrammi di sequenza dei messaggi}
 All'appendice \ref{messaggi_scambiati_appendix}, sono presenti i diagrammi di sequenza dei messaggi che vengono scambiati tra i diversi moduli per permettere le funzionalità del sistema.
@@ -170,16 +220,18 @@ Sono stati individuati due insiemi di funzionalità che è necessario supportare
 	\item Comunicazione peer to peer per la leader election.
 	\item Richiesta dell'utente di trasporto.
 	\item Gestione della ricarica delle macchine.
-	\item Cambio di direzione.
+	\item Cambio di direzione di utente singolo.
 	\item Gestione degli incidenti sia delle macchine che delle strade rotte.
 \end{enumerate}
 
 \subsection{Funzionalità Aggiuntive}
 
 \begin{itemize}
-	\item Lista di possibili taxi in caso di pareggio tra i candidati.
 	\item Perdita delle connessioni mentre si elegge il leader.
 	\item Partecipazione della macchina già impegnata alla leader election.
+	\item Possibilità di rimuovere la prenotazione
+	\item Possibilità di cambiare destinazione anche se ci sono altri utenti nella coda della macchina candidata
+	\item Lista di possibili taxi in caso di pareggio tra i candidati.
 	\item Car sharing fino a tre persone.
 \end{itemize}
 
@@ -194,6 +246,8 @@ Lo sviluppo dell'applicazione verrà suddiviso in diverse versioni via via estes
 	\item Le macchine possono comunicare solo con quelle vicine.
 	\item La macchina partecipa all'elezione anche se al momento è già impegnata, tuttavia si considera disponibile solo dopo aver compiuto il tragitto già attivo.
 	\item Implementazione del car-sharing fino a 3 clienti.
+	\item Rimuovere prenotazione.
+	\item Cambio direzione anche se in lista.
 	\item Viene fornita al cliente una lista di possibili candidati vincitori.
-	\item panino alla guida
+%	\item panino alla guida
 \end{enumerate}
