@@ -23,10 +23,10 @@ Più nello specifico, ogni requisito è caratterizzato da tre componenti: dati i
 \begin{enumerate}
 	\item Richiesta taxi
 		\begin{itemize}
-			\item Input:  <Posizione iniziale, Posizione finale, id utente>
+			\item Input:  $\langle$Posizione iniziale, Posizione finale, id utente$\rangle$
 			\item Output: Se presente taxi che possa raggiungere 'posizione finale' -> <id Taxi designato> \\
 						  altrimenti -> avviso assenza taxi disponibile
-			\item Effetto: il Taxi con id = 'id Taxi designato' (quello più adatto all'utente, secondo diversi parametri) si sposta dalla sua posizione a 'Posizione iniziale'. Successivamente avviene il Trasporto (vedasi prossimo requisito) di 'id utente' verso la 'Pozione finale'. 'id Taxi designato' potrebbe variare nel caso di incidenti o variazioni della città. Non vi è una garanzia di tempo entro il quale avverrà il Trasporto, imprevisti vari possono ritardare il servizio con tempistiche indefinite, tuttavia nel caso di tali imprevisti il servizio garantisce la presa in carico dello spostamento dell'utente secondo le sue richieste.
+			\item Effetto: il Taxi con id = 'id Taxi designato' (quello più adatto all'utente, secondo diversi parametri) si sposta dalla sua posizione a 'Posizione iniziale'. Successivamente avviene il Trasporto (vedasi prossimo requisito) di 'id utente' verso la 'Posizione finale'. 'id Taxi designato' potrebbe variare nel caso di incidenti o variazioni della città. Non vi è una garanzia di tempo entro il quale avverrà il Trasporto, imprevisti vari possono ritardare il servizio con tempistiche indefinite, tuttavia nel caso di tali imprevisti il servizio garantisce la presa in carico dello spostamento dell'utente secondo le sue richieste.
 		\end{itemize}
 
 	\item Trasporto

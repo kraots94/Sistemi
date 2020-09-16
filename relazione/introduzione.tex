@@ -37,8 +37,6 @@ Le componenti individuate nella modellazione del problema sono principalmente tr
 
 Per chiarezza, l'ambiente sopperisce alla mancanza di fattori presenti in un contesto reale: schede di rete che permettano connessioni wireless tra macchine, eventi casuali che possano causare diversi tipi di errori nel sistema, sostituzione di una macchina, variazione dei clienti. In tal senso, l'ambiente non offre nessun servizio alle altre entità equiparabile a quello di un server, se non quelli ottenibili tramite i fattori appena descritti.
 
-\newpage
-
 \section{Architettura}
 
 L'architettura scelta per il progetto è quella peer-to-peer, quindi le macchine comunicano fra di loro in una rete mesh, con nodi idem-potenti, attraverso scambi di messaggi tramite connessioni affidabili (ossia reti che utilizzano ack per una conferma di ricezione e ritrasmissione in caso di errore).
@@ -49,11 +47,11 @@ Per questo tipo di progetto, sono state considerate le seguenti trasparenze:
 \begin{itemize}
 	\item Location transparency: non è necessario che il cliente sappia dove si trovino le risorse dell'architettura che corrispondono alle automobili. Per interagire con esse, infatti, è sufficiente utilizzare l'interfaccia fornita, la quale chiede solo posizione e destinazione. Le vetture si spostano all'interno della città e il cliente non è necessario sia a conoscenza della loro locazione.
 	\item Failure transparency: come già accennato, le possibili cause di fallimento vengono gestite automaticamente dal sistema senza precludere al cliente la possibilità di utilizzo del servizio. Nel caso di un fallimento che interessi l'utente, come per esempio la rottura della macchina nella quale si trova, questo viene avvisato dal sistema riguardo alla presa in carico e gestione del problema.
-	\item Mobility transparency: questa trasperenza viene intrinsecamente garantita, considerando che la comunicazione delle entità avviene in modalità wireless e lo scopo dell'applicativo stesso è spostare alcune entità (utente e macchine).
+	\item Mobility transparency: questa trasparenza viene intrinsecamente garantita, considerando che la comunicazione delle entità avviene in modalità wireless e lo scopo dell'applicativo stesso è spostare alcune entità (utente e macchine).
 	\item Scaling transparency: l'aumento di clienti o di macchine non appesantisce il sistema poiché gli algoritmi utilizzati sono fin da subito scalabili, per esempio: anche in un ipotetico contesto con moltissime macchine quelle effettivamente coinvolte (e che comunicano fra loro per trovare la candidata) sono un piccolo sottoinsieme. 
 \end{itemize}
 
-Le trasparenze "Access", "Concurrency", "Replication" e "Performance" non riguardano le richieste del progetto in esame, pertanto non sono state inserite.
+Le trasparenze ``Access'', ``Concurrency'', ``Replication'' e ``Performance'' non riguardano le richieste del progetto in esame, pertanto non sono state inserite.
 
 \section{Algoritmi} \label{intro_algo}
 
