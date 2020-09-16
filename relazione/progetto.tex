@@ -152,6 +152,17 @@ L'algoritmo segue i seguenti passi:
 	\item Tutti i nodi ricevono la notifica del leader e in base al risultato compiono le azioni più opportune. In ogni caso escono dallo stato di elezione eliminando tutte le informazioni calcolate.
 \end{enumerate}
 
+Un esempio dei pacchetti scambiati durate l'algoritmo è presente all'immagine \ref{fig:messaggi_macchina_elezione}. La parte in basso a sinistra mostra lo spanning tree creato.
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=15cm]{messaggi_macchina_elezione.jpg}
+	\caption{Rappresentazione dei messaggi scambiati durante l'elezione.}
+	\label{fig:messaggi_macchina_elezione}
+\end{figure}
+
+\newpage
+
 \subsection{Possibili errori durante l'elezione}
 
 I problemi durante l'esecuzione dell'algoritmo nel sistema sono i seguenti:
@@ -201,6 +212,7 @@ All'appendice \ref{messaggi_scambiati_appendix}, sono presenti i diagrammi di se
 	\item Ricarica della macchina, rimozione della macchina dal sistema e aggiornamento della mappa  \ref{fig:messaggi_macchina_batteria_morte_mappaIdle}. In queste operazioni si considera che la macchina sia nello stato 'idle'.
 	\item Aggiornamento della mappa della città mentre il taxi si sta muovendo verso il cliente \ref{fig:messaggi_macchina_aggiornamento_mappa_to_client}.
 	\item Aggiornamento della mappa della città mentre il taxi sta trasportando il cliente a destinazione \ref{fig:messaggi_macchina_aggiornamento_mappa_to_target}.
+	\item Aggiornamento della mappa della città mentre il taxi è occupato con un utente e ne ha altri nella coda \ref{fig:messaggi_macchina_aggiornamento_mappa_clienti}.
 \end{itemize}
 
 
