@@ -4,7 +4,7 @@
 
 \chapter{Analisi}
 
-In questo capitolo, vengono descritti i requisiti funzionali e non funzionali, vale a dire le possibilità offerte al cliente e i requisiti di qualità del sistema.
+In questo capitolo, vengono descritti i requisiti funzionali e non, vale a dire le possibilità offerte al cliente e i requisiti di qualità del sistema.
 
 \section{Requisiti Funzionali}\label{requisiti_funzionali}
 
@@ -24,21 +24,21 @@ Più nello specifico, ogni requisito è caratterizzato da tre componenti: dati i
 	\item Richiesta taxi
 		\begin{itemize}
 			\item Input:  $\langle$Posizione iniziale, Posizione finale, id utente$\rangle$
-			\item Output: Se presente taxi che possa raggiungere 'posizione finale' -> <id Taxi designato> \\
+			\item Output: Se presente taxi che possa raggiungere 'posizione finale' -> $\langle$id Taxi designato$\rangle$ \\
 						  altrimenti -> avviso assenza taxi disponibile
 			\item Effetto: il Taxi con id = 'id Taxi designato' (quello più adatto all'utente, secondo diversi parametri) si sposta dalla sua posizione a 'Posizione iniziale'. Successivamente avviene il Trasporto (vedasi prossimo requisito) di 'id utente' verso la 'Posizione finale'. 'id Taxi designato' potrebbe variare nel caso di incidenti o variazioni della città. Non vi è una garanzia di tempo entro il quale avverrà il Trasporto, imprevisti vari possono ritardare il servizio con tempistiche indefinite, tuttavia nel caso di tali imprevisti il servizio garantisce la presa in carico dello spostamento dell'utente secondo le sue richieste.
 		\end{itemize}
 
 	\item Trasporto
 		\begin{itemize}
-			\item Input:  <Utente situato in posizione A>
-			\item Output: <Utente situato in posizione B>
+			\item Input:  $\langle$Utente situato in posizione A$\rangle$
+			\item Output: $\langle$Utente situato in posizione B$\rangle$
 			\item Effetto: la posizione dell'utente dopo un lasso di tempo proporzionale alla lunghezza del tragitto, assumendo assenza di imprevisti che ritardino i tempi, si trova nella posizione B.
 		\end{itemize}
 
 	\item Utente cambia destinazione
 		\begin{itemize}
-			\item Input: <id utente, id taxi designato, posizione B>
+			\item Input: $\langle$id utente, id taxi designato, posizione B$\rangle$
 			\item Output: Se possibile cambio dest. -> avviso possibilità spostamento \\
 						  altrimenti -> avviso impossibilità spostamento con 'id taxi designato'
 			\item Effetto: il Taxi al quale è assegnato l'utente valuta se è c'è la possibilità di soddisfarne la richiesta di trasporto al nuovo target = 'posizione B'. Se è nelle facoltà del taxi trasporterà il cliente alla nuova destinazione, altrimenti prenderà in carico la sua richiesta cercando un altro veicolo che possa soddisfare i nuovi bisogni del cliente.
@@ -49,22 +49,22 @@ Più nello specifico, ogni requisito è caratterizzato da tre componenti: dati i
 	% oltre al fatto che rappresentano un interesse indiretto per l'utilizzatore del servizio, 
 	\item Rimozione di un taxi
 		\begin{itemize}
-			\item Input: <id taxi>
-			\item Output: <eliminazione del taxi dalla mappa>
+			\item Input: $\langle$id taxi$\rangle$
+			\item Output: $\langle$eliminazione del taxi dalla mappa$\rangle$
 			\item Effetto: un generico evento di rottura catastrofico, il taxi scompare dalla città. NB: Si assume che il taxi da rimuovere, ossia con id = 'id taxi', non stia compiendo alcuna operazione per il servizio, ossia che si trovi in una situazione "a riposo", nella quale non trasporta clienti, non si sta dirigendo verso uno di essi e non contribuisce alla ricerca di un taxi designato.
 		\end{itemize}
 	
 	\item Incidente di un taxi
 	\begin{itemize}
-		\item Input: <id taxi>
-		\item Output: <taxi impossibilitato al movimento>
+		\item Input: $\langle$id taxi$\rangle$
+		\item Output: $\langle$taxi impossibilitato al movimento$\rangle$
 		\item Effetto: un generico evento di rottura non catastrofico, come per esempio una gomma bucata o un problema al motore. La stazione Wi-Fi del taxi continua a funzionare. Nel caso in cui il taxi stia trasportando un cliente, si prenderà la briga di trovare un nuovo taxi per garantire il servizio all'utente.
 	\end{itemize}
 
 	\item Modifica della topologia cittadina
 		\begin{itemize}
-			\item Input: <topologia cittadina attuale>
-			\item Output: <topologia cittadina con strada inagibile oppure con nuova via>
+			\item Input: $\langle$topologia cittadina attuale$\rangle$
+			\item Output: $\langle$topologia cittadina con strada inagibile oppure con nuova via$\rangle$
 			\item Effetto: ogni taxi aggiorna la propria mappa. Se la modifica comprende parti del percorso che il taxi sta percorrendo, il veicolo cerca un percorso alternativo. Se questa nuova strada non è percorribile da questo taxi per via della sua eccessiva lunghezza, esso inoltra una richiesta al sistema di trovare un nuovo taxi in grado di soddisfare i bisogni dell'utente. Nel caso in cui ci siano più utenti serviti dallo stesso taxi, si darà precedenza a quelli che hanno effettuato prima la loro prenotazione. Gli altri verranno notificati dell'impossibilità del trasporto.
 		\end{itemize}
 
@@ -82,7 +82,7 @@ Le trasparenze sono già state discusse nell'introduzione al punto \ref{intro_tr
 \end{itemize}
 
 \subsection{CAP Theorem}
-Come conseguenza del CAP Theorem, e quindi dell'impossibilità di garantire consistenza, disponibilità e tolleranza alle partizioni assieme, si è valutato, per il progetto in esame, di considerare disponibilità e gestione delle partizioni.
+Come conseguenza del CAP Theorem, e quindi dell'impossibilità di garantire consistenza, disponibilità e tolleranza alle partizioni assieme, si è valutato, per il progetto in esame, di considerare disponibilità tolleranza alle partizioni.
 
 Riguardo la consistenza, è necessario considerare due grafi: mappa della città e mappa delle comunicazioni tra i veicoli. 
 

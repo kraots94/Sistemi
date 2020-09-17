@@ -6,11 +6,9 @@
 
 In questo capitolo vengono descritte l'architettura del software, i protocolli e gli algoritmi utilizzati, l'architettura fisica e il piano di sviluppo.
 
-This chapter is devoted to the description of the general architectures, and specific algorithms.
-
 \section{Architettura Logica}
-Describe the components of your systems: modules/objects/components/services. For each component, describe the functionalities it implements, and by who is used.
 
+Qui di seguito sono descritti i vari moduli che si intende implementare per il progetto:
 \begin{itemize}
 	\item Modulo algoritmi grafi: fornisce gli algoritmi che è possibile utilizzare sui grafi. Per esempio include Dijkstra, BFS, DFS, aggiungi nodo, aggiungi arco, ... 
 	
@@ -38,8 +36,16 @@ Describe the components of your systems: modules/objects/components/services. Fo
 
 Per rappresentare il comportamento delle entità coinvolte in base ai possibili eventi, sono stati creati due automi che rappresentano i possibili stati delle macchine e degli utenti. In essi, gli stati sono rappresentati da degli ovali, mentre gli eventi da dei riquadri di colore blu o rosso. Queste tonalità esprimono il tipo di messaggio: ricezione ed invio.
 
-L'immagine \ref{fig:automa_utente} rappresenta l'automa degli stati dell'entità utente e come esso cambia il proprio stato in base agli eventi e messaggi.
+I  messaggi inseriti negli automi presentano un prefisso che indica la tipologia dell'evento. Ecco una legenda per la comprensione di questi prefissi:
+\begin{itemize}
+	\item M : indica un evento generico, inviato fra i due automi: macchina ed utente.
+	\item SC : indica una "system call", ossia un messaggio ricevuto dalla entità ambiente.
+	\item ME: indica i messaggi relativi all'algoritmo di leader election.
+	\item EV: indica un evento interno all'automa.
+\end{itemize}
 
+
+L'immagine \ref{fig:automa_utente} rappresenta l'automa degli stati dell'entità utente.
 
 \begin{figure}[htbp]
 	\centering
@@ -48,7 +54,7 @@ L'immagine \ref{fig:automa_utente} rappresenta l'automa degli stati dell'entità
 	\label{fig:automa_utente}
 \end{figure}
 
-L'immagine \ref{fig:automa_macchina} rappresenta l'automa degli stati dell'entità macchina e come esso cambia il proprio stato in base agli eventi e messaggi.
+L'immagine \ref{fig:automa_macchina} rappresenta l'automa degli stati dell'entità macchina.
 
 
 \begin{figure}[htbp]
@@ -103,7 +109,7 @@ Lo scopo di questo pacchetto è di notificare ai nodi raggiungibili dal nodo cor
 
 \begin{itemize}
 	\item ID\_self: il riferimento a sé stesso per permettere l'impostazione del genitore agli altri nodi raggiunti.
-	\item TTL: Per evitare di dover visitare tutto il grafo delle comunicazioni tra le macchine, si è scelto di impostare un TTL al pacchetto affiché dopo un certo numero fisso di salti ci si fermi. Questo porta al fatto che non è garantito che la soluzione trovata sia quella ottimale, tuttavia questo fatto permette un compromesso tra una buona soluzione e una limitazione della possibile congestione dei messaggi. Inoltre permette una riduzione dei possbili conflitti tra diverse leader election.
+	\item TTL: Per evitare di dover visitare tutto il grafo delle comunicazioni tra le macchine, si è scelto di impostare un TTL al pacchetto affiché dopo un certo numero fisso di salti ci si fermi. Questo porta al fatto che non è garantito che la soluzione trovata sia quella ottimale, tuttavia ciò permette un compromesso tra una buona soluzione e una limitazione della possibile congestione dei messaggi. Inoltre permette una riduzione dei possbili conflitti tra diverse leader election.
 \end{itemize}
 
 Il sistema si aspetta che alla ricezione di questo messaggio, il nodo risponda con una notifica di acknowledgment, in tal modo il nodo inviante è sicuro che esso sia stato ricevuto.
@@ -139,7 +145,7 @@ Ogni nodo che partecipa riceve dal genitore padre la notifica di inizio elezione
 La radice dello spanning tree è il nodo iniziatore.
 
 \subsection{Algoritmo di Elezione}
-Come già accennato nell'introduzione al punto \ref{intro_algo}, l'algoritmo di elezione scelto è di tipo Wave e ne soddisfa le proprietà. In particolare, si è optato per un Echo algoritm poichè il grafo su cui deve essere applicato è indiretto ed è possibile che siano presenti dei cicli.
+Come già accennato nell'introduzione al punto \ref{intro_algo}, l'algoritmo di elezione scelto è di tipo Wave e ne soddisfa le notorie proprietà. In particolare, si è optato per un Echo algoritm poichè il grafo su cui deve essere applicato è indiretto ed è possibile che siano presenti dei cicli.
 L'algoritmo segue i seguenti passi:
 \begin{enumerate}
 	\item La macchina iniziatrice, la quale viene scelta perché la più vicina al cliente oppure in seguito a degli eventi di aggiornamento della mappa o incidente, inizia la wave creando un pacchetto da inviare ai propri vicini formato come già descritto al punto \ref{descrizione_pacchetto}, poi calcola i propri costi come descritto nella parte \ref{funzioni_di_costo_macchine}, ed aspetta i dati dei nodi che hanno risposto in modo positivo con l'acknowledgment al pacchetto di inizio elezione.
