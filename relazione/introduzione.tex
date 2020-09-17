@@ -15,15 +15,17 @@ La soluzione proposta consiste in:
 	\item Il veicolo scelto si sposta verso l'utente e lo trasporta verso la direzione richiesta.
 \end{enumerate}
 
+\newpage
+
 \section{Problemi del sistema distribuito} \label{problematiche_distribuite}
 
-Alcuni problemi che potrebbero emergere in questo contesto, interessanti da affrontare nella costruzione del sistema distribuito, sono la possibilità di rottura di un veicolo, il cambio destinazione di un utente, la rottura di una strada della città, l'elezione del miglior taxi da assegnare al cliente.
+Alcuni problemi che potrebbero emergere in un contesto distribuito, interessanti da affrontare nella costruzione del sistema, sono: la possibilità di rottura di un veicolo, il cambio destinazione di un utente, il cambiamento della topologia della città, la scelta del miglior taxi da assegnare al cliente.
 
 Si potrebbe pensare che nella realtà, a seguito dell'inagibilità di una strada, una parte della città sia isolata dal resto. Questa situazione non viene presa in considerazione, infatti in uno scenario reale la disconnessione della città è praticamente impossibile poiché vi sono strade alternative che garantiscono un percorso.
 
 Si potrebbe anche pensare che un veicolo, a seguito di uno spostamento, si isoli e non sia più in grado di comunicare con le altre vetture. Questa situazione è realistica, tuttavia non è problematica visto che gli algoritmi utilizzati non prevedono una connessione completa del grafo di comunicazione delle macchine.
 
-I clienti che richiedono il servizio inoltrano la propria richiesta a delle speciali celle riservate alla comunicazione cliente-taxi, simili a dei ripetitori, che hanno come unico scopo quello di inoltrare le richieste a una macchina connessa ad essi. In tal modo non capita mai la situazione in cui un cliente non possa comunicare con alcun veicolo. Questa comunicazione è bidirezionale, vale a dire che tramite la stessa anche la macchina può inoltrare messaggi al cliente.
+I clienti che vogliono usufruire del servizio inviano la propria richiesta alla vettura tramite delle speciali celle riservate alla comunicazione cliente-taxi, simili a dei ripetitori. Queste strutture hanno come unico scopo quello di permettere lo scambio di messaggi tra clienti e taxi in modo bidirezionale. Questo permette di evitare la situazione in cui un cliente non possa comunicare con alcun veicolo.
 
 \section{Componenti del sistema}
 
@@ -55,7 +57,7 @@ Le trasparenze ``Access'', ``Concurrency'', ``Replication'' e ``Performance'' no
 
 \section{Algoritmi} \label{intro_algo}
 
-Per la selezione del veicolo da inviare al cliente che richiede il servizio, è stato scelto un algoritmo di elezione che seleziona il leader secondo la minimizzazione di alcuni parametri, come per esempio la vicinanza e quanto già descritto. Un sottoinsieme di veicoli, i più vicini all'utente, concordano quindi sulla macchina candidata da inviare con un tipo di algoritmo Wave. Vale a dire l'Echo.
+Per la selezione del veicolo migliore da inviare al cliente che richiede il servizio, è stato scelto un algoritmo di elezione che seleziona il leader secondo la minimizzazione di alcuni parametri, come già discusso nella soluzione proposta. Un sottoinsieme di veicoli, i più vicini all'utente, concordano su quale tra di essi sia da inviare con un tipo di algoritmo Wave, vale a dire l'Echo Algorithm.
 
 \section{Testing del sistema}
 

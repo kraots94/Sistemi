@@ -9,7 +9,9 @@ In questo capitolo vengono descritte l'architettura del software, i protocolli e
 \section{Architettura Logica}
 
 Qui di seguito sono descritti i vari moduli che si intende implementare per il progetto:
+
 \begin{itemize}
+
 	\item Modulo algoritmi grafi: fornisce gli algoritmi che è possibile utilizzare sui grafi. Per esempio include Dijkstra, BFS, DFS, aggiungi nodo, aggiungi arco, ... 
 	
 	\item Modulo per l'algoritmo di elezione del leader: implementa la funzionalità della scelta della macchina da assegnare all'utente.
@@ -36,17 +38,15 @@ Qui di seguito sono descritti i vari moduli che si intende implementare per il p
 
 Per rappresentare il comportamento delle entità coinvolte in base ai possibili eventi, sono stati creati due automi che rappresentano i possibili stati delle macchine e degli utenti. In essi, gli stati sono rappresentati da degli ovali, mentre gli eventi da dei riquadri di colore blu o rosso. Queste tonalità esprimono il tipo di messaggio: ricezione ed invio.
 
-I  messaggi inseriti negli automi presentano un prefisso che indica la tipologia dell'evento. Ecco una legenda per la comprensione di questi prefissi:
+I  messaggi inseriti negli automi presentano un prefisso che indica la tipologia dell'evento:
 \begin{itemize}
 	\item M : indica un evento generico, inviato fra i due automi: macchina ed utente.
-	\item SC : indica una "system call", ossia un messaggio ricevuto dalla entità ambiente.
+	\item SC : indica una ``system call'', ossia un messaggio ricevuto dalla entità ambiente.
 	\item ME: indica i messaggi relativi all'algoritmo di leader election.
 	\item EV: indica un evento interno all'automa.
 \end{itemize}
 
-
 L'immagine \ref{fig:automa_utente} rappresenta l'automa degli stati dell'entità utente.
-
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=15cm]{automa_utente.jpg}
@@ -145,8 +145,10 @@ Ogni nodo che partecipa riceve dal genitore padre la notifica di inizio elezione
 La radice dello spanning tree è il nodo iniziatore.
 
 \subsection{Algoritmo di Elezione}
+
 Come già accennato nell'introduzione al punto \ref{intro_algo}, l'algoritmo di elezione scelto è di tipo Wave e ne soddisfa le notorie proprietà. In particolare, si è optato per un Echo algoritm poichè il grafo su cui deve essere applicato è indiretto ed è possibile che siano presenti dei cicli.
 L'algoritmo segue i seguenti passi:
+
 \begin{enumerate}
 	\item La macchina iniziatrice, la quale viene scelta perché la più vicina al cliente oppure in seguito a degli eventi di aggiornamento della mappa o incidente, inizia la wave creando un pacchetto da inviare ai propri vicini formato come già descritto al punto \ref{descrizione_pacchetto}, poi calcola i propri costi come descritto nella parte \ref{funzioni_di_costo_macchine}, ed aspetta i dati dei nodi che hanno risposto in modo positivo con l'acknowledgment al pacchetto di inizio elezione.
 	\item Ogni nodo che riceve il pacchetto di inizio elezione, se non sta già partecipando a un'altra elezione, si sposta nello stato relativo al calcolo del leader. In ogni caso, risponde al nodo inviante se partecipa oppure no all'elezione. In caso negativo, non inoltra il pacchetto di inizio elezione ricevuto ai suoi vicini. In caso positivo, invece, se il TTL è superiore a 0, ne riduce il valore di un'unità e lo inoltra ai propri vicini. Successivamente, come per il nodo padre, si mette in attesa degli ack dei vicini.
