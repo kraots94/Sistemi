@@ -10,19 +10,20 @@ In questo capitolo vengono descritte l'architettura del software, i protocolli e
 
 Qui di seguito sono descritti i vari moduli che si intende implementare per il progetto:
 
-\begin{itemize}
+\begin{itemize} \label{modules}
 
 	\item Modulo algoritmi grafi: fornisce gli algoritmi che è possibile utilizzare sui grafi. Per esempio include Dijkstra, BFS, DFS, aggiungi nodo, aggiungi arco, ... 
+	
+	\item Modulo mappa città: fornisce i metodi di lettura e modifica della mappa della città.
 	
 	\item Modulo per l'algoritmo di elezione del leader: implementa la funzionalità della scelta della macchina da assegnare all'utente.
 	
 	\item Modulo per l'invio di messaggi: controlla che il messaggio sia ben formato.
 	
-	\item Modulo interfaccia cliente-servizio: fornisce le possibili operazioni che un cliente può richiedere al sistema.
+	\item Modulo interfaccia cliente-servizio: rappresenta l'app che utilizzerebbe l'utente per usufruire del servizio. In tal senso, fornisce le operazioni che un cliente può richiedere al sistema e comunica all'entità cliente gli eventuali messaggi.
 	
 	\item Modulo scheda wireless: simula la scheda di rete che fornisce i vicini dell'entità che ne invoca i metodi.
 	
-	\item Modulo mappa città: fornisce i metodi di lettura e modifica della mappa della città.
 	
 	\item Modulo gestione macchine: fornisce i metodi per ricaricare le batterie delle macchine, ne gestiscono gli incidenti e le riparazioni.
 	
@@ -33,7 +34,10 @@ Qui di seguito sono descritti i vari moduli che si intende implementare per il p
 	\item Modulo Entità Macchina: rappresenta l'astrazione dell'entità veicolo.
 	
 	\item Modulo Entità Utente: rappresenta l'astrazione dell'entità utente.
+	
+	\item Modulo Entità Ambiente : rappresenta l'astrazione dell'entità ambiente.
 
+L'associazione fra i componenti fisici del sistema con i suddetti moduli e le varie dipendenze fra questi sono riportate nella sezione \ref{arch_fisica}.
 \end{itemize}
 
 Per rappresentare il comportamento delle entità coinvolte in base ai possibili eventi, sono stati creati due automi che rappresentano i possibili stati delle macchine e degli utenti. In essi, gli stati sono rappresentati da degli ovali, mentre gli eventi da dei riquadri di colore blu o rosso. Queste tonalità esprimono il tipo di messaggio: ricezione ed invio.
@@ -224,10 +228,48 @@ All'appendice \ref{messaggi_scambiati_appendix}, sono presenti i diagrammi di se
 \end{itemize}
 
 
-\section{Architettura fisica e Distribuzione}
+\section{Architettura fisica e Distribuzione} \label{arch_fisica}
 Per l'implementazione fisica del progetto, è necessario che ogni automobile elettrica sia dotata di una scheda Wi-Fi per la comunicazione con i veicoli vicini. Il cliente per poter comunicare con il sistema necessita di utilizzare un'applicazione dedicata per le prenotazioni. Si suppone esista già la mappa della città nel formato adatto, ogni automobile deve possederne una copia nel disco locale. Un altro requisito hardware è che le macchine dispongano di sufficiente potenza di calcolo per effettuare velocemente il calcolo dei percorsi.
 
-% Which nodes and platforms involved, and where each component is deployed.
+I moduli descritti nella sezione \ref{modules} sono associati ai componenti fisici in questo modo:
+I moduli per le operazioni sui grafi, la scheda wireless, operazioni mappa città, gestione macchine, elezione del leader sono legati ai taxi e il modulo entità macchina ne rappresenta una sua astrazione.
+
+Il modulo per l'interfaccia cliente-servizio è legato all'utente, esso infatti deve conoscere soltanto questo modulo per utilizzare il servizio, il modulo utente ne rappresenta una sua astrazione.
+
+il "modulo per l'invio dei messaggi" è utilizzato da tutti i componenti, in quanto l'invio di un qualsiasi messaggio viene analizzato dai metodi di questo modulo.
+
+I moduli per le operazioni sui grafi, operazioni mappa città, gestione macchine, comunicazione ambiente-entità, creazione entità vengono usati dall'ambiente, il quale però, si ricorda, non ha nessuna rappresentazione nei componenti fisici del sistema.
+
+una descrizione delle dipendenze fra i moduli verrà rappresentata da un grafo...
+
+\begin{itemize} 
+	
+	\item Modulo algoritmi grafi: fornisce gli algoritmi che è possibile utilizzare sui grafi. Per esempio include Dijkstra, BFS, DFS, aggiungi nodo, aggiungi arco, ... 
+	
+	\item Modulo per l'algoritmo di elezione del leader: implementa la funzionalità della scelta della macchina da assegnare all'utente.
+	
+	\item Modulo per l'invio di messaggi: controlla che il messaggio sia ben formato.
+	
+	\item Modulo interfaccia cliente-servizio: fornisce le possibili operazioni che un cliente può richiedere al sistema.
+	
+	\item Modulo scheda wireless: simula la scheda di rete che fornisce i vicini dell'entità che ne invoca i metodi.
+	
+	\item Modulo mappa città: fornisce i metodi di lettura e modifica della mappa della città.
+	
+	\item Modulo gestione macchine: fornisce i metodi per ricaricare le batterie delle macchine, ne gestiscono gli incidenti e le riparazioni.
+	
+	\item Modulo creazione entità: fornisce le primitive per creare nuove macchine e nuovi utenti.
+	
+	\item Modulo comunicazione Ambiente-Entità: il processo Ambiente può utilizzare i metodi in questo modulo per simulare il mondo reale.
+	
+	\item Modulo Entità Macchina: rappresenta l'astrazione dell'entità veicolo.
+	
+	\item Modulo Entità Utente: rappresenta l'astrazione dell'entità utente.
+	
+	\item Modulo Entità Ambiente : rappresenta l'astrazione dell'entità ambiente.
+	
+	L'associazione fra i componenti fisici del sistema con i suddetti moduli e le varie dipendenze fra questi sono riportate nella sezione \ref{arch_fisica}.
+\end{itemize}
 
 \section{Piano di Sviluppo}
 % Since it is diffcult to predict just how hard implementing a new system will be, you should formulate as a set of "tiers", where the basic tier is something youre sure you can complete, and the additional tiers add more features, at both the application and the system level.
