@@ -20,7 +20,7 @@ Qui di seguito sono descritti i vari moduli che si intende implementare per il p
 	
 	\item Modulo per l'invio di messaggi: controlla che il messaggio sia ben formato.
 	
-	\item Modulo interfaccia cliente-servizio: rappresenta l'app che utilizzerebbe l'utente per usufruire del servizio. In tal senso, fornisce le operazioni che un cliente può richiedere al sistema e comunica all'entità cliente gli eventuali messaggi.
+	\item Modulo interfaccia cliente-servizio: rappresenta l'app che utilizzerebbe l'utente per usufruire del servizio. In tal senso, fornisce le operazioni che un cliente può richiedere al sistema e comunica all'entità cliente gli eventuali messaggi.tre
 	
 	\item Modulo scheda wireless: simula la scheda di rete che fornisce i vicini dell'entità che ne invoca i metodi.
 	
@@ -215,8 +215,8 @@ L'aggiornamento può avvenire in diversi momenti e stati della macchina.
 All'appendice \ref{messaggi_scambiati_appendix}, sono presenti i diagrammi di sequenza dei messaggi che vengono scambiati tra i diversi moduli per permettere le funzionalità del sistema.
 
 \begin{itemize}
-	\item Movimento del taxi alla posizione dell'utente e successivo trasporto \ref{fig:messaggi_utente_trasporto}.
 	\item Richiesta da parte dell'utente del servizio di trasporto \ref{fig:messaggi_utente_chiede_macchina}.
+	\item Movimento del taxi alla posizione dell'utente e successivo trasporto \ref{fig:messaggi_utente_trasporto}.
 	\item Richiesta di cambiamento di destinazione da parte dell'utente mentre il taxi è in viaggio verso l'utente \ref{fig:messaggi_utente_cambio_direzione_waiting}.
 	\item Richiesta di cambiamento di destinazione da parte dell'utente mentre il taxi lo sta trasportando \ref{fig:messaggi_utente_cambio_direzione_moving}.
 	\item Partecipazione all'elezione di una macchina non iniziatrice \ref{fig:messaggi_macchina_partecipazione_elezione}. Poiché è possibile che la macchina si trovi in diversi stati mentre viene avviato l'algoritmo di elezione, sono stati rappresentati tre possibili scenari.
@@ -278,7 +278,6 @@ Sono stati individuati due insiemi di funzionalità che è necessario supportare
 \subsection{Funzionalità Base}
 
 \begin{enumerate}
-%	\item Panino alla guida
 	\item Comunicazione peer to peer per la leader election.
 	\item Richiesta dell'utente di trasporto.
 	\item Gestione della ricarica delle macchine.
@@ -293,7 +292,6 @@ Sono stati individuati due insiemi di funzionalità che è necessario supportare
 	\item Partecipazione della macchina già impegnata alla leader election.
 	\item Possibilità di rimuovere la prenotazione
 	\item Possibilità di cambiare destinazione anche se ci sono altri utenti nella coda della macchina candidata
-	\item Lista di possibili taxi in caso di pareggio tra i candidati.
 	\item Car sharing fino a tre persone.
 \end{itemize}
 
@@ -301,15 +299,13 @@ Sono stati individuati due insiemi di funzionalità che è necessario supportare
 Lo sviluppo dell'applicazione verrà suddiviso in diverse versioni via via estese con le nuove funzionalità. In particolare si seguirà questo ordine:
 
 \begin{enumerate}
-	\item Ogni macchina potrà parlare con tutte le altre macchine; l'utente invia la richiesta di trasporto alla macchina più vicina a lui; se un veicolo è impegnato con un cliente non partecipa alla selezione del leader per il trasporto; la comunicazione tra i veicoli è diretta, quindi ogni taxi può parlare con chiunque.
-	\item Vengono aggiunte le colonnine di ricarica, alle quali le macchine devono far rifornimento se hanno esaurito le batterie; le macchine possono guastarsi; l'utente può decidere di cambiare destinazione.
+	\item Ogni macchina potrà parlare con tutte le altre macchine; l'utente invia la richiesta di trasporto alla macchina più vicina a lui; se un veicolo è impegnato con un cliente non partecipa alla selezione del leader per il trasporto ma fa da ponte per i vicini; la comunicazione tra i veicoli è diretta, quindi ogni taxi può parlare con chiunque.
+	\item Vengono aggiunte le colonnine di ricarica, alle quali le macchine devono far rifornimento se stanno esaurendo le batterie; le macchine possono guastarsi; l'utente può decidere di cambiare destinazione.
 	\item Rottura delle strade ma senza disconnessione del grafo stradale.
-	\item Le connessioni tra le macchine possono perdere andare perse mentre si elegge il leader.
 	\item Le macchine possono comunicare solo con quelle vicine.
 	\item La macchina partecipa all'elezione anche se al momento è già impegnata, tuttavia si considera disponibile solo dopo aver compiuto il tragitto già attivo.
-	\item Implementazione del car-sharing fino a 3 clienti.
+	\item Le connessioni tra le macchine possono perdere andare perse mentre si elegge il leader.
 	\item Rimuovere prenotazione.
 	\item Cambio direzione anche se in lista.
-	\item Viene fornita al cliente una lista di possibili candidati vincitori.
-%	\item panino alla guida
+	\item Implementazione del car-sharing fino a 3 clienti.
 \end{enumerate}

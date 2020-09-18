@@ -1,0 +1,14 @@
+[t1, {x2,y2}, t2, {x3,y3}, t3, {x4,y4}, t2, {x3,y3}, t3, {x4,y4}]
+[n1, n2, ..., nn]
+
+{
+	tipo = PARTENZA_CLIENT | ARRIVO_CLIENT | COLONNINA | P_INTERMEDIO
+	t = tempo
+	P_arr = nodo | (x, y)
+}
+
+MOVING:
+
+
+GPS:
+ current_pos = {x1, y1}
