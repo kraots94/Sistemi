@@ -2,13 +2,13 @@
 [n1, n2, ..., nn]
 
 {
-	tipo = PARTENZA_CLIENT | ARRIVO_CLIENT | COLONNINA | P_INTERMEDIO
+	tipo = PARTENZA_CLIENT | ARRIVO_CLIENT | COLONNINA | INIZO_PERCORSO_COLONNINA | P_INTERMEDIO
 	t = tempo
 	P_arr = nodo | (x, y)
 }
 
 MOVING:
-
+	Dopo il tempo Ti, aggiorno GPS, riazzero il contatore dei TIC, in base al nodo invio eventuali eventi.
 
 GPS:
  current_pos = {x1, y1}
