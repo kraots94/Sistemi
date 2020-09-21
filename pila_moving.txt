@@ -12,3 +12,17 @@ MOVING:
 
 GPS:
  current_pos = {x1, y1}
+
+
+MOV	Movement Automa
+CAR	Car Listener
+ELE	Election
+BAT	SENSORE_BATTERIA
+APP INTERFACCIA_UTENTE
+MAP GESTORE_MAPPA
+ALL TUTTI_GLI_AUTOMI
+ENV ENVIRONMENT
+EV GENERICO MESSAGGIO PER E DA QUALCHE AUTOMA
+UID Real ID Persona
+
+''' # /* <!-- // % aggiornaMappaInterna(Nuovi_Dati)
