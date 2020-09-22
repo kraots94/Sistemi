@@ -40,35 +40,63 @@ Qui di seguito sono descritti i vari moduli che si intende implementare per il p
 L'associazione fra i componenti fisici del sistema con i suddetti moduli e le varie dipendenze fra questi sono riportate nella sezione \ref{arch_fisica}.
 \end{itemize}
 
-Per rappresentare il comportamento delle entità coinvolte in base ai possibili eventi, sono stati creati due automi che rappresentano i possibili stati delle macchine e degli utenti. In essi, gli stati sono rappresentati da degli ovali, mentre gli eventi da dei riquadri di colore blu o rosso. Queste tonalità esprimono il tipo di messaggio: ricezione ed invio.
+\section{Automi Coinvolti} \label{automi}
 
-I  messaggi inseriti negli automi presentano un prefisso che indica la tipologia dell'evento:
-\begin{itemize}
-	\item M : indica un evento generico, inviato fra i due automi: macchina ed utente.
-	\item SC : indica una ``system call'', ossia un messaggio ricevuto dalla entità ambiente.
-	\item ME: indica i messaggi relativi all'algoritmo di leader election.
-	\item EV: indica un evento interno all'automa.
+Per rappresentare il comportamento delle entità coinvolte in base ai possibili eventi, sono stati creati diversi automi che codificano i possibili stati delle macchine e degli utenti. 
+Si è deciso di suddividere le suddette entità in più automi, ognuno di questi dedicato a una funzione specifica. 
+In particolare, l'utente è stato modellato con:
+\begin{itemize} 
+ \item automa\_utente : la rappresentazione dell'utente e di tutti gli eventi che possono interessargli.
+ \item automa\_app\_utente : la rappresentazione dell'utente dal punto di vista del servizio. Questo automa è l'istanza del servizio per un particolare utente, l'automa\_utente comunica con questo per poter usare il servizio così come i taxi o il servizio stesso per poter comunicare con l'automa\_utente.
 \end{itemize}
 
-L'immagine \ref{fig:automa_utente} rappresenta l'automa degli stati dell'entità utente.
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=15cm]{automa_utente.jpg}
-	\caption{Rappresentazione degli stati possibili dell'entità utente.}
-	\label{fig:automa_utente}
-\end{figure}
+Il Taxi è stato invece modellato con questi automi:
+\begin{itemize} 
+ \item automa\_moving: rappresenta il veicolo in servizio.
+ \item automa\_elezione: descrive gli stati per l'algoritmo di elezione ed eventi associati. 
+ \item automa\_batteria: rappresenta un sensore della batteria interna al veicolo, notificando, quando necessario, che è necessario ricaricarla oppure lo stato di fermo della macchina per un certo periodo di tempo.
+ \item automa\_listener: l'automa ascoltatore dei possibili eventi che interessano al veicolo. Riceve eventi dall'ambiente, comunica con automa\_app\_utente per dialogare con gli utenti e permette la comunicazione con gli altri veicoli. Esso è il tramite verso gli automi interni al veicolo: ogni evento indirizzato ad essi viene prima catturato da questo automa e poi inviato al corretto destinatario.
+\end{itemize} 
 
-L'immagine \ref{fig:automa_macchina} rappresenta l'automa degli stati dell'entità macchina.
+All'interno del servizio, quando viene creato un nuovo utente oppure un nuovo taxi, vengono generate istanze di ogni automa correlato, vale a dire, quindi, i due automi per l'utente e i quattro automi per il taxi. Nel momento in cui un cliente è stato servito portandolo a destinazione, oppure un taxi viene rimosso dalla mappa, vengono distrutti gli automi correlati.
 
+In questi automi, gli stati sono rappresentati da degli ovali, mentre gli eventi da dei riquadri di colore blu o rosso. Queste tonalità esprimono il tipo di messaggio: ricezione ed invio.
 
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=15cm]{automa_macchina.jpg}
-	\caption{Rappresentazione degli stati possibili dell'entità macchina.}
-	\label{fig:automa_macchina}
-\end{figure}
+I messaggi scambiati dagli automi sono formati da due parti:
+\begin{lstlisting} 
+[ Prefisso | Messaggio ]
+\end{lstlisting}
 
-\newpage
+Il prefisso indica il destinatario o il mittente del messaggio. Nel caso in cui sia assente si intende sia un messaggio interno allo stesso automa valido come scelta condizionale con lo scopo di effettuare un cambio di stato. I possibili mittenti e destinatari sono:
+
+\begin{itemize}
+	\item MOV : automa\_moving
+	\item CAR : automa\_listener
+	\item ELE : automa\_elezione
+	\item BAT :	automa\_batteria
+	\item UID : automa\_utente
+	\item APP : automa\_app\_utente
+	\item ALL : tutti gli altri automi collegati alla stessa entità
+	\item ENV : ambiente
+	\item EV  : generico messaggio per o da qualche automa della stessa entità
+\end{itemize}
+
+Gli automi sono presenti nell'appendice.
+
+L'immagine \ref{fig:automa_utente} rappresenta l'automa\_utente.
+
+L'automa\_app\_utente è stato suddiviso, graficamente, in 2 automi : l'immagine \ref{fig:automa_app_utente_flusso}  rappresenta il flusso del semplice spostamento dell'utente, mentre l'immagine \ref{fig:automa_app_utente_stati}  contiene tutti gli altri eventi che si possono ricevere nel mentre: cambiamento topologia, incidenti etc.
+
+L'immagine \ref{fig:automa_moving} rappresenta l'automa\_moving.
+
+L'immagine \ref{fig:automa_elezione} rappresenta l'automa\_elezione.
+
+L'immagine \ref{fig:automa_batteria} rappresenta l'automa\_batteria.
+
+L'immagine \ref{fig:automa_listener} rappresenta l'automa\_listener.
+
+L'immagine \ref{fig:various} rappresenta alcuni eventi globali per i taxi, ossia che interessano più stati di automi diversi.
+
 
 \section{Protocolli e algoritmi}
 In questa sezione vengono discusse le comunicazioni tra le diverse componenti e gli algoritmi utilizzati all'interno del sistema.
