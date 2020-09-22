@@ -4,11 +4,11 @@
 
 \chapter{Introduzione}
 
-Il problema in esame consiste nella gestione dei taxi elettrici e assegnazione di essi agli utenti che ne fanno richiesta per spostarsi all'interno di una città. Si vuole creare un sistema distribuito in modo che non sia necessario un server centralizzato, in tal modo sono le vetture che si accordano tra di loro, attraverso un meccanismo di comunicazione wireless, per decidere la migliore vettura che possa soddisfare la richiesta del cliente. Allo stesso modo, il cliente richiede il servizio comunicando direttamente con una di queste macchine, con lo stesso metodo di comunicazione senza fili. 
+Il problema in esame consiste nella gestione dei taxi elettrici e assegnazione di essi agli utenti che ne fanno richiesta per spostarsi all'interno di una città. Si vuole creare un sistema distribuito in modo che non sia necessario un server centralizzato. Con questa modalità, sono le vetture che si accordano tra di loro, attraverso un meccanismo di comunicazione wireless, per decidere quale sia il miglior veicolo che possa soddisfare la richiesta del cliente. Allo stesso modo, egli richiede il servizio tramite un'applicazione dedicata che comunica direttamente con una di queste macchine, con lo un metodo di comunicazione senza fili dedicato. 
 
 La soluzione proposta consiste in:
 \begin{enumerate}
-	\item L'utente invia la richiesta di spostamento al taxi a lui più vicino indicando la propria posizione e destinazione.
+	\item L'utente, tramite l'app, invia la richiesta di spostamento al taxi a lui più vicino indicando la propria posizione e destinazione.
 	\item La vettura riceve la richiesta e, comunicando con gli altri taxi, viene deciso quale veicolo sia il più adatto a soddisfare il bisogno dell'utente.
 	\item Per decidere quale sia la vettura più adatta, si prendono in considerazione diversi parametri, tra cui: distanza dall'utente, carica rimanente e se la vettura al momento è già occupata.
 	\item Notifica al cliente da parte della macchina di essere stata scelta per il trasporto.
@@ -19,13 +19,13 @@ La soluzione proposta consiste in:
 
 \section{Problemi del sistema distribuito} \label{problematiche_distribuite}
 
-Alcuni problemi che potrebbero emergere in un contesto distribuito, interessanti da affrontare nella costruzione del sistema, sono: la possibilità di rottura di un veicolo, il cambio destinazione di un utente, il cambiamento della topologia della città, la scelta del miglior taxi da assegnare al cliente.
+Alcuni problemi che potrebbero emergere in un contesto distribuito, interessanti da affrontare nella costruzione del sistema, sono: la scelta del miglior taxi da assegnare al cliente, la possibilità di rottura di un veicolo, il cambio destinazione di un utente, il cambiamento della topologia della città.
 
-Si potrebbe pensare che nella realtà, a seguito dell'inagibilità di una strada, una parte della città sia isolata dal resto. Questa situazione non viene presa in considerazione, infatti in uno scenario reale la disconnessione della città è praticamente impossibile poiché vi sono strade alternative che garantiscono un percorso.
+Si potrebbe pensare che nella realtà, a seguito dell'inagibilità di una strada, una parte della città sia isolata dal resto. Questa situazione non viene presa in considerazione poiché, in uno scenario reale, la disconnessione della città è praticamente impossibile visto che sono presenti strade alternative che garantiscono un percorso.
 
-Si potrebbe anche pensare che un veicolo, a seguito di uno spostamento, si isoli e non sia più in grado di comunicare con le altre vetture. Questa situazione è realistica, tuttavia non è problematica visto che gli algoritmi utilizzati non prevedono una connessione completa del grafo di comunicazione delle macchine.
+Un'altra possibile situazione è quella in cui un veicolo, a seguito di uno spostamento, si isoli e non sia più in grado di comunicare con le altre vetture. Questa possibilità è realistica, tuttavia non è problematica visto che gli algoritmi utilizzati non prevedono una connessione completa del grafo di comunicazione delle macchine.
 
-I clienti che vogliono usufruire del servizio inviano la propria richiesta alla vettura tramite delle speciali celle riservate alla comunicazione cliente-taxi, simili a dei ripetitori. Queste strutture hanno come unico scopo quello di permettere lo scambio di messaggi tra clienti e taxi in modo bidirezionale. Questo permette di evitare la situazione in cui un cliente non possa comunicare con alcun veicolo.
+Per utilizzare il servizio, l'applicazione utilizzata dagli utenti comunica con le vetture tramite delle speciali celle riservate alla comunicazione cliente-taxi, simili a dei ripetitori. Queste strutture hanno come unico scopo quello di permettere lo scambio di messaggi tra applicazione e taxi in modo bidirezionale. Questo permette di evitare la situazione in cui un cliente non possa utilizzare il servizio.
 
 \section{Componenti del sistema}
 
@@ -44,16 +44,7 @@ Per chiarezza, l'ambiente sopperisce alla mancanza di fattori presenti in un con
 L'architettura scelta per il progetto è quella peer-to-peer, quindi le macchine comunicano fra di loro in una rete mesh, con nodi idem-potenti, attraverso scambi di messaggi tramite connessioni affidabili (ossia reti che utilizzano ack per una conferma di ricezione e ritrasmissione in caso di errore).
 
 \section{Trasparenze}\label{intro_trasparenze}
-
-Per questo tipo di progetto, sono state considerate le seguenti trasparenze: 
-\begin{itemize}
-	\item Location transparency: non è necessario che il cliente sappia dove si trovino le risorse dell'architettura che corrispondono alle automobili. Per interagire con esse, infatti, è sufficiente utilizzare l'interfaccia fornita, la quale chiede solo posizione e destinazione. Le vetture si spostano all'interno della città e il cliente non è necessario sia a conoscenza della loro locazione.
-	\item Failure transparency: come già accennato, le possibili cause di fallimento vengono gestite automaticamente dal sistema senza precludere al cliente la possibilità di utilizzo del servizio. Nel caso di un fallimento che interessi l'utente, come per esempio la rottura della macchina nella quale si trova, questo viene avvisato dal sistema riguardo alla presa in carico e gestione del problema.
-	\item Mobility transparency: questa trasparenza viene intrinsecamente garantita, considerando che la comunicazione delle entità avviene in modalità wireless e lo scopo dell'applicativo stesso è spostare alcune entità (utente e macchine).
-	\item Scaling transparency: l'aumento di clienti o di macchine non appesantisce il sistema poiché gli algoritmi utilizzati sono fin da subito scalabili, per esempio: anche in un ipotetico contesto con moltissime macchine quelle effettivamente coinvolte (e che comunicano fra loro per trovare la candidata) sono un piccolo sottoinsieme. 
-\end{itemize}
-
-Le trasparenze ``Access'', ``Concurrency'', ``Replication'' e ``Performance'' non riguardano le richieste del progetto in esame, pertanto non sono state inserite.
+Una trasparenza è un aspetto del sistema distribuito che viene nascosto all'utente. Esse vengono discusse nella parte relativa ai requisiti non fuzionali.
 
 \section{Algoritmi} \label{intro_algo}
 
@@ -62,6 +53,8 @@ Per la selezione del veicolo migliore da inviare al cliente che richiede il serv
 \section{Testing del sistema}
 
 Per testare il sistema, l'entità Ambiente utilizzerà un grafo casuale, precedentemente generato, rappresentante una città, e inserirà in esso un gran numero di macchine e utenti, i quali sottoporranno richieste di spostamenti, inoltre l'entità introdurrà una componente di stress attraverso eventi casuali come: rottura di strade, rimozione di veicoli, variazioni richieste utenti, rottura di veicoli che però continuano ad essere nodi attivi nella rete p2p. 
+
+\newpage
 
 \section{Fasi dello sviluppo}
 Lo sviluppo del progetto seguirà le seguenti fasi:

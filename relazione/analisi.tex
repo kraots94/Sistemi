@@ -94,3 +94,15 @@ Essa è garantita dal fatto che si assume l'utente possa sempre comunicare con a
 
 \subsubsection{Tolleranza alle Partizioni}
 Il partizionamento della mappa delle macchine, la rete del sistema distribuito, non rappresenta un problema per il corretto funzionamento del servizio:  soltanto nel caso di totale fallimento dei veicoli il sistema non risponde correttamente, visto e considerato che per la notifica al cliente è sufficiente una partizione di auto nelle sue vicinanze. Di questo si era già accennato nell'introduzione nelle parte relativa agli algoritmi \ref{intro_algo}.
+
+\subsection{Trasparenze} \label{req_trasparenze}
+
+Per questo tipo di progetto, sono state considerate le seguenti trasparenze: 
+\begin{itemize}
+	\item Location transparency: non è necessario che il cliente sappia dove si trovino le risorse dell'architettura che corrispondono alle automobili. Per interagire con esse, infatti, è sufficiente utilizzare l'interfaccia fornita, la quale chiede solo posizione e destinazione. Le vetture si spostano all'interno della città e il cliente non è necessario sia a conoscenza della loro locazione.
+	\item Failure transparency: come già accennato, le possibili cause di fallimento vengono gestite automaticamente dal sistema senza precludere al cliente la possibilità di utilizzo del servizio. Nel caso di un fallimento che interessi l'utente, come per esempio la rottura della macchina nella quale si trova, questo viene avvisato dal sistema riguardo alla presa in carico e gestione del problema.
+	\item Mobility transparency: questa trasparenza viene intrinsecamente garantita, considerando che la comunicazione delle entità avviene in modalità wireless e lo scopo dell'applicativo stesso è spostare alcune entità (utente e macchine).
+	\item Scaling transparency: l'aumento di clienti o di macchine non appesantisce il sistema poiché gli algoritmi utilizzati sono fin da subito scalabili, per esempio: anche in un ipotetico contesto con moltissime macchine quelle effettivamente coinvolte (e che comunicano fra loro per trovare la candidata) sono un piccolo sottoinsieme. 
+\end{itemize}
+
+Le trasparenze ``Access'', ``Concurrency'', ``Replication'' e ``Performance'' non riguardano le richieste del progetto in esame, pertanto non sono state inserite.
