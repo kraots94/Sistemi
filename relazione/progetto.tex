@@ -11,34 +11,35 @@ In questo capitolo vengono descritte l'architettura del software, i protocolli e
 Qui di seguito sono descritti i vari moduli che si intende implementare per il progetto:
 
 \begin{itemize} \label{modules}
-
-	\item Modulo algoritmi grafi: fornisce gli algoritmi che è possibile utilizzare sui grafi. Per esempio include Dijkstra, BFS, DFS, aggiungi nodo, aggiungi arco, ... 
-	
-	\item Modulo mappa città: fornisce i metodi di lettura e modifica della mappa della città.
-	
-	\item Modulo per l'algoritmo di elezione del leader: implementa la funzionalità della scelta della macchina da assegnare all'utente.
-	
-	\item Modulo per l'invio di messaggi: controlla che il messaggio sia ben formato.
-	
-	\item Modulo interfaccia cliente-servizio: rappresenta l'app che utilizzerebbe l'utente per usufruire del servizio. In tal senso, fornisce le operazioni che un cliente può richiedere al sistema e comunica all'entità cliente gli eventuali messaggi.tre
-	
-	\item Modulo scheda wireless: simula la scheda di rete che fornisce i vicini dell'entità che ne invoca i metodi.
-	
-	
-	\item Modulo gestione macchine: fornisce i metodi per ricaricare le batterie delle macchine, ne gestiscono gli incidenti e le riparazioni.
-	
-	\item Modulo creazione entità: fornisce le primitive per creare nuove macchine e nuovi utenti.
-	
-	\item Modulo comunicazione Ambiente-Entità: il processo Ambiente può utilizzare i metodi in questo modulo per simulare il mondo reale.
-	
 	\item Modulo Entità Macchina: rappresenta l'astrazione dell'entità veicolo.
-	
 	\item Modulo Entità Utente: rappresenta l'astrazione dell'entità utente.
-	
 	\item Modulo Entità Ambiente : rappresenta l'astrazione dell'entità ambiente.
-
-L'associazione fra i componenti fisici del sistema con i suddetti moduli e le varie dipendenze fra questi sono riportate nella sezione \ref{arch_fisica}.
+	\item Mappa Città: fornisce i metodi di lettura e modifica della mappa della città. Per le modifiche utilizza il modulo degli algoritmi sui grafi per controllarne la fattibilità. Questo modulo astrae il fatto che è presente un grafo per la rappresentazione della mappa.
+	\item Algoritmi Grafo: fornisce gli algoritmi che è possibile utilizzare sui grafi. Per esempio include Dijkstra, BFS, DFS, aggiungi nodo / arco, ...
+	\item Scheda wireless: permettendo di conoscere le entità vicine.
+	\item Invio Messaggi: permette la comunicazione fra entità, controllando, la formattazione dei messaggi da inviare e se l'entità destinataria esiste. Essa simula la scheda di comunicazione.
+	\item Modulo per l'algoritmo di elezione del leader: implementa la funzionalità della scelta della macchina da assegnare all'utente.
+	\item Modulo interfaccia cliente-servizio: rappresenta l'app che utilizzerebbe l'utente per usufruire del servizio. In tal senso, fornisce le operazioni che un cliente può richiedere al sistema e comunica all'entità cliente gli eventuali messaggi. Il modulo di gestione del taxi comunica a questo modulo gli eventuali cambi di stato.
+	\item Modulo gestione macchine: fornisce i metodi per ricaricare le batterie delle macchine, ne gestiscono gli incidenti, movimento e gestione eventi.
 \end{itemize}
+
+Le relazioni e le dipendenze tra di essi sono presenti alle immagini \ref{fig:schema_moduli_livello_0} e \ref{fig:schema_moduli_livello_1}.
+In questi schemi le bolle rappresentano i suddetti moduli, sono colorate di rosso per gli attori, ossia i moduli principali, e di verde per i moduli secondari in quanto fornitori di funzionalità. Gli archi indicano una relazione di dipendenza con questa semantica: un arco che parte da A e arriva in B indica che A conosce B e che vi comunica.
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=10cm]{schema_moduli_livello_0.jpg}
+	\caption{Dipendenze tra i moduli livello 0}
+	\label{fig:schema_moduli_livello_0}
+\end{figure}
+
+L'immagine \ref{fig:schema_moduli_livello_1} specializza le relazioni precedentemente definite incorporando i restanti moduli. In giallo sono state colorate le bolle che specializzano le entità Utente e Taxi.
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=12cm]{schema_moduli_livello_1.jpg}
+	\caption{Dipendenze tra i moduli livello 1}
+	\label{fig:schema_moduli_livello_1}
+\end{figure}
 
 \section{Automi Coinvolti} \label{automi}
 
@@ -81,11 +82,22 @@ Il prefisso indica il destinatario o il mittente del messaggio. Nel caso in cui 
 	\item EV  : generico messaggio per o da qualche automa della stessa entità
 \end{itemize}
 
+Le relazioni tra automi e moduli definiti precedentemente alla sezione \ref{modules} sono presenti all'immagine \ref{fig:schema_moduli_livello_2}. Le bolle viola indicano gli automi sopra descritti.
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=13cm]{schema_moduli_livello_2.jpg}
+	\caption{Dipendenza tra moduli e automi}
+	\label{fig:schema_moduli_livello_2}
+\end{figure}
+
+\newpage
+
 Gli automi sono presenti nell'appendice.
 
 L'immagine \ref{fig:automa_utente} rappresenta l'automa\_utente.
 
-L'automa\_app\_utente è stato suddiviso, graficamente, in 2 automi : l'immagine \ref{fig:automa_app_utente_flusso}  rappresenta il flusso del semplice spostamento dell'utente, mentre l'immagine \ref{fig:automa_app_utente_stati}  contiene tutti gli altri eventi che si possono ricevere nel mentre: cambiamento topologia, incidenti etc.
+L'automa app\_utente è stato suddiviso, graficamente, in 2 automi : l'immagine \ref{fig:automa_app_utente_flusso}  rappresenta il flusso del semplice spostamento dell'utente, mentre l'immagine \ref{fig:automa_app_utente_stati} contiene tutti gli altri eventi che si possono ricevere nel mentre: cambiamento topologia, incidenti etc.
 
 L'immagine \ref{fig:automa_moving} rappresenta l'automa\_moving.
 
@@ -95,8 +107,7 @@ L'immagine \ref{fig:automa_batteria} rappresenta l'automa\_batteria.
 
 L'immagine \ref{fig:automa_listener} rappresenta l'automa\_listener.
 
-L'immagine \ref{fig:various} rappresenta alcuni eventi globali per i taxi, ossia che interessano più stati di automi diversi.
-
+L'immagine \ref{fig:automi_macchina_various} rappresenta alcuni eventi globali per i taxi, ossia che interessano più stati di automi diversi.
 
 \section{Protocolli e algoritmi}
 In questa sezione vengono discusse le comunicazioni tra le diverse componenti e gli algoritmi utilizzati all'interno del sistema.
@@ -136,11 +147,13 @@ Vengono utilizzati tre tipi di pacchetti per l'algoritmo di elezione:
 Lo scopo di questo pacchetto è di notificare ai nodi raggiungibili dal nodo corrente l'inizio dell'elezione. Esso è formato in questo modo:
 
 \begin{lstlisting}
-[ID_self, begin_election, TTL]
+[ID_self, begin_election, Position_From, Position_To, TTL]
 \end{lstlisting}
 
 \begin{itemize}
 	\item ID\_self: il riferimento a sé stesso per permettere l'impostazione del genitore agli altri nodi raggiunti.
+	\item Position\_From: Posizione di partenza del percorso da calcolare.
+	\item Position\_To: Posizione di arrivo del percorso da calcolare.
 	\item TTL: Per evitare di dover visitare tutto il grafo delle comunicazioni tra le macchine, si è scelto di impostare un TTL al pacchetto affiché dopo un certo numero fisso di salti ci si fermi. Questo porta al fatto che non è garantito che la soluzione trovata sia quella ottimale, tuttavia ciò permette un compromesso tra una buona soluzione e una limitazione della possibile congestione dei messaggi. Inoltre permette una riduzione dei possbili conflitti tra diverse leader election.
 \end{itemize}
 
@@ -163,7 +176,7 @@ Esso contiene, in ordine, per ogni nodo i:
 Scopo del pacchetto è di notificare il vincitore dell'elezione e rilasciare i nodi coinvolti in essa. Questo pacchetto è formato nel seguente modo:
 
 \begin{lstlisting}
-[ID_WINNER, winner]
+[ID_WINNER, ID_USER, winner]
 \end{lstlisting}
 
 Il nodo iniziatore lo crea e lo invia in multicast a tutti i nodi coinvolti nell'elezione.
@@ -192,7 +205,7 @@ L'algoritmo segue i seguenti passi:
 	\item Quando il nodo iniziatore riceve tutti i dati calcola il leader in base alle proprietà descritte nella parte \ref{funzioni_di_costo_macchine}. 
 	\item Infine l'iniziatore invia il messaggio contentente il leader in multicasting a tutti i partecipanti all'elezione. Si faccia rifermento alla parte \ref{pacchetto_vincitore} per la descrizione del pacchetto.
 	\item Tutti i nodi ricevono la notifica del leader e in base al risultato compiono le azioni più opportune. In ogni caso escono dallo stato di elezione eliminando tutte le informazioni calcolate.
-	\item Il nodo vincitore comunica al moudlo di ricezione del cliente, tramite le celle di comunicazione descritte nell'introduzione al punto \ref{problematiche_distribuite}, di essere pronto a servirlo e se egli è in coda oppure no.
+	\item Il nodo vincitore comunica al modulo di ricezione del cliente, tramite le celle di comunicazione descritte nell'introduzione al punto \ref{problematiche_distribuite}, di essere pronto a servirlo e se egli è in coda oppure no.
 \end{enumerate}
 
 Un esempio dei pacchetti scambiati durate l'algoritmo è presente all'immagine \ref{fig:messaggi_macchina_elezione}. La parte in basso a sinistra mostra lo spanning tree creato.
