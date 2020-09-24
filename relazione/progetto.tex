@@ -21,25 +21,33 @@ Qui di seguito sono descritti i vari moduli che si intende implementare per il p
 	\item Modulo per l'algoritmo di elezione del leader: implementa la funzionalità della scelta della macchina da assegnare all'utente.
 	\item Modulo interfaccia cliente-servizio: rappresenta l'app che utilizzerebbe l'utente per usufruire del servizio. In tal senso, fornisce le operazioni che un cliente può richiedere al sistema e comunica all'entità cliente gli eventuali messaggi. Il modulo di gestione del taxi comunica a questo modulo gli eventuali cambi di stato.
 	\item Modulo gestione macchine: fornisce i metodi per ricaricare le batterie delle macchine, ne gestiscono gli incidenti, movimento e gestione eventi.
+	\item Modulo gestione tempo: simula un orologio utilizzato per la gestione degli spostamenti e timeout.
 \end{itemize}
 
-Le relazioni e le dipendenze tra di essi sono presenti alle immagini \ref{fig:schema_moduli_livello_0} e \ref{fig:schema_moduli_livello_1}.
-In questi schemi le bolle rappresentano i suddetti moduli, sono colorate di rosso per gli attori, ossia i moduli principali, e di verde per i moduli secondari in quanto fornitori di funzionalità. Gli archi indicano una relazione di dipendenza con questa semantica: un arco che parte da A e arriva in B indica che A conosce B e che vi comunica.
+Le relazioni e le dipendenze tra di essi sono presenti all'immagine \ref{fig:schema_moduli_livello_0}. Le immagini \ref{fig:schema_moduli_livello_1} e \ref{fig:schema_moduli_livello_2} ne approfondiscono il significato.
+
+In questi schemi le bolle rappresentano i suddetti moduli: sono colorate di rosso per gli attori, ossia i moduli principali, e di verde per i fornitori di funzionalità, ossia i moduli secondari. La bolla ``clock'' indica il modulo gestione tempo ed è stata colorata in azzurro  poiché non fornisce nessun'altra funzionalità al di là del comunicare lo scorrere del tempo.  
+
+Gli archi indicano una relazione di dipendenza con questa semantica: un arco che parte da una bolla A e arriva in una bolla B indica che A conosce B e che vi comunica. Si noti che la relazione non è simmetrica. Nel caso di relazione tra un attore e un fornitore di funzionalità, la comunicazione si intende come ``utilizzo dei servizi offerti'', mentre nel caso della relazione attore-attore si intende ``effettua scambi di messaggi''.
+
 \begin{figure}[htbp]
 	\centering
-	\includegraphics[width=10cm]{schema_moduli_livello_0.jpg}
+	\includegraphics[width=15cm]{schema_moduli_livello_0.jpg}
 	\caption{Dipendenze tra i moduli livello 0}
 	\label{fig:schema_moduli_livello_0}
 \end{figure}
+
 
 L'immagine \ref{fig:schema_moduli_livello_1} specializza le relazioni precedentemente definite incorporando i restanti moduli. In giallo sono state colorate le bolle che specializzano le entità Utente e Taxi.
 
 \begin{figure}[htbp]
 	\centering
-	\includegraphics[width=12cm]{schema_moduli_livello_1.jpg}
+	\includegraphics[width=15cm]{schema_moduli_livello_1.jpg}
 	\caption{Dipendenze tra i moduli livello 1}
 	\label{fig:schema_moduli_livello_1}
 \end{figure}
+
+\newpage
 
 \section{Automi Coinvolti} \label{automi}
 
@@ -86,7 +94,7 @@ Le relazioni tra automi e moduli definiti precedentemente alla sezione \ref{modu
 
 \begin{figure}[htbp]
 	\centering
-	\includegraphics[width=13cm]{schema_moduli_livello_2.jpg}
+	\includegraphics[width=15cm]{schema_moduli_livello_2.jpg}
 	\caption{Dipendenza tra moduli e automi}
 	\label{fig:schema_moduli_livello_2}
 \end{figure}
@@ -271,48 +279,17 @@ All'appendice \ref{messaggi_scambiati_appendix}, sono presenti i diagrammi di se
 	\item Aggiornamento della mappa della città mentre il taxi è occupato con un utente e ne ha altri nella coda \ref{fig:messaggi_macchina_aggiornamento_mappa_clienti}.
 \end{itemize}
 
-
 \section{Architettura fisica e Distribuzione} \label{arch_fisica}
-Per l'implementazione fisica del progetto, è necessario che ogni automobile elettrica sia dotata di una scheda Wi-Fi per la comunicazione con i veicoli vicini. Il cliente per poter comunicare con il sistema necessita di utilizzare un'applicazione dedicata per le prenotazioni. Si suppone esista già la mappa della città nel formato adatto, ogni automobile deve possederne una copia nel disco locale. Un altro requisito hardware è che le macchine dispongano di sufficiente potenza di calcolo per effettuare velocemente il calcolo dei percorsi.
+Per l'implementazione fisica del progetto, è necessario che ogni automobile elettrica sia dotata di una scheda Wi-Fi per la comunicazione. Il cliente per poter usufruire del sistema necessita di utilizzare un'applicazione dedicata dal suo smartphone per le prenotazioni. Si suppone esista già la mappa della città nel formato adatto, ogni automobile ne deve possedere una copia nel disco locale. Un altro requisito hardware è che le macchine dispongano di sufficiente potenza computazionale per effettuare velocemente il calcolo dei percorsi. Si assume inoltre che sia già presente un'interfaccia che fornisca le primitive per lo spostamento della macchina: esse vengono utilizzate dall'automa movimento interno al modulo di gestione del taxi.
 
 I moduli descritti nella sezione \ref{modules} sono associati ai componenti fisici in questo modo:
-I moduli per le operazioni sui grafi, la scheda wireless, operazioni mappa città, gestione macchine, elezione del leader sono legati ai taxi e il modulo entità macchina ne rappresenta una sua astrazione.
-
-Il modulo per l'interfaccia cliente-servizio è legato all'utente, esso infatti deve conoscere soltanto questo modulo per utilizzare il servizio, il modulo utente ne rappresenta una sua astrazione.
-
-il "modulo per l'invio dei messaggi" è utilizzato da tutti i componenti, in quanto l'invio di un qualsiasi messaggio viene analizzato dai metodi di questo modulo.
-
-I moduli per le operazioni sui grafi, operazioni mappa città, gestione macchine, comunicazione ambiente-entità, creazione entità vengono usati dall'ambiente, il quale però, si ricorda, non ha nessuna rappresentazione nei componenti fisici del sistema.
-
-una descrizione delle dipendenze fra i moduli verrà rappresentata da un grafo...
-
-\begin{itemize} 
-	
-	\item Modulo algoritmi grafi: fornisce gli algoritmi che è possibile utilizzare sui grafi. Per esempio include Dijkstra, BFS, DFS, aggiungi nodo, aggiungi arco, ... 
-	
-	\item Modulo per l'algoritmo di elezione del leader: implementa la funzionalità della scelta della macchina da assegnare all'utente.
-	
-	\item Modulo per l'invio di messaggi: controlla che il messaggio sia ben formato.
-	
-	\item Modulo interfaccia cliente-servizio: fornisce le possibili operazioni che un cliente può richiedere al sistema.
-	
-	\item Modulo scheda wireless: simula la scheda di rete che fornisce i vicini dell'entità che ne invoca i metodi.
-	
-	\item Modulo mappa città: fornisce i metodi di lettura e modifica della mappa della città.
-	
-	\item Modulo gestione macchine: fornisce i metodi per ricaricare le batterie delle macchine, ne gestiscono gli incidenti e le riparazioni.
-	
-	\item Modulo creazione entità: fornisce le primitive per creare nuove macchine e nuovi utenti.
-	
-	\item Modulo comunicazione Ambiente-Entità: il processo Ambiente può utilizzare i metodi in questo modulo per simulare il mondo reale.
-	
-	\item Modulo Entità Macchina: rappresenta l'astrazione dell'entità veicolo.
-	
-	\item Modulo Entità Utente: rappresenta l'astrazione dell'entità utente.
-	
-	\item Modulo Entità Ambiente : rappresenta l'astrazione dell'entità ambiente.
-	
-	L'associazione fra i componenti fisici del sistema con i suddetti moduli e le varie dipendenze fra questi sono riportate nella sezione \ref{arch_fisica}.
+\begin{itemize}
+	\item Il modulo utilizzato per la comunicazione da parte delle entità è composto da due parti: modulo ``localizzatore vicini'', dedito alla ricerca delle vicine entità, e modulo ``invio messaggi'', il cui scopo è controllare la buona formattazione dei dati da inviare e la spedizione stessa.
+	\item Il modulo ``gestione tempo'', interno ad ogni entità del sistema, rappresenta l'orologio interno del dispositivo.
+	\item Per quanto riguarda l'entità ``Utente'' descritta all'inizio del capitolo, l'omonimo modulo ne rappresenta un'astrazione e pertanto non possiede una controparte fisica. Il modulo ``interfaccia cliente-servizio'' corrisponde all'applicazione sullo smartphone dell'utente.
+	\item I moduli ``mappa città'' e ``algoritmi grafo'' modellano il navigatore interno che permette l'accesso alla mappa precedentemente nominata e il calcolo dei percorsi.
+	\item Il modulo ``gestione macchina'' contiene gli automi che permettono il funzionamento intelligente del taxi, come avverrebbe nel mondo reale.
+	\item Il modulo ``elezione'' viene utilizzato dal corrispondente automa, pertanto non ha una controparte fisica.
 \end{itemize}
 
 \section{Piano di Sviluppo}
