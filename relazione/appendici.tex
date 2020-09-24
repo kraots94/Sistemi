@@ -6,18 +6,83 @@
   
 \index{appendici}
 
-\section{Messaggi scambiati all'interno del sistema} \label{messaggi_scambiati_appendix}
+\section{Automi coinvolti}
 
 \begin{figure}[htbp]
 	\centering
-	\includegraphics[width=12cm]{messaggi_utente_chiede_macchina.jpg}
-	\caption{Messaggi scambiati per la richiesta di un trasporto.}
-	\label{fig:messaggi_utente_chiede_macchina}
+	\includegraphics[width=14cm]{automa_utente.jpg}
+	\caption{Rappresentazione degli stati possibili dell'entità utente.}
+	\label{fig:automa_utente}
 \end{figure}
 
 \begin{figure}[htbp]
 	\centering
-	\includegraphics[width=10cm]{messaggi_utente_trasporto.jpg}
+	\includegraphics[width=14cm]{automa_app_utente_flusso.jpg}
+	\caption{Rappresentazione degli stati utente per il servizio - spostamento utente.}
+	\label{fig:automa_app_utente_flusso}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=13cm]{automa_app_utente_stati.jpg}
+	\caption{Rappresentazione degli stati utente per il servizio - ulteriori eventi.}
+	\label{fig:automa_app_utente_stati}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=14cm]{automa_macchina_moving.jpg}
+	\caption{Rappresentazione degli stati macchina in servizio}
+	\label{fig:automa_moving}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=16cm]{automa_macchina_elezione.jpg}
+	\caption{Rappresentazione degli stati macchina - elezione}
+	\label{fig:automa_elezione}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=16cm]{automa_macchina_batteria.jpg}
+	\caption{Rappresentazione degli stati macchina - batteria}
+	\label{fig:automa_batteria}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=22cm, angle = 90]{automa_macchina_ascoltatore.jpg}
+	\caption{Rappresentazione degli stati macchina - listener}
+	\label{fig:automa_listener}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=13cm]{automa_macchina_global_events.jpg}
+	\caption{Eventi globali automi macchina}
+	\label{fig:automi_macchina_various}
+\end{figure}
+
+\section{Messaggi scambiati all'interno del sistema} \label{messaggi_scambiati_appendix}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=15cm]{messaggi_utente_request_car.jpg}
+	\caption{Messaggi scambiati per la richiesta di un trasporto.}
+	\label{fig:messaggi_utente_request_car}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=15cm]{messaggi_app_utente_elezione.jpg}
+	\caption{Messaggi scambiati dall'app dell'utente per l'elezione.}
+	\label{fig:messaggi_app_utente_elezione}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=15cm]{messaggi_utente_trasporto.jpg}
 	\caption{Messaggi scambiati per il trasporto dell'utente.}
 	\label{fig:messaggi_utente_trasporto}
 \end{figure}
@@ -78,67 +143,3 @@
 \label{fig:messaggi_macchina_aggiornamento_mappa_clienti}
 \end{figure}
 
-
-
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=14cm]{automa_utente.jpg}
-	\caption{Rappresentazione degli stati possibili dell'entità utente.}
-	\label{fig:automa_utente}
-\end{figure}
-
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=14cm]{automa_app_utente_flusso.jpg}
-	\caption{Rappresentazione degli stati utente per il servizio - spostamento utente.}
-	\label{fig:automa_app_utente_flusso}
-\end{figure}
-
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=13cm]{automa_app_utente_stati.jpg}
-	\caption{Rappresentazione degli stati utente per il servizio - ulteriori eventi.}
-	\label{fig:automa_app_utente_stati}
-\end{figure}
-
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=14cm]{automa_macchina_moving.jpg}
-	\caption{Rappresentazione degli stati macchina in servizio}
-	\label{fig:automa_moving}
-\end{figure}
-
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=16cm]{automa_macchina_elezione.jpg}
-	\caption{Rappresentazione degli stati macchina - elezione}
-	\label{fig:automa_elezione}
-\end{figure}
-
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=16cm]{automa_macchina_batteria.jpg}
-	\caption{Rappresentazione degli stati macchina - batteria}
-	\label{fig:automa_batteria}
-\end{figure}
-
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=22cm, angle = 90]{automa_macchina_ascoltatore.jpg}
-	\caption{Rappresentazione degli stati macchina - listener}
-	\label{fig:automa_listener}
-\end{figure}
-
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=13cm]{automa_macchina_ascoltatore.jpg}
-	\caption{Rappresentazione degli stati macchina - listener}
-	\label{fig:automa_listener_2}
-\end{figure}
-
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=13cm]{automa_macchina_global_events.jpg}
-	\caption{Eventi globali automi macchina}
-	\label{fig:automi_macchina_various}
-\end{figure}

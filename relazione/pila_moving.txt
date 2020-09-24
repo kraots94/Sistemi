@@ -2,10 +2,14 @@
 [n1, n2, ..., nn]
 
 {
-	tipo = PARTENZA_CLIENT | ARRIVO_CLIENT | COLONNINA | INIZO_PERCORSO_COLONNINA | P_INTERMEDIO
+	user = "ID_USER"
+	tipo = PARTENZA_CLIENT | ARRIVO_CLIENT | COLONNINA | INIZO_PERCORSO_COLONNINA | P_INTERMEDIO | ID_USER
 	t = tempo
 	P_arr = nodo | (x, y)
 }
+
+ID_USER:
+	se il nodo è di questo tipo, è settato il parametro user, gli altri sono a -1
 
 MOVING:
 	Dopo il tempo Ti, aggiorno GPS, riazzero il contatore dei TIC, in base al nodo invio eventuali eventi.

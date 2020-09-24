@@ -11,16 +11,18 @@ In questo capitolo vengono descritte l'architettura del software, i protocolli e
 Qui di seguito sono descritti i vari moduli che si intende implementare per il progetto:
 
 \begin{itemize} \label{modules}
-	\item Modulo Entità Macchina: rappresenta l'astrazione dell'entità veicolo.
 	\item Modulo Entità Utente: rappresenta l'astrazione dell'entità utente.
 	\item Modulo Entità Ambiente : rappresenta l'astrazione dell'entità ambiente.
 	\item Mappa Città: fornisce i metodi di lettura e modifica della mappa della città. Per le modifiche utilizza il modulo degli algoritmi sui grafi per controllarne la fattibilità. Questo modulo astrae il fatto che è presente un grafo per la rappresentazione della mappa.
 	\item Algoritmi Grafo: fornisce gli algoritmi che è possibile utilizzare sui grafi. Per esempio include Dijkstra, BFS, DFS, aggiungi nodo / arco, ...
-	\item Scheda wireless: permettendo di conoscere le entità vicine.
-	\item Invio Messaggi: permette la comunicazione fra entità, controllando, la formattazione dei messaggi da inviare e se l'entità destinataria esiste. Essa simula la scheda di comunicazione.
-	\item Modulo per l'algoritmo di elezione del leader: implementa la funzionalità della scelta della macchina da assegnare all'utente.
-	\item Modulo interfaccia cliente-servizio: rappresenta l'app che utilizzerebbe l'utente per usufruire del servizio. In tal senso, fornisce le operazioni che un cliente può richiedere al sistema e comunica all'entità cliente gli eventuali messaggi. Il modulo di gestione del taxi comunica a questo modulo gli eventuali cambi di stato.
-	\item Modulo gestione macchine: fornisce i metodi per ricaricare le batterie delle macchine, ne gestiscono gli incidenti, movimento e gestione eventi.
+	\item Localizzatore Vicini: permette di conoscere le entità vicine.
+	\item Invio Messaggi: permette la comunicazione fra entità controllando la buona formattazione dei messaggi da inviare. Essa simula la scheda di comunicazione.
+	\item Modulo Taxi: è formato al suo interno da due moduli:
+	\begin{itemize}
+		\item Modulo per l'algoritmo di elezione del leader: implementa la funzionalità della scelta della macchina da assegnare all'utente.
+		\item Modulo gestione taxi: esso è l'interfaccia con cui l'applicazione dell'utente comunica con un determinato taxi. Fornisce i metodi di prenotazione di una corsa, gestisce gli eventi generati dal sistema, fornisce il servizio di spostamento.
+	\end{itemize}
+	\item Modulo interfaccia cliente-servizio: rappresenta l'applicazione che utilizzerebbe l'utente per usufruire del servizio. In tal senso, fornisce le operazioni che un cliente può richiedere al sistema e comunica ad egli gli eventuali messaggi. Il modulo di gestione del taxi comunica a questo modulo gli eventuali cambi di stato.
 	\item Modulo gestione tempo: simula un orologio utilizzato per la gestione degli spostamenti e timeout.
 \end{itemize}
 
@@ -64,7 +66,7 @@ Il Taxi è stato invece modellato con questi automi:
  \item automa\_moving: rappresenta il veicolo in servizio.
  \item automa\_elezione: descrive gli stati per l'algoritmo di elezione ed eventi associati. 
  \item automa\_batteria: rappresenta un sensore della batteria interna al veicolo, notificando, quando necessario, che è necessario ricaricarla oppure lo stato di fermo della macchina per un certo periodo di tempo.
- \item automa\_listener: l'automa ascoltatore dei possibili eventi che interessano al veicolo. Riceve eventi dall'ambiente, comunica con automa\_app\_utente per dialogare con gli utenti e permette la comunicazione con gli altri veicoli. Esso è il tramite verso gli automi interni al veicolo: ogni evento indirizzato ad essi viene prima catturato da questo automa e poi inviato al corretto destinatario.
+ \item automa\_listener: ascoltatore dei possibili eventi che interessano al veicolo. Riceve messaggi dall'ambiente, comunica con l'automa dell'applicazione dell'utente e con gli automi suoi pari negli altri veicoli. Esso è anche il tramite verso gli automi interni al veicolo: ogni evento indirizzato ad essi viene prima catturato da questo automa e poi inviato al corretto destinatario. Nel caso in cui riceve un messaggio di inizio elezione, questo automa si sposta nello stato ``listen\_election''. Questo speciale stato comporta che vengano considerati solo i messaggi relativi all'elezione, tutti gli altri vengono messi in una speciale coda e verranno gestiti alla fine dell'elezione.
 \end{itemize} 
 
 All'interno del servizio, quando viene creato un nuovo utente oppure un nuovo taxi, vengono generate istanze di ogni automa correlato, vale a dire, quindi, i due automi per l'utente e i quattro automi per il taxi. Nel momento in cui un cliente è stato servito portandolo a destinazione, oppure un taxi viene rimosso dalla mappa, vengono distrutti gli automi correlati.
@@ -86,6 +88,7 @@ Il prefisso indica il destinatario o il mittente del messaggio. Nel caso in cui 
 	\item UID : automa\_utente
 	\item APP : automa\_app\_utente
 	\item ALL : tutti gli altri automi collegati alla stessa entità
+	\item GPS : localizzatore dell'entità
 	\item ENV : ambiente
 	\item EV  : generico messaggio per o da qualche automa della stessa entità
 \end{itemize}
@@ -98,8 +101,6 @@ Le relazioni tra automi e moduli definiti precedentemente alla sezione \ref{modu
 	\caption{Dipendenza tra moduli e automi}
 	\label{fig:schema_moduli_livello_2}
 \end{figure}
-
-\newpage
 
 Gli automi sono presenti nell'appendice.
 
@@ -187,9 +188,7 @@ Scopo del pacchetto è di notificare il vincitore dell'elezione e rilasciare i n
 [ID_WINNER, ID_USER, winner]
 \end{lstlisting}
 
-Il nodo iniziatore lo crea e lo invia in multicast a tutti i nodi coinvolti nell'elezione.
-
-Successiva
+Il nodo iniziatore lo crea e lo invia in multicast a tutti i nodi coinvolti nell'elezione. Il vincitore, ricevendolo, aggiorna la propria coda e notifica la presa in carico al cliente.
 
 \subsection{Creazione dello Spanning Tree}
 
@@ -210,17 +209,21 @@ L'algoritmo segue i seguenti passi:
 	\item Il nodo che riceve il pacchetto di starting election con TTL pari a zero, dopo avere inviato l'ack al genitore, non inoltra ulteriormente l'inizio dell'elezione ai vicini.
 	\item Ogni nodo, dopo aver ricevuto l'ack da parte dei figli alla partecipazione dell'elezione, calcola i propri costi e si mette in attesa che i propri figli, se presenti, gli mandino i costi calcolati. Alla ricezione di tutti i costi dei figli esso crea un pacchetto unico concatenando i costi ricevuti al proprio. Successivamente inoltre il pacchetto risultate al padre. Per la struttura di esso si faccia riferimenti a \ref{pacchetto_calcolato}.
 	\item Dopo aver inviato al padre i dati relativi ai costi, ogni nodo si mette in attesa di conoscere chi è il leader.
-	\item Quando il nodo iniziatore riceve tutti i dati calcola il leader in base alle proprietà descritte nella parte \ref{funzioni_di_costo_macchine}. 
-	\item Infine l'iniziatore invia il messaggio contentente il leader in multicasting a tutti i partecipanti all'elezione. Si faccia rifermento alla parte \ref{pacchetto_vincitore} per la descrizione del pacchetto.
+	\item Quando il nodo iniziatore riceve tutti i dati calcola il leader in base alle proprietà descritte nella parte \ref{funzioni_di_costo_macchine}. Nel caso in cui non sia presente alcun vincitore, l'identificativo del miglior taxi viene impostato a un valore di errore.
+	\item L'iniziatore invia il messaggio contenente il leader in multicasting a tutti i partecipanti all'elezione. Si faccia rifermento alla parte \ref{pacchetto_vincitore} per la descrizione del pacchetto.
 	\item Tutti i nodi ricevono la notifica del leader e in base al risultato compiono le azioni più opportune. In ogni caso escono dallo stato di elezione eliminando tutte le informazioni calcolate.
-	\item Il nodo vincitore comunica al modulo di ricezione del cliente, tramite le celle di comunicazione descritte nell'introduzione al punto \ref{problematiche_distribuite}, di essere pronto a servirlo e se egli è in coda oppure no.
+	\item In base al vincitore si hanno due casistiche:
+		\begin{itemize}
+			\item Vincitore presente: il nodo corrispondente aggiorna la propria coda dei nodi da visitare e comunica al modulo di ricezione del cliente, tramite le celle di comunicazione descritte nell'introduzione al punto \ref{problematiche_distribuite}, di essere pronto a servirlo e se egli è in coda oppure no.
+			\item Vincitore assente: il nodo iniziatore invia il pacchetto contenente l'id con errore anche all'applicazione dell'utente.
+		\end{itemize}
 \end{enumerate}
 
 Un esempio dei pacchetti scambiati durate l'algoritmo è presente all'immagine \ref{fig:messaggi_macchina_elezione}. La parte in basso a sinistra mostra lo spanning tree creato.
 
 \begin{figure}[htbp]
 	\centering
-	\includegraphics[width=15cm]{messaggi_macchina_elezione.jpg}
+	\includegraphics[width=14cm]{messaggi_macchina_elezione.jpg}
 	\caption{Rappresentazione dei messaggi scambiati durante l'elezione.}
 	\label{fig:messaggi_macchina_elezione}
 \end{figure}
@@ -244,36 +247,40 @@ I problemi possibili ma assenti per via dell'implementazione del sistema sono i 
 Viene discussa nella sezione Aggiornamento Mappa \ref{aggiornamento_mappa}.
 
 \subsubsection{Rimozione di una macchina}
-Sebbene il sistema venga costruito in modo che un nodo possa essere rimosso solamente se si trova nello stato "idle", è bene gestire i casi in cui l'eliminazione avvenga in ogni possibile stato, compresa l'elezione. Per risolvere il problema di attesa della risposta da un nodo ormai rimosso, ogni nodo invia dei messaggi di tipo "hello" per controllare lo stato del nodo collegato. In tal modo se non ricevono risposta entro un tempo ragionevole lo considerano rimosso e continuano l'algoritmo di elezione.
+Sebbene il sistema venga costruito in modo che una vettura possa essere rimossa solamente se si trova nello stato ``idle'', è bene gestire i casi in cui l'eliminazione avvenga in ogni possibile stato, compresa l'elezione. Per risolvere il problema di attesa della risposta da un taxi ormai rimosso, ogni nodo invia dei messaggi di tipo ``hello'' per controllare lo stato della vettura di cui sta aspettando il calcolo dei costi. In tal modo se non ricevono risposta entro un tempo ragionevole lo considerano rimosso e continuano l'algoritmo di elezione.
 
 \subsubsection{Perdita di pacchetti}
-Nel caso in cui vengano persi dei pacchetti durante qualsiasi fase dell'elezione, è possibile accorgersene poichè non ritornano i messaggi di ack. Una possibile soluzione per questo problema è l'utilizzo del protocollo TCP.
+Nel caso in cui vengano persi dei pacchetti durante qualsiasi fase dell'elezione, è possibile accorgersene poiché vengono restituiti i messaggi di acknowledgment. Una soluzione per questo problema è l'utilizzo del protocollo TCP.
 
 \subsection{Aggiornamento della mappa}\label{aggiornamento_mappa}
 
-Questa casistica comporta che i percorsi calcolati, nel caso utilizzino degli archi deprecati, non siano più validi. 
+Questa casistica considera il caso in cui i percorsi calcolati, nel caso utilizzino degli archi deprecati, non siano più validi. 
 
 L'aggiornamento può avvenire in diversi momenti e stati della macchina. 
 
 \begin{itemize}
-	\item Macchina in stato IDLE: Semplice aggiornamento, non comporta alcun problema.
-	\item Macchina in stato Running Election: al termine dell'elezione effettua l'aggiornamento. Se risulta vincitrice ed è necessario, ricalcola il percorso.
-	\item Macchina in stato Moving to Client o Moving to Target con un solo cliente: il veicolo effettua l'aggiornamento della mappa e, se necessario, ricarcola il percorso. Se è in grado di soddisfare l'utente, lo notifica del ritardo e torna nello stato precedente. Altrimenti notifica l'utente e inizia una leader election per l'utente.
-	\item Macchina in stato Moving to Client o Moving to Target con più clienti in coda: Effettua l'aggiornamento e calcola il massimo percorso che riesce a soddifare con la carica rimanente. In tal modo, nel caso in cui alcuni clienti non possano venir soddifatti li notifica con un messaggio di avviare autonomamente una nuova richiesta al sistema e li rimuove dalla coda. In questo caso non parte alcuna leader election. Nel caso peggiore in cui non riesca a soddisfare nemmeno il cliente corrente l'approccio è come al punto precedente.
-	\item Macchina in stato Running Election Bridge Mode: come detto precedentemente, esegue comunque il calcolo del leader e poi si comporta in base al numero di utenti in coda.
+	\item Macchina in stato ``idle'': semplice aggiornamento, non comporta alcun problema.
+	\item Macchina in stato ``Running Election'': l'automa ``ascoltatore'' si trova nello stato ``listen\_election'', quindi l'aggiornamento avviene non appena l'elezione si è conclusa.
+	\item Macchina in stato ``Moving'': significa che la coda dei punti da visitare non è vuota. Nello stato ``update\_map'' dell'automa ``ascoltatore'' vengono calcolati quanti utenti presenti nella coda possono essere soddisfatti e quindi si hanno tre possibili scenari:
+	\begin{itemize}
+		\item Tutti i clienti sono soddisfatti: notifica ai clienti con i nuovi tempi di percorrenza.
+		\item Alcuni clienti soddisfatti: i clienti soddisfatti ricevono un messaggio con i nuovi tempi, gli altri un messaggio di impossibilità nel soddisfare la richiesta. Sarà l'applicazione dell'utente a far ripartire l'elezione.
+		\item Nessun cliente soddisfatti: tutti i clienti riceveranno la notifica di impossibilità di erogazione del servizio.
+	\end{itemize}
 \end{itemize}
 
 \subsection{Diagrammi di sequenza dei messaggi}
-All'appendice \ref{messaggi_scambiati_appendix}, sono presenti i diagrammi di sequenza dei messaggi che vengono scambiati tra i diversi moduli per permettere le funzionalità del sistema.
-
+All'appendice \ref{messaggi_scambiati_appendix}, sono presenti i diagrammi di sequenza dei messaggi che vengono scambiati tra i diversi moduli per permettere le funzionalità del sistema. Il modulo di comunicazione dei messaggi non viene incluso nei diagrammi poiché sottinteso ad ogni comunicazione. L'invocazione di questo modulo corrisponde, negli automi, al passaggio a un generico stato che inizia con ``send'', pertanto anche questi stati non vengono riportati.
+I riquadri di colore giallo indicano gli stati mentre quelli di colore rosso indicano un riferimento ad altri diagrammi di sequenza.
 \begin{itemize}
-	\item Richiesta da parte dell'utente del servizio di trasporto \ref{fig:messaggi_utente_chiede_macchina}.
-	\item Movimento del taxi alla posizione dell'utente e successivo trasporto \ref{fig:messaggi_utente_trasporto}.
+	\item Richiesta da parte dell'utente del servizio di trasporto \ref{fig:messaggi_utente_request_car}.
+	\item Messaggi scambiati dall'applicazione dell'utente per la richiesta di un taxi. Questa è l'elezione dal punto di vista dell'app. \ref{fig:messaggi_app_utente_elezione}. Nella rappresentazione sono stati inseriti due veicoli, un iniziatore e un vincitore. In base ai risultati dell'elezione il messaggio del vincitore viene inviato dall'entità adatta.
+	\item Partecipazione all'elezione di una macchina non iniziatrice \ref{fig:messaggi_macchina_partecipazione_elezione}. Poiché è possibile che la macchina si trovi in diversi stati mentre viene avviato l'algoritmo di elezione, sono stati rappresentati tre possibili scenari.
+	\item Movimento del taxi alla posizione dell'utente e successivo trasporto \ref{fig:messaggi_utente_trasporto}. In questa fase vengono consumati i punti contenuti nella coda dell'automa movimento del taxi. Ogni punto è etichettato e in base al tipo di punto viene inviato un messaggio all'utente.
 	\item Richiesta di cambiamento di destinazione da parte dell'utente mentre il taxi è in viaggio verso l'utente \ref{fig:messaggi_utente_cambio_direzione_waiting}.
 	\item Richiesta di cambiamento di destinazione da parte dell'utente mentre il taxi lo sta trasportando \ref{fig:messaggi_utente_cambio_direzione_moving}.
-	\item Partecipazione all'elezione di una macchina non iniziatrice \ref{fig:messaggi_macchina_partecipazione_elezione}. Poiché è possibile che la macchina si trovi in diversi stati mentre viene avviato l'algoritmo di elezione, sono stati rappresentati tre possibili scenari.
 	\item Incidente di una macchina con conseguente notifica all'utente e ricerca di un taxi alternativo \ref{fig:messaggi_macchina_crash}.
-	\item Ricarica della macchina, rimozione della macchina dal sistema e aggiornamento della mappa  \ref{fig:messaggi_macchina_batteria_morte_mappaIdle}. In queste operazioni si considera che la macchina sia nello stato 'idle'.
+	\item Ricarica della macchina, rimozione della macchina dal sistema e aggiornamento della mappa  \ref{fig:messaggi_macchina_batteria_morte_mappaIdle}. In queste operazioni si considera che la macchina sia nello stato ``idle''.
 	\item Aggiornamento della mappa della città mentre il taxi si sta muovendo verso il cliente \ref{fig:messaggi_macchina_aggiornamento_mappa_to_client}.
 	\item Aggiornamento della mappa della città mentre il taxi sta trasportando il cliente a destinazione \ref{fig:messaggi_macchina_aggiornamento_mappa_to_target}.
 	\item Aggiornamento della mappa della città mentre il taxi è occupato con un utente e ne ha altri nella coda \ref{fig:messaggi_macchina_aggiornamento_mappa_clienti}.
