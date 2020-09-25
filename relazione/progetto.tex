@@ -219,13 +219,13 @@ L'algoritmo segue i seguenti passi:
 		\end{itemize}
 \end{enumerate}
 
-Un esempio dei pacchetti scambiati durate l'algoritmo è presente all'immagine \ref{fig:messaggi_macchina_elezione}. La parte in basso a sinistra mostra lo spanning tree creato.
+Un esempio dei pacchetti scambiati durate l'algoritmo è presente all'immagine \ref{fig:pacchetti_macchina_elezione}. La parte in basso a sinistra mostra lo spanning tree creato.
 
 \begin{figure}[htbp]
 	\centering
-	\includegraphics[width=14cm]{messaggi_macchina_elezione.jpg}
+	\includegraphics[width=14cm]{pacchetti_macchina_elezione.jpg}
 	\caption{Rappresentazione dei messaggi scambiati durante l'elezione.}
-	\label{fig:messaggi_macchina_elezione}
+	\label{fig:pacchetti_macchina_elezione}
 \end{figure}
 
 \newpage
@@ -272,18 +272,28 @@ L'aggiornamento può avvenire in diversi momenti e stati della macchina.
 \subsection{Diagrammi di sequenza dei messaggi}
 All'appendice \ref{messaggi_scambiati_appendix}, sono presenti i diagrammi di sequenza dei messaggi che vengono scambiati tra i diversi moduli per permettere le funzionalità del sistema. Il modulo di comunicazione dei messaggi non viene incluso nei diagrammi poiché sottinteso ad ogni comunicazione. L'invocazione di questo modulo corrisponde, negli automi, al passaggio a un generico stato che inizia con ``send'', pertanto anche questi stati non vengono riportati.
 I riquadri di colore giallo indicano gli stati mentre quelli di colore rosso indicano un riferimento ad altri diagrammi di sequenza.
-\begin{itemize}
+
+Questi messaggi vengono scambiati durante il flusso normale del servizio, nel caso non siano presenti eventi problematici.
+\begin{enumerate}	
 	\item Richiesta da parte dell'utente del servizio di trasporto \ref{fig:messaggi_utente_request_car}.
-	\item Messaggi scambiati dall'applicazione dell'utente per la richiesta di un taxi. Questa è l'elezione dal punto di vista dell'app. \ref{fig:messaggi_app_utente_elezione}. Nella rappresentazione sono stati inseriti due veicoli, un iniziatore e un vincitore. In base ai risultati dell'elezione il messaggio del vincitore viene inviato dall'entità adatta.
-	\item Partecipazione all'elezione di una macchina non iniziatrice \ref{fig:messaggi_macchina_partecipazione_elezione}. Poiché è possibile che la macchina si trovi in diversi stati mentre viene avviato l'algoritmo di elezione, sono stati rappresentati tre possibili scenari.
+	\item Messaggi scambiati dall'applicazione dell'utente per la richiesta di un taxi. Questa è l'elezione dal punto di vista dell'app. \ref{fig:messaggi_app_utente_elezione}. Nella rappresentazione sono stati inseriti due veicoli, un iniziatore e un vincitore. In base ai risultati dell'elezione il messaggio del vincitore viene inviato dall'entità adatta. Il riquadro rosso con all'interno la scritta ``Cars running Election'' fa rifermento al relativo diagramma dei messaggi, vale a dire al punto 3.
+	\item Messaggi scambiati tra la macchina iniziatrice dell'elezione e le altre partecipanti. In questo grafico viene mostrato il flusso completo nel caso in cui non sorgano problemi durante l'elezione. \ref{fig:messaggi_macchina_iniziatore_elezione}. La macchina vincitrice, oltre ad aggiornare la coda dei punti da visitare, notifica all'utente il proprio riferimento e il tempo di attesa per esaudire la richiesta
 	\item Movimento del taxi alla posizione dell'utente e successivo trasporto \ref{fig:messaggi_utente_trasporto}. In questa fase vengono consumati i punti contenuti nella coda dell'automa movimento del taxi. Ogni punto è etichettato e in base al tipo di punto viene inviato un messaggio all'utente.
-	\item Richiesta di cambiamento di destinazione da parte dell'utente mentre il taxi è in viaggio verso l'utente \ref{fig:messaggi_utente_cambio_direzione_waiting}.
-	\item Richiesta di cambiamento di destinazione da parte dell'utente mentre il taxi lo sta trasportando \ref{fig:messaggi_utente_cambio_direzione_moving}.
-	\item Incidente di una macchina con conseguente notifica all'utente e ricerca di un taxi alternativo \ref{fig:messaggi_macchina_crash}.
-	\item Ricarica della macchina, rimozione della macchina dal sistema e aggiornamento della mappa  \ref{fig:messaggi_macchina_batteria_morte_mappaIdle}. In queste operazioni si considera che la macchina sia nello stato ``idle''.
-	\item Aggiornamento della mappa della città mentre il taxi si sta muovendo verso il cliente \ref{fig:messaggi_macchina_aggiornamento_mappa_to_client}.
-	\item Aggiornamento della mappa della città mentre il taxi sta trasportando il cliente a destinazione \ref{fig:messaggi_macchina_aggiornamento_mappa_to_target}.
-	\item Aggiornamento della mappa della città mentre il taxi è occupato con un utente e ne ha altri nella coda \ref{fig:messaggi_macchina_aggiornamento_mappa_clienti}.
+\end{enumerate}
+
+Questi sono i messaggi scambiati nella gestione dei possibili eventi gestiti dal sistema. Nel caso dell'utilizzo di variabili presenti in automi diversi dal proprietario, vengono utilizzati i messaggi definiti al primo punto. Nelle successive rappresentazioni, questa parte verrà omessa poiché le frecce punteranno direttamente all'automa destinatario.
+
+Si assume che i messaggi interni alla macchina, quindi scambiati tra gli automi, giungano sempre a destinazione.
+
+\begin{itemize}
+	\item Messaggi scambiati dagli automi internamente alla macchina per il passaggio dei valori degli attributi. \ref{fig:messaggi_macchina_get_attribute}
+	\item Messaggi scambiati tra gli automi nel caso in cui il livello della batteria scende sotto il minimo durante il viaggio della macchina. L'automa della batteria abilita il percorso verso la colonnina di ricarica. \ref{fig:messaggi_macchina_batteria}
+	\item Messaggi scambiati tra gli automi nel caso in cui il livello della batteria resti costante per un tempo fissato. In tal caso si assume che la batteria venga ricaricata dai pannelli solari della macchina. \ref{fig:messaggi_macchina_pannelli_solari}
+	\item aggiornamento mappa
+	\item utente cambia dest
+	\item incidente
+	\item L'ambiente sceglie un taxi tra quelli rotti e lo ripara. \ref{fig:messaggi_macchina_fixcar}
+	\item L'ambiente decide quando rimuovere una macchina dalla mappa e per farlo invia un messaggio. \ref{fig:messaggi_macchina_rimozione}
 \end{itemize}
 
 \section{Architettura fisica e Distribuzione} \label{arch_fisica}
