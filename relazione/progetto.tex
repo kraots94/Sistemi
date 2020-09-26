@@ -289,12 +289,14 @@ Si assume che i messaggi interni alla macchina, quindi scambiati tra gli automi,
 	\item Messaggi scambiati dagli automi internamente alla macchina per il passaggio dei valori degli attributi. \ref{fig:messaggi_macchina_get_attribute}
 	\item Messaggi scambiati tra gli automi nel caso in cui il livello della batteria scende sotto il minimo durante il viaggio della macchina. L'automa della batteria abilita il percorso verso la colonnina di ricarica. \ref{fig:messaggi_macchina_batteria}
 	\item Messaggi scambiati tra gli automi nel caso in cui il livello della batteria resti costante per un tempo fissato. In tal caso si assume che la batteria venga ricaricata dai pannelli solari della macchina. \ref{fig:messaggi_macchina_pannelli_solari}
-	\item aggiornamento mappa
-	\item utente cambia dest
-	\item incidente
+	\item Messaggi scambiati durante l'aggiornamento della mappa come già spiegato nella relativa parte \ref{aggiornamento_mappa}. \ref{fig:messaggi_macchina_update_map}
+	\item Nel caso l'utente voglia cambiare destinazione, possono avvenire diversi scambi messaggi. \ref{fig:messaggi_utente_cambio_destinazione}
+	\item Messaggi nel caso in cui avvenga un incidente. L'ambiente controlla che una macchia sia in movimento. \ref{fig:messaggi_macchina_incidente}
 	\item L'ambiente sceglie un taxi tra quelli rotti e lo ripara. \ref{fig:messaggi_macchina_fixcar}
 	\item L'ambiente decide quando rimuovere una macchina dalla mappa e per farlo invia un messaggio. \ref{fig:messaggi_macchina_rimozione}
 \end{itemize}
+
+\newpage
 
 \section{Architettura fisica e Distribuzione} \label{arch_fisica}
 Per l'implementazione fisica del progetto, è necessario che ogni automobile elettrica sia dotata di una scheda Wi-Fi per la comunicazione. Il cliente per poter usufruire del sistema necessita di utilizzare un'applicazione dedicata dal suo smartphone per le prenotazioni. Si suppone esista già la mappa della città nel formato adatto, ogni automobile ne deve possedere una copia nel disco locale. Un altro requisito hardware è che le macchine dispongano di sufficiente potenza computazionale per effettuare velocemente il calcolo dei percorsi. Si assume inoltre che sia già presente un'interfaccia che fornisca le primitive per lo spostamento della macchina: esse vengono utilizzate dall'automa movimento interno al modulo di gestione del taxi.
@@ -308,6 +310,8 @@ I moduli descritti nella sezione \ref{modules} sono associati ai componenti fisi
 	\item Il modulo ``gestione macchina'' contiene gli automi che permettono il funzionamento intelligente del taxi, come avverrebbe nel mondo reale.
 	\item Il modulo ``elezione'' viene utilizzato dal corrispondente automa, pertanto non ha una controparte fisica.
 \end{itemize}
+
+\newpage
 
 \section{Piano di Sviluppo}
 % Since it is diffcult to predict just how hard implementing a new system will be, you should formulate as a set of "tiers", where the basic tier is something youre sure you can complete, and the additional tiers add more features, at both the application and the system level.

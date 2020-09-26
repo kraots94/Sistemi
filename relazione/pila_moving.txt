@@ -17,6 +17,13 @@ MOVING:
 GPS:
  current_pos = {x1, y1}
 
+Prima dell'aggiornamento, sistema controlla che la rimozione del nodo / arco non crea problemi
+- arco non partiziona la città
+- nessun cliente ha come destinazione p1
+Per la rimozione del nodo, systema controlla che p1 abbia un solo arco e nessuno lo abbia come destinazione.
+
+Aggiornamento mappa: add, remove, p1, [p2]
+aggiungi o rimuovi un nodo / arco. Se p2 è definito -> arco
 
 MOV	Movement Automa
 CAR	Car Listener
