@@ -6,8 +6,8 @@ from graphviz.dot import Graph
 import sys
 
 PATH_SEPARATOR = "\\"
-WEIGHT_MIN = 10
-WEIGHT_MAX = 100
+WEIGHT_MIN = 5
+WEIGHT_MAX = 20
 TOTAL_NODES = 10
 TOTAL_EDGES = 20
 
@@ -72,10 +72,20 @@ def generateCombination(n):
 def add_edges(graph_edges, total_nodes, total_to_add):
     combinations = generateCombination(total_nodes)
     visited_combo = []
+
+    for edge in graph_edges:
+        for index in range(len(combinations)):
+            if edge[1] == combinations[index][0] and edge[2] == combinations[index][1]:
+                visited_combo.append(index)
+                break
+
     for _ in range(total_to_add):
         index = randint(0,len(combinations))
         while index in visited_combo:
             index = randint(0,len(combinations)-1)
+
+        visited_combo.append(index)
+
         graph_edges.add((random.randint(WEIGHT_MIN,WEIGHT_MAX), combinations[index][0], combinations[index][1]))
 
 def create_file(V, E):
