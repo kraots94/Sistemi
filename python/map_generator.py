@@ -1,109 +1,190 @@
 import random
 from random import randint
-from graphviz import Digraph
-from graphviz.backend import version
 from graphviz.dot import Graph
 import sys
+import math
 
 PATH_SEPARATOR = "\\"
+PATH_MAP = sys.path[0]+PATH_SEPARATOR+".."+ PATH_SEPARATOR +"map" + PATH_SEPARATOR
+PATH_GRAPH = sys.path[0]+PATH_SEPARATOR
+
 WEIGHT_MIN = 5
 WEIGHT_MAX = 20
 TOTAL_NODES = 10
 TOTAL_EDGES = 20
+CARTESIAN_SIDE = 100
 
-def generateRandomConnectedGraph(V):
-    #PRE: V for the number of vertices
-    #POST: creates a random connected graph with a V-1 edges
+"""convert positive decimal integer n to equivalent in another base (2-26)"""
+def baseconvert(n, base):
 
-    initialSet = set()
+    digits = "abcdefghijklmnopqrstuvwxyz"
 
-    visitedSet = set()
+    try:
+        n = int(n)
+        base = int(base)
+    except:
+        return ""
 
-    vertices = set()
+    if n < 0 or base < 2 or base > 26:
+        return ""
 
-    edges = set()
+    s = ""
+    while 1:
+        r = math.floor(n % base)
+        s = digits[r] + s
+        n = math.floor(n / base)
+        if n == 0:
+            break
 
-    #generate the set of names for the vertices
+    return s
 
-    for i in range(1, V+1):
+# Function to do insertion sort 
+def insertionSort(arr, begin, end, k): 
 
-        initialSet.add(str(i))
+    # Traverse through 1 to len(arr) 
+    for i in range(begin+1, end+1): 
+  
+        key = arr[i]
+        # Move elements of arr[0..i-1], that are 
+        # greater than key, to one position ahead 
+        # of their current position 
+        j = i-1
+        while j >=begin and key[k] < arr[j][k] : 
+                arr[j+1] = arr[j]
+                j -= 1
+        arr[j+1] = key 
 
-        vertices.add(str(i))
+def createNodes(N):
+    vertices = []
+    for _ in range(0, N):
+        x = y = -1
+        can_not_exit = True
+        while can_not_exit:
+            x = randint(1, CARTESIAN_SIDE)
+            y = randint(1, CARTESIAN_SIDE)
+            can_not_exit = False
+            for v in vertices:
+                if x == v[1] and y == v[2]:
+                    can_not_exit = True
+                    break
+            
+        new_vertex = ["", x, y]
+        vertices.append(new_vertex)
 
-    #set the intial vertex to be connected
+    #sorting
+    insertionSort(vertices, 0, N-1, 1)
 
-    curVertex = random.sample(initialSet, 1).pop()
+    begin = 0
+    while 1:
+        if begin >= N:
+            break
 
-    initialSet.remove(curVertex)
+        currentValue = vertices[begin][1]
+        end = begin + 1
+        while end < N and vertices[end][1] == currentValue:
+            end = end + 1
 
-    visitedSet.add(curVertex)
+        insertionSort(vertices, begin, end-1, 2)
+        begin = end
 
-    #loop through all the vertices, connecting them randomly
+    last_node_name = baseconvert(N, 26)
+    name_length = len(last_node_name)
 
-    while initialSet:
+    for i in range(0, N):
+        name = baseconvert(i, 26)
+        while len(name) < name_length:
+            name = "a"+name
+        vertices[i][0] = name
 
-        adjVertex = random.sample(initialSet, 1).pop()
+    return vertices
 
-        edge = (random.randint(WEIGHT_MIN,WEIGHT_MAX), curVertex, adjVertex)
+def createPath(V, E):
+    visitedList = []
+    initialList = []
+    for vertex in V:
+        initialList.append(vertex[0])
 
-        edges.add(edge)
 
-        initialSet.remove(adjVertex)
+    index = randint(0, len(initialList)-1)
+    currentVertex = initialList[index]
+    initialList.remove(currentVertex)
+    
+    visitedList.append(currentVertex)
 
-        visitedSet.add(adjVertex)
-
-        curVertex = adjVertex
-
-    return vertices, edges
+    while len(initialList) > 0:
+        index = randint(0, len(initialList)-1)
+        adjVertex = initialList[index]
+        edge = [random.randint(WEIGHT_MIN,WEIGHT_MAX), currentVertex, adjVertex]
+        E.append(edge)
+        initialList.remove(adjVertex)
+        visitedList.append(adjVertex)
+        currentVertex = adjVertex
 
 def generateCombination(n):
-
     com = []
-
-    for i in range(1, n+1):
-
-        for j in range(i+1, n+1):
-
+    for i in range(0, n):
+        for j in range(i+1, n):
             com.append([i,j])
-
     return com
 
-def add_edges(graph_edges, total_nodes, total_to_add):
+def add_edges(graph_edges, graph_vertices, total_nodes, total_to_add):
     combinations = generateCombination(total_nodes)
     visited_combo = []
 
     for edge in graph_edges:
+        from_edge = edge[1]
+        to_edge = edge[2]
+
         for index in range(len(combinations)):
-            if edge[1] == combinations[index][0] and edge[2] == combinations[index][1]:
+            current_combination = combinations[index]
+
+            graph_vertex_from = graph_vertices[current_combination[0]][0]
+            graph_vertex_to = graph_vertices[current_combination[1]][0]
+            if from_edge == graph_vertex_from and to_edge == graph_vertex_to:
+                visited_combo.append(index)
+                break
+
+            graph_vertex_from = graph_vertices[current_combination[1]][0]
+            graph_vertex_to = graph_vertices[current_combination[0]][0]
+            if from_edge == graph_vertex_from and to_edge == graph_vertex_to:
                 visited_combo.append(index)
                 break
 
     for _ in range(total_to_add):
-        index = randint(0,len(combinations))
+        index = randint(0,len(combinations) -1)
         while index in visited_combo:
-            index = randint(0,len(combinations)-1)
-
+            index = randint(0,len(combinations) -1)
+        current_combination = combinations[index]
+        graph_edges.append([random.randint(WEIGHT_MIN,WEIGHT_MAX), graph_vertices[current_combination[0]][0], graph_vertices[current_combination[1]][0]])
         visited_combo.append(index)
 
-        graph_edges.add((random.randint(WEIGHT_MIN,WEIGHT_MAX), combinations[index][0], combinations[index][1]))
-
 def create_file(V, E):
-    dot = Graph(name="City_Map", filename="map.gv")
+    fo = open(PATH_MAP+"city_map.dat", "w")
+    fo.write(str(len(V)) + "\n")
+    for vertex in V:
+        fo.write(vertex[0] + " " +str(vertex[1]) + " " +str(vertex[2]) + "\n")
+    fo.write(str(len(E)) + "\n")
+    for edge in E:
+        fo.write(str(edge[0]) + " " + edge[1] + " " + edge[2] + "\n")
+    fo.close()
+
+def create_file_dot(V, E):
+    dot = Graph(name="City_Map", filename="map")
     
     for vertex in V:
-        dot.node(str(vertex))
+        dot.node(str(vertex[0]), label="({},{})".format(vertex[1], vertex[2]))
 
     for edge in E:
         dot.edge(str(edge[1]), str(edge[2]), label=str(edge[0]))
 
-    dot.render(sys.path[0]+PATH_SEPARATOR+"map.gv")
+    dot.render(filename="map", directory=PATH_GRAPH, cleanup=True)
 
-V, E = generateRandomConnectedGraph(TOTAL_NODES)
 edges_to_add = TOTAL_EDGES - TOTAL_NODES + 1
-add_edges(E,TOTAL_NODES, edges_to_add)
 
-print(V)
-print(E)
+V = createNodes(TOTAL_NODES)
+E = []
+createPath(V, E)
+add_edges(E, V, TOTAL_NODES, edges_to_add)
 
 create_file(V, E)
+create_file_dot(V, E)
