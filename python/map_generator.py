@@ -1,12 +1,19 @@
-import random;
+import random
+from random import randint
+from graphviz import Digraph
+from graphviz.backend import version
+from graphviz.dot import Graph
+import sys
+
+PATH_SEPARATOR = "\\"
 WEIGHT_MIN = 10
 WEIGHT_MAX = 100
-
-#PRE: V for the number of vertices
-
-#POST: creates a random connected graph with a V-1 edges
+TOTAL_NODES = 10
+TOTAL_EDGES = 20
 
 def generateRandomConnectedGraph(V):
+    #PRE: V for the number of vertices
+    #POST: creates a random connected graph with a V-1 edges
 
     initialSet = set()
 
@@ -18,7 +25,7 @@ def generateRandomConnectedGraph(V):
 
     #generate the set of names for the vertices
 
-    for i in range(V):
+    for i in range(1, V+1):
 
         initialSet.add(str(i))
 
@@ -54,18 +61,39 @@ def generateCombination(n):
 
     com = []
 
-    for i in range(n):
+    for i in range(1, n+1):
 
-        for j in range(i+1, n):
+        for j in range(i+1, n+1):
 
             com.append([i,j])
 
     return com
 
-V, E = generateRandomConnectedGraph(10)
+def add_edges(graph_edges, total_nodes, total_to_add):
+    combinations = generateCombination(total_nodes)
+    visited_combo = []
+    for _ in range(total_to_add):
+        index = randint(0,len(combinations))
+        while index in visited_combo:
+            index = randint(0,len(combinations)-1)
+        graph_edges.add((random.randint(WEIGHT_MIN,WEIGHT_MAX), combinations[index][0], combinations[index][1]))
+
+def create_file(V, E):
+    dot = Graph(name="City_Map", filename="map.gv")
+    
+    for vertex in V:
+        dot.node(str(vertex))
+
+    for edge in E:
+        dot.edge(str(edge[1]), str(edge[2]), label=str(edge[0]))
+
+    dot.render(sys.path[0]+PATH_SEPARATOR+"map.gv")
+
+V, E = generateRandomConnectedGraph(TOTAL_NODES)
+edges_to_add = TOTAL_EDGES - TOTAL_NODES + 1
+add_edges(E,TOTAL_NODES, edges_to_add)
 
 print(V)
 print(E)
 
-combi = generateCombination(10)
-print(combi)
+create_file(V, E)
