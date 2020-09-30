@@ -1,11 +1,10 @@
 -module(environment).
--export([generate_event/1, generate_random_number/0, start_link/0, get_nearest/1, get_cars/2, end_environment/1]).
--import('tick_server',[start/2, end_clock/1]).
+-export([generate_event/1, start_link/0, get_nearest/1, get_cars/2, end_environment/1]).
+-import('tick_server',[start_clock/2, end_clock/1]).
 -import('my_util',[println/1]).
 -import('send', [send_message/2, send_message/3]).
 -record(state, {cars, users, map, tick_s_pid}).
 -define(TICKTIME, 2).
-
 
 %%% Client API
 start_link() -> spawn_link(fun init/0).
@@ -13,17 +12,14 @@ start_link() -> spawn_link(fun init/0).
 %%% Server functions
 init() -> 
 	println("Start Environment~n"), 
-	Pid_Tick = tick_server:start(?TICKTIME, [self()]),
+	Pid_Tick = start_clock(?TICKTIME, [self()]),
 	S = #state{cars = [], users = [], map = [], tick_s_pid = Pid_Tick},
-	{T_M, T_S, T_m} = erlang:timestamp(),
-	io:format("Current Timestamp: ~w ~w ~w ~n", [T_M, T_S, T_m]),
-	rand:seed(exro928ss, {T_M, T_S, T_m}),
 	loop(S).
 
 end_environment(Pid) ->
 	println("Killing Environment"),
 	Ref = erlang:monitor(process, Pid),
-	send:send_message(Pid, {self(), Ref, terminate}),
+	send_message(Pid, {self(), Ref, terminate}),
 	
 	receive
 		{Ref, ok} ->
@@ -37,11 +33,11 @@ end_environment(Pid) ->
 
 loop(State) ->
     receive
-		{_Pid, tick} -> io:format("Tick received"),
-							  generate_event(generate_random_number()),
+		{_Pid, tick} -> println("Tick received"),
+							  generate_event(my_util:generate_random_number()),
 							  loop(State);
         {Pid, Ref, terminate} ->
-			send:send_message(Pid, {Ref, ok}),
+			send_message(Pid, {Ref, ok}),
 			terminate(State),
 			println("Exiting enviroment loop~n");
         Unknown ->
@@ -52,38 +48,34 @@ loop(State) ->
 
 %%% Private functions
 generate_event(N) ->
-	if 	N < 0 ->  io:format("nothing happened~n");
-		N < 10 -> io:format("spawn car~n");
-	   	N < 15 -> io:format("nothing happened~n");
-	   	N < 25 -> io:format("spawn client~n");
-	   	N < 35 -> io:format("nothing happened~n");
-	   	N < 45 -> io:format("client change target~n");
-	   	N < 50 -> io:format("nothing happened~n");
-	   	N < 60 -> io:format("car crash~n");
-	   	N < 70 -> io:format("fix car~n");
-		N < 75 -> io:format("nothing happened~n");
-		N < 77 -> io:format("add node to map~n");
-		N == 77 -> io:format("nothing happened~n");
-		N < 80 -> io:format("add street to map~n");
-		N == 80 -> io:format("nothing happened~n");
-		N < 83 -> io:format("remove node to map~n");
-		N == 83 -> io:format("nothing happened~n");
-		N < 86 -> io:format("remove arrow to map~n");
-		N < 95 -> io:format("nothing happened~n");
-		N < 100 -> io:format("remove car~n");
-		true -> io:format("nothing happened~n")
+	if 	N < 0 ->  println("nothing happened");
+		N < 10 -> println("spawn car");
+	   	N < 15 -> println("nothing happened");
+	   	N < 25 -> println("spawn client");
+	   	N < 35 -> println("nothing happened");
+	   	N < 45 -> println("client change target");
+	   	N < 50 -> println("nothing happened");
+	   	N < 60 -> println("car crash");
+	   	N < 70 -> println("fix car");
+		N < 75 -> println("nothing happened");
+		N < 77 -> println("add node to map");
+		N == 77 -> println("nothing happened");
+		N < 80 -> println("add street to map");
+		N == 80 -> println("nothing happened");
+		N < 83 -> println("remove node to map");
+		N == 83 -> println("nothing happened");
+		N < 86 -> println("remove arrow to map");
+		N < 95 -> println("nothing happened");
+		N < 100 -> println("remove car");
+		true -> println("nothing happened")
 	end.
 
 get_nearest(_Coord) -> ok.
 
 get_cars(_Coord, _Range) -> ok.
 
-generate_random_number() ->
-	N = rand:uniform(100),
-	io:format("Generated number: ~w ~n", [N]),
-	N.
-
+% uccide l'orologio e gli automi delle macchine / utenti
 terminate(State) ->
 	PID_clock = State#state.tick_s_pid,
-	tick_server:end_clock(PID_clock),
+	end_clock(PID_clock),
     ok.

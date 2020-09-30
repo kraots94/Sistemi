@@ -1,19 +1,19 @@
 -module(tick_server).
 -import('send', [send_message/2, send_message/3]).
 -import('my_util',[println/1]).
--export([start/2, end_clock/1, tick_generation/2]).
+-export([start_clock/2, end_clock/1, tick_generation/2]).
 
 %timeToTick: espresso in secondi, tempo di attesa tra due tick
 %Subscribers: lista dei processi che ricevono il tick
-start(TimeToTick, Subcribers) ->
+start_clock(TimeToTick, Subcribers) ->
 	Pid = spawn(tick_server, tick_generation, [TimeToTick, Subcribers]),
 	Pid.
 
 tick_generation(TimeToTick,Subscribers) ->
 	receive 
 		{Pid, Ref, terminate} ->
-			send:send_message(Pid, {Ref, ok}),
-			my_util:println("Exiting clock loop");
+			send_message(Pid, {Ref, ok}),
+			println("Exiting clock loop");
 		Unknown ->
             io:format("Unknown message: ~p~n", [Unknown]),
 			tick_generation(TimeToTick,Subscribers)
@@ -28,9 +28,9 @@ send_notification([H | T]) ->
 
 
 end_clock(Pid) ->
-	my_util:println("Killing clock"),
+	println("Killing clock."),
 	Ref = erlang:monitor(process, Pid),
-	send:send_message(Pid, {self(), Ref, terminate}),
+	send_message(Pid, {self(), Ref, terminate}),
 	receive
 		{Ref, ok} ->
 			erlang:demonitor(Ref, [flush]),
