@@ -15,18 +15,18 @@
 				currentUser = "",
 				currentPos = {0,0}}).
 
-start() ->
-	{ok, Pid} = gen_statem:start(?MODULE, foo, []),
+start(InitialPos) ->
+	{ok, Pid} = gen_statem:start(?MODULE, InitialPos, []),
 	Pid.
 
 callback_mode() ->
     [state_functions,state_enter].
 
-init(foo) ->
-	tick_server:start(?TICKTIME, self()),
+init(InitialPos) ->
+	tick_server:start_clock(?TICKTIME, [self()]),
 	State = #state {tappe = [],
 					currentUser = "",
-					currentPos = {0,0}},
+					currentPos = InitialPos},
 	{ok, idle, State}.
 
 updateQueue(Pid, Queue) ->
@@ -56,8 +56,9 @@ handle_common(cast, {updateQueue, RcvQueue}, _OldState, State) ->
 	my_util:println("ricevuto queue nuova"),
 	{next_state, moving, State#state{tappe=NewTappe}}.
 
-idle(enter, _OldState, _Stato) ->
+idle(enter, _OldState, Stato) ->
 	my_util:println("sono in idle..."),
+	printState(Stato),
 	keep_state_and_data;
 
 %gestisco tick ricevuti in idle ignorandoli
@@ -65,9 +66,13 @@ idle(info, {_From, tick}, _Stato) ->
 	keep_state_and_data;
 	?HANDLE_COMMON.
 	  
-moving(enter, _OldState, _State) ->
+moving(enter, _OldState, State) ->
 	my_util:println("mi sto spostando..."),
-	keep_state_and_data;
+	PrimaTappa = hd(State#state.tappe),
+	FirstUser = PrimaTappa#tappa.user,
+	ActualState = State#state{currentUser = FirstUser},
+	printState(ActualState),
+	{keep_state, ActualState};
 	
 moving(info, {_From, tick}, State) ->
 	my_util:println("ricevuto tick...aggiorno spostamento"),
@@ -76,43 +81,71 @@ moving(info, {_From, tick}, State) ->
 	Time = TappaAttuale#tappa.tempo,
 	NewTime = Time - 1,
 	if 
-		NewTime > 0 -> %semplice spostamento fra due nodi, decremento il tempo
+		NewTime > 0 -> %sono nello spostamento fra due nodi, decremento il tempo
 			TappaConSpostamento = TappaAttuale#tappa{tempo = NewTime},
 			NuoveTappe = [TappaConSpostamento] ++ tl(TappeAttuali),
-			my_util:println("situazione coda:", NuoveTappe),
-			{keep_state, State#state{tappe=NuoveTappe}};
-		true -> %se tempo = 0 , quindi ho raggiunto nodo nuovo
+			NuovoStato =  State#state{tappe=NuoveTappe},
+			printState(NuovoStato),
+			{keep_state, NuovoStato};
+		true -> %tempo = 0 , quindi ho raggiunto nodo nuovo
 			my_util:println("raggiunto nuovo nodo"),
 			TipoNodoAttuale = TappaAttuale#tappa.tipo,
 			PersonaAttuale = TappaAttuale#tappa.user,
-			if 
+			if  %controllo se sono arrivato al target oppure se sono arrivato da utente nuovo
 				TipoNodoAttuale =:= "arrivo" ->
-					my_util:println("ho servito: ", PersonaAttuale);
-				true ->
-					foo
+					arrivedInTargetPosition(PersonaAttuale);
+				TipoNodoAttuale =:= "partenza" ->
+					arrivedInUserPosition(PersonaAttuale);
+				true -> foo
 			end,
-			NewState = checkNewPath(State, TappaAttuale, TappeAttuali),
-			{keep_state, NewState}
+			NewState = calculateNewState(State, TappaAttuale, TappeAttuali),
+			if 
+				tl(TappeAttuali) =:= [] -> %ho finito il servizio
+					{next_state, idle, NewState};
+				true -> %ho ancora tappe
+					printState(NewState),
+					{keep_state, NewState}
+			end
 	end;
 	?HANDLE_COMMON.
-	  
-checkNewPath(Stato, TappaAttuale, Tappe) ->
+
+%return cambiamento stato macchina dopo essere arrivato a nuovo nodo e stampa se servo nuovo utente
+calculateNewState(Stato, TappaAttuale, Tappe) ->
 	NuoveTappe = tl(Tappe),
-	ProssimaTappa = hd(NuoveTappe),
-	ProssimoUtente = ProssimaTappa#tappa.user,
-	ProssimoTipo = ProssimaTappa#tappa.tipo,
 	Pos = TappaAttuale#tappa.posizione,
+	sendPosToGps(Pos),
 	if 
-		ProssimoUtente /= TappaAttuale#tappa.user ->
-			my_util:println("sto servendo: ", ProssimoUtente),
-			Stato#state{tappe = NuoveTappe, currentUser = ProssimoUtente, currentPos = Pos};
-		(ProssimoTipo =:= "partenza") ->
-			my_util:println("sono arrivato da", ProssimoUtente),
-			Stato#state{tappe = NuoveTappe, currentPos = Pos};
+		NuoveTappe =:= [] -> Stato#state{tappe = [], currentUser = "", currentPos = Pos};
 		true ->
-			Stato#state{tappe = NuoveTappe, currentPos = Pos}
+			ProssimaTappa = hd(NuoveTappe),
+			ProssimoUtente = ProssimaTappa#tappa.user,
+			if 
+				ProssimoUtente /= TappaAttuale#tappa.user ->
+					taxiServingAppId(ProssimoUtente),
+					Stato#state{tappe = NuoveTappe, currentUser = ProssimoUtente, currentPos = Pos};
+				true ->
+					Stato#state{tappe = NuoveTappe, currentPos = Pos}
+			end
 	end.
 
+sendPosToGps(_Position) ->
+	foo.
+  
+arrivedInTargetPosition(User) ->
+	my_util:println("ho servito: ", User).
 
+arrivedInUserPosition(User) ->
+	my_util:println("sono arrivato da", User).
+
+taxiServingAppId(User) ->
+		my_util:println("sto servendo: ", User).
+
+printState(State) ->
+	my_util:println("situazione Stato:", State).
 		
+%testing seq
+%c(macchina_moving_withRecords),
+%f(),
+%Pid = macchina_moving_withRecords:start({44,33}),
+%macchina_moving_withRecords:updateQueue1(Pid).
 	
