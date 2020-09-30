@@ -13,3 +13,13 @@ println(String) ->
 printList(String,List) -> 
 	io:format(String ++ " ~w~n" , [List]).
 
+init_random_generator() ->
+	println("Initiating random generatior.~n"),
+	{T_M, T_S, T_m} = erlang:timestamp(),
+	io:format("Current Timestamp: ~w ~w ~w ~n", [T_M, T_S, T_m]),
+	rand:seed(exro928ss, {T_M, T_S, T_m}).
+
+generate_random_number() ->
+	N = rand:uniform(100),
+	io:format("Generated number: ~w ~n", [N]),
+	N.
