@@ -5,33 +5,37 @@
 -define(HANDLE_COMMON,
     ?FUNCTION_NAME(T, C, D) -> handle_common(T, C,?FUNCTION_NAME, D)).
 
--record(tappa, {user = "",
+-record(tappa, {user,
 				tipo = "",
 				tempo = 0,
 				posizione = {0,0}
 				}).
 
 -record(state, {tappe,
-				currentUser = "",
+				currentUser = none,
 				currentPos = {0,0}}).
-
-start(InitialPos) ->
-	{ok, Pid} = gen_statem:start(?MODULE, InitialPos, []),
-	Pid.
 
 callback_mode() ->
     [state_functions,state_enter].
 
+start(InitialPos) ->
+	{ok, Pid} = gen_statem:start_link(?MODULE, InitialPos, []),
+	Pid.
+
 init(InitialPos) ->
 	tick_server:start_clock(?TICKTIME, [self()]),
 	State = #state {tappe = [],
-					currentUser = "",
+					currentUser = none,
 					currentPos = InitialPos},
 	{ok, idle, State}.
 
 updateQueue(Pid, Queue) ->
     gen_statem:cast(Pid, {updateQueue, Queue}).
 
+%normale = nodo intermedio di spostamento
+%partenza = il nodo di partenza del cliente
+%arrivo = il nodo target
+%tempo = tempo mancante per arrivare a quel nodo
 updateQueue1(Pid) ->
 	Record1 = #tappa {user = "pippo", tipo = "normale", tempo = 3, posizione = {1,2}},
 	Record2 = #tappa {user = "pippo", tipo = "partenza", tempo = 5, posizione = {5,7}},
@@ -49,6 +53,19 @@ updateQueue2(Pid) ->
 	Queue = [Record1,Record5],
 	gen_statem:cast(Pid, {updateQueue, Queue}).
 
+%pid = del processo macchina
+%Other = pid utente
+updateQueuePid(Pid, Other) ->
+	Record1 = #tappa {user = Other, tipo = "normale", tempo = 3, posizione = {1,2}},
+	Record2 = #tappa {user = Other, tipo = "partenza", tempo = 5, posizione = {5,7}},
+	Record3 = #tappa {user = Other, tipo = "normale", tempo = 3, posizione = {1,2}},
+	Record4 = #tappa {user = Other, tipo = "arrivo", tempo = 4, posizione = {5,7}},
+	Queue = [Record1,Record2,Record3,Record4],
+	gen_statem:cast(Pid, {updateQueue, Queue}).
+
+%update queue posseduta dal processo
+updateQueuePid_alone(Pid,Queue) ->
+	gen_statem:cast(Pid, {updateQueue, Queue}).
 
 handle_common(cast, {updateQueue, RcvQueue}, _OldState, State) ->
 	TappeAttuali = State#state.tappe,
@@ -71,6 +88,7 @@ moving(enter, _OldState, State) ->
 	PrimaTappa = hd(State#state.tappe),
 	FirstUser = PrimaTappa#tappa.user,
 	ActualState = State#state{currentUser = FirstUser},
+	taxiServingAppId(FirstUser),
 	printState(ActualState),
 	{keep_state, ActualState};
 	
@@ -115,7 +133,7 @@ calculateNewState(Stato, TappaAttuale, Tappe) ->
 	Pos = TappaAttuale#tappa.posizione,
 	sendPosToGps(Pos),
 	if 
-		NuoveTappe =:= [] -> Stato#state{tappe = [], currentUser = "", currentPos = Pos};
+		NuoveTappe =:= [] -> Stato#state{tappe = [], currentUser = none, currentPos = Pos};
 		true ->
 			ProssimaTappa = hd(NuoveTappe),
 			ProssimoUtente = ProssimaTappa#tappa.user,
@@ -131,18 +149,24 @@ calculateNewState(Stato, TappaAttuale, Tappe) ->
 sendPosToGps(_Position) ->
 	foo.
   
-arrivedInTargetPosition(User) ->
-	my_util:println("ho servito: ", User).
+taxiServingAppId(User) ->
+	gen_statem:cast(User,taxiServingYou).
+	%my_util:println("sto servendo: ", User).
 
 arrivedInUserPosition(User) ->
-	my_util:println("sono arrivato da", User).
+	gen_statem:cast(User,arrivedUserPosition).
+	%my_util:println("sono arrivato da", User).
 
-taxiServingAppId(User) ->
-		my_util:println("sto servendo: ", User).
+arrivedInTargetPosition(User) ->
+	gen_statem:cast(User,arrivedTargetPosition).
+	%my_util:println("ho servito: ", User).
+
 
 printState(State) ->
 	my_util:println("situazione Stato:", State).
-		
+	
+
+
 %testing seq
 %c(macchina_moving_withRecords),
 %f(),
