@@ -1,11 +1,15 @@
 -module(environment).
+
 -export([generate_event/1, start_link/0, get_nearest/1, get_cars/2, end_environment/1]).
+
 -import('tick_server',[start_clock/2, end_clock/1]).
 -import('my_util',[println/1]).
 -import('send', [send_message/2, send_message/3]).
 -import('graph', [from_file/1, num_of_edges/1, num_of_vertices/1, del_graph/1]).
+-import('city_map', [load_map/0, load_nodes/0, print_nodes/1]).
 -record(state, {cars, users, map, tick_s_pid}).
--define(TICKTIME, 2).
+-include("records.hrl").
+-include("globals.hrl").
 
 %%% Client API
 start_link() -> spawn_link(fun init/0).
@@ -13,7 +17,9 @@ start_link() -> spawn_link(fun init/0).
 %%% Server functions
 init() -> 
 	println("Start Environment~n"), 
-	City_Map = from_file("map\\city_map_graph.dat"),
+	City_Map = load_map(),
+	Nodes = load_nodes(),
+	print_nodes(Nodes),
 	io:format("Total nodes: ~w~n", [num_of_vertices(City_Map)]),
 	io:format("Total edges: ~w~n", [num_of_edges(City_Map)]),
 	del_graph(City_Map),
