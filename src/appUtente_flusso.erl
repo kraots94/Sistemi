@@ -22,12 +22,15 @@ init(TaxiPid) ->
 	sendQueue1(TaxiPid),
 	{ok, waiting_car_queue, TaxiPid}.
 
+%normale = nodo intermedio di spostamento
+%partenza = il nodo di partenza del cliente
+%arrivo = il nodo target
+%tempo = tempo mancante per arrivare a quel nodo
+
 sendQueue1(TaxiPid) ->
-	Record1 = #tappa {user = self(), tipo = "normale", tempo = 3, posizione = {1,1}},
-	Record2 = #tappa {user = self(), tipo = "partenza", tempo = 5, posizione = {2,2}},
-	Record3 = #tappa {user = self(), tipo = "normale", tempo = 3, posizione = {3,3}},
-	Record4 = #tappa {user = self(), tipo = "arrivo", tempo = 4, posizione = {4,4}},
-	Queue = [Record1, Record2, Record3, Record4],
+	Record1 = #tappa {user = self(), tipo = "partenza", tempo = 0, posizione = {44,33}},
+	Record3 = #tappa {user = self(), tipo = "arrivo", tempo = 2, posizione = {4,4}},
+	Queue = [Record1, Record3],
 	macchina_moving_withRecords:updateQueuePid_alone(TaxiPid, Queue).
 
 %idle(enter, _OldState, Stato) ->
@@ -53,6 +56,7 @@ waiting_car(cast, {changeDest, _NewDest}, _Taxi) ->
 
 moving(cast, arrivedTargetPosition, Taxi) ->
 	my_util:println("sono arrivato a destinazione USER: ", self()),
+	my_util:println("ora vado a morire USER: ", self()),
 	{next_state, ending, Taxi};
 
 moving(cast, {changeDest, _NewDest}, _Taxi) ->
@@ -60,7 +64,7 @@ moving(cast, {changeDest, _NewDest}, _Taxi) ->
 	keep_state_and_data.
 
 ending(enter, _OldState, _Taxi) ->
-	my_util:println("Sto per morire harry..."),
+	my_util:println("...Morto..."),
 	keep_state_and_data.
 
 %testing

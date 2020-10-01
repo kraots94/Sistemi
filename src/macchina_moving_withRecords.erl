@@ -1,7 +1,7 @@
 -module(macchina_moving_withRecords).
 -compile(export_all).
 -behaviour(gen_statem).
--define(TICKTIME, 1).
+-define(TICKTIME, 3).
 -define(HANDLE_COMMON,
     ?FUNCTION_NAME(T, C, D) -> handle_common(T, C,?FUNCTION_NAME, D)).
 
@@ -32,37 +32,6 @@ init(InitialPos) ->
 updateQueue(Pid, Queue) ->
     gen_statem:cast(Pid, {updateQueue, Queue}).
 
-%normale = nodo intermedio di spostamento
-%partenza = il nodo di partenza del cliente
-%arrivo = il nodo target
-%tempo = tempo mancante per arrivare a quel nodo
-updateQueue1(Pid) ->
-	Record1 = #tappa {user = "pippo", tipo = "normale", tempo = 3, posizione = {1,2}},
-	Record2 = #tappa {user = "pippo", tipo = "partenza", tempo = 5, posizione = {5,7}},
-	Record7 = #tappa {user = "pippo", tipo = "normale", tempo = 3, posizione = {1,2}},
-	Record3 = #tappa {user = "pippo", tipo = "arrivo", tempo = 4, posizione = {5,7}},
-	Record4 = #tappa {user = "pluto", tipo = "normale", tempo = 4, posizione = {5,7}},
-	Record5 = #tappa {user = "pluto", tipo = "partenza", tempo = 3, posizione = {123,123}},
-	Record6 = #tappa {user = "pluto", tipo = "arrivo", tempo = 3, posizione = {123,123}},
-	Queue = [Record1,Record2,Record7,Record3,Record4,Record5,Record6],
-	gen_statem:cast(Pid, {updateQueue, Queue}).
-
-updateQueue2(Pid) ->
-	Record1 = #tappa {user = "topolino", tipo = "partenza", tempo = 1, posizione = {1,2}},
-	Record5 = #tappa {user = "topolino", tipo = "arrivo", tempo = 1, posizione = {123,123}},
-	Queue = [Record1,Record5],
-	gen_statem:cast(Pid, {updateQueue, Queue}).
-
-%pid = del processo macchina
-%Other = pid utente
-updateQueuePid(Pid, Other) ->
-	Record1 = #tappa {user = Other, tipo = "normale", tempo = 3, posizione = {1,2}},
-	Record2 = #tappa {user = Other, tipo = "partenza", tempo = 5, posizione = {5,7}},
-	Record3 = #tappa {user = Other, tipo = "normale", tempo = 3, posizione = {1,2}},
-	Record4 = #tappa {user = Other, tipo = "arrivo", tempo = 4, posizione = {5,7}},
-	Queue = [Record1,Record2,Record3,Record4],
-	gen_statem:cast(Pid, {updateQueue, Queue}).
-
 %update queue posseduta dal processo
 updateQueuePid_alone(Pid,Queue) ->
 	gen_statem:cast(Pid, {updateQueue, Queue}).
@@ -87,8 +56,17 @@ moving(enter, _OldState, State) ->
 	my_util:println("mi sto spostando..."),
 	PrimaTappa = hd(State#state.tappe),
 	FirstUser = PrimaTappa#tappa.user,
-	ActualState = State#state{currentUser = FirstUser},
+	TipoTappa = PrimaTappa#tappa.tipo,
+	TempoTappa = PrimaTappa#tappa.tempo,
 	taxiServingAppId(FirstUser),
+	ActualState = 
+	if 
+		(TipoTappa =:= "partenza") and (TempoTappa == 0) -> %caso speciale in cui primo utente è nel nodo macchina
+			arrivedInUserPosition(FirstUser),
+			NuoveTappe = tl(State#state.tappe),
+			State#state{currentUser = FirstUser,tappe = NuoveTappe};
+		true -> State#state{currentUser = FirstUser}
+	end,	
 	printState(ActualState),
 	{keep_state, ActualState};
 	
@@ -109,6 +87,7 @@ moving(info, {_From, tick}, State) ->
 			my_util:println("raggiunto nuovo nodo"),
 			TipoNodoAttuale = TappaAttuale#tappa.tipo,
 			PersonaAttuale = TappaAttuale#tappa.user,
+			NewState = calculateNewState(State, TappaAttuale, TappeAttuali),
 			if  %controllo se sono arrivato al target oppure se sono arrivato da utente nuovo
 				TipoNodoAttuale =:= "arrivo" ->
 					arrivedInTargetPosition(PersonaAttuale);
@@ -116,7 +95,6 @@ moving(info, {_From, tick}, State) ->
 					arrivedInUserPosition(PersonaAttuale);
 				true -> foo
 			end,
-			NewState = calculateNewState(State, TappaAttuale, TappeAttuali),
 			if 
 				tl(TappeAttuali) =:= [] -> %ho finito il servizio
 					{next_state, idle, NewState};
@@ -137,10 +115,17 @@ calculateNewState(Stato, TappaAttuale, Tappe) ->
 		true ->
 			ProssimaTappa = hd(NuoveTappe),
 			ProssimoUtente = ProssimaTappa#tappa.user,
+			ProssimoTipo = ProssimaTappa#tappa.tipo,
 			if 
 				ProssimoUtente /= TappaAttuale#tappa.user ->
 					taxiServingAppId(ProssimoUtente),
-					Stato#state{tappe = NuoveTappe, currentUser = ProssimoUtente, currentPos = Pos};
+					if (ProssimoTipo =:= "partenza") -> %caso in cui il prossimo utente è nel nodo attuale
+						   arrivedInUserPosition(ProssimoUtente),
+						   NuoveNuoveTappe = tl(NuoveTappe),
+						   Stato#state{tappe = NuoveNuoveTappe, currentUser = ProssimoUtente, currentPos = Pos};
+					   true ->
+						   Stato#state{tappe = NuoveTappe, currentUser = ProssimoUtente, currentPos = Pos}
+					end;
 				true ->
 					Stato#state{tappe = NuoveTappe, currentPos = Pos}
 			end
