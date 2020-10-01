@@ -38,6 +38,24 @@ def baseconvert(n, base):
 
     return s
 
+def reverse_string(str):  
+    str1 = ""   # Declaring empty string to store the reversed string  
+    for i in str:  
+        str1 = i + str1  
+    return str1    # It will return the reverse string to the caller function  
+
+''' Only works if symbols are: "abcdefghijklmnopqrstuvwxyz"'''
+def base26to10(number26):
+    reversed = reverse_string(number26)
+    out = 0
+    count = 0
+    for c in reversed:
+        n = math.pow(26,count) * (ord(c) - ord('a'))
+        out = out + n
+        count = count + 1
+
+    return math.floor(out)
+
 # Function to do insertion sort 
 def insertionSort(arr, begin, end, k): 
 
@@ -158,14 +176,22 @@ def add_edges(graph_edges, graph_vertices, total_nodes, total_to_add):
         graph_edges.append([random.randint(WEIGHT_MIN,WEIGHT_MAX), graph_vertices[current_combination[0]][0], graph_vertices[current_combination[1]][0]])
         visited_combo.append(index)
 
-def create_file(V, E):
-    fo = open(PATH_MAP+"city_map.dat", "w")
+def create_file_graph(V, E):
+    fo = open(PATH_MAP+"city_map_graph.dat", "w")
+    total_nodes = len(V)
+    total_edges = len(E)
+    graph_type = "undirected"
+    weights_type = "d"
+    fo.write("{} {} {} {}\n".format(total_nodes, total_edges, graph_type, weights_type))
+    for edge in E:
+        fo.write(str(base26to10(edge[1])) + " " + str(base26to10(edge[2]))  + " " + str(edge[0]) + "\n")
+    fo.close()
+
+def create_file_nodes_positions(V):
+    fo = open(PATH_MAP+"city_map_nodes.dat", "w")
     fo.write(str(len(V)) + "\n")
     for vertex in V:
-        fo.write(vertex[0] + " " +str(vertex[1]) + " " +str(vertex[2]) + "\n")
-    fo.write(str(len(E)) + "\n")
-    for edge in E:
-        fo.write(str(edge[0]) + " " + edge[1] + " " + edge[2] + "\n")
+        fo.write(vertex[0] + " "+ str(base26to10(vertex[0])) +" "+str(vertex[1]) + " " +str(vertex[2]) + "\n")
     fo.close()
 
 def create_file_dot(V, E):
@@ -186,5 +212,6 @@ E = []
 createPath(V, E)
 add_edges(E, V, TOTAL_NODES, edges_to_add)
 
-create_file(V, E)
+create_file_graph(V, E)
+create_file_nodes_positions(V)
 create_file_dot(V, E)

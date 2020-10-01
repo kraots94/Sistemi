@@ -3,6 +3,7 @@
 -import('tick_server',[start_clock/2, end_clock/1]).
 -import('my_util',[println/1]).
 -import('send', [send_message/2, send_message/3]).
+-import('graph', [from_file/1, num_of_edges/1, num_of_vertices/1, del_graph/1]).
 -record(state, {cars, users, map, tick_s_pid}).
 -define(TICKTIME, 2).
 
@@ -12,6 +13,10 @@ start_link() -> spawn_link(fun init/0).
 %%% Server functions
 init() -> 
 	println("Start Environment~n"), 
+	City_Map = from_file("map\\city_map_graph.dat"),
+	io:format("Total nodes: ~w~n", [num_of_vertices(City_Map)]),
+	io:format("Total edges: ~w~n", [num_of_edges(City_Map)]),
+	del_graph(City_Map),
 	Pid_Tick = start_clock(?TICKTIME, [self()]),
 	S = #state{cars = [], users = [], map = [], tick_s_pid = Pid_Tick},
 	loop(S).
