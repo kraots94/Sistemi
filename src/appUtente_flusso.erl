@@ -20,7 +20,7 @@ start(TaxiPid) ->
 init(TaxiPid) ->
 	%tick_server:start_clock(?TICKTIME, [self()]),
 	sendQueue1(TaxiPid),
-	{ok, idle, TaxiPid}.
+	{ok, waiting_car_queue, TaxiPid}.
 
 sendQueue1(TaxiPid) ->
 	Record1 = #tappa {user = self(), tipo = "normale", tempo = 3, posizione = {1,1}},
@@ -35,17 +35,29 @@ sendQueue1(TaxiPid) ->
 %	sendQueue1(Stato),
 %	keep_state_and_data;
 
-idle(cast, taxiServingYou, Taxi) ->
-	my_util:println("PENIS"),
+waiting_car_queue(cast, taxiServingYou, Taxi) ->
+	my_util:println("taxi mi sta servendo USER: ", self()),
 	{next_state, waiting_car, Taxi}.
 
+waitin_car_queue(cast, {changeDest, _NewDest}, _Taxi) ->
+	%invio evento non puoi cambiare path...
+	keep_state_and_data.
+
 waiting_car(cast, arrivedUserPosition, Taxi) ->
-	my_util:println("BIGGER PENIS"),
-	{next_state, moving, Taxi}.
+	my_util:println("taxi arrivato da me USER: ", self()),
+	{next_state, moving, Taxi};
+
+waiting_car(cast, {changeDest, _NewDest}, _Taxi) ->
+	%invio evento cambio dest...
+	keep_state_and_data.
 
 moving(cast, arrivedTargetPosition, Taxi) ->
-	my_util:println("UBER PENIS"),
-	{next_state, ending, Taxi}.
+	my_util:println("sono arrivato a destinazione USER: ", self()),
+	{next_state, ending, Taxi};
+
+moving(cast, {changeDest, _NewDest}, _Taxi) ->
+	%invio evento cambio dest...
+	keep_state_and_data.
 
 ending(enter, _OldState, _Taxi) ->
 	my_util:println("Sto per morire harry..."),
