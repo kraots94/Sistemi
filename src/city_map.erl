@@ -8,30 +8,19 @@
 
 -import('graph', [from_file/1, num_of_edges/1, num_of_vertices/1, del_graph/1, vertices/1, pprint/1]).
 -import('dijkstra', [run/2]).
-%%	
-_Verticies = vertices(City_Map),
-	pprint(City_Map),
-	Out_Djsktra = dijkstra:run(City_Map, 6),
-	io:format("========================~n"),
-	io:format("~w~n", [Out_Djsktra]),
-	Nodes = load_nodes(),
-	print_nodes(Nodes),
-	io:format("Total nodes: ~w~n", [num_of_vertices(City_Map)]),
-	io:format("Total edges: ~w~n", [num_of_edges(City_Map)]),
-	del_graph(City_Map),
+
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([load_map/0, load_nodes/0, print_nodes/1, delete_map/1, calculate_path/4]).
+-export([init_city/0, load_nodes/0, print_nodes/1, delete_map/1, calculate_path/4]).
 
-load_map() -> graph:from_file(?FILE_MAP).
-
-load_nodes() -> 
-	{ok, IO} = file:open(?FILE_NODES, [read]),
-	{ok, [Total_Nodes]} = io:fread(IO, ">", "~d"),
-	Nodes = read_node([], Total_Nodes, IO),
-	Nodes.
-
+init_city() -> 
+	Map = load_map(),
+	City = #city{total_nodes = num_of_vertices(Map),
+				 total_edges = num_of_edges(Map),
+				 city_graph = Map,
+				 nodes = load_nodes()},
+	City.
 
 print_nodes(Nodes) -> io:format("id name x y~n"),
 					  print_node(Nodes).
@@ -45,11 +34,34 @@ delete_map(_Map) -> ok.
 %% P2 -> Position user start
 %% P3 -> Position user targat
 %% ====================================================================
-calculate_path(User, _P1, _P2, _P3) -> create_records(User, []).
+calculate_path(User, P1, P2, P3) -> 
+	io:format("Bella~n"),
+	City_Graph = get_map(),
+	io:format("P1: ~w~n", P1),
+	ID_P1 = my_util:base26to10(P1),
+	_ID_P2 = my_util:base26to10(P2),
+	_ID_P3 = my_util:base26to10(P3),
+	io:format("id: ~w~n", ID_P1),
+	Out_Djsktra = dijkstra:run(City_Graph, ID_P1),
+	io:format("~p~n", Out_Djsktra),
+	del_graph(City_Graph),
+	create_records(User, []).
 
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
+get_map() ->
+	load_map().
+	
+load_map() ->
+	City_Map = graph:from_file(?FILE_MAP),
+	City_Map.
+
+load_nodes() -> 
+	{ok, IO} = file:open(?FILE_NODES, [read]),
+	{ok, [Total_Nodes]} = io:fread(IO, ">", "~d"),
+	Nodes = read_node([], Total_Nodes, IO),
+	Nodes.
 
 read_node(Nodes, 0, _IO) -> Nodes;
 read_node(Nodes, N, IO) -> 

@@ -5,8 +5,8 @@
 -import('tick_server',[start_clock/2, end_clock/1]).
 -import('my_util',[println/1]).
 -import('send', [send_message/2, send_message/3]).
--import('city_map', [load_map/0, load_nodes/0, print_nodes/1]).
--record(state, {cars, users, map, tick_s_pid}).
+-import('city_map', [init_city/0]).
+-record(state, {cars, users, city, tick_s_pid}).
 -include("records.hrl").
 -include("globals.hrl").
 
@@ -16,9 +16,9 @@ start_link() -> spawn_link(fun init/0).
 %%% Server functions
 init() -> 
 	println("Start Environment~n"), 
-	City_Map = load_map(),
+	City = init_city(),
 	Pid_Tick = start_clock(?TICKTIME, [self()]),
-	S = #state{cars = [], users = [], map = [], tick_s_pid = Pid_Tick},
+	S = #state{cars = [], users = [], city = City, tick_s_pid = Pid_Tick},
 	loop(S).
 
 end_environment(Pid) ->
