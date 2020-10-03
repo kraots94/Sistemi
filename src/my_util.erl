@@ -26,16 +26,6 @@ generate_random_number() ->
 	io:format("Generated number: ~w ~n", [N]),
 	N.
 
-base26to10(N) -> 
-	Res = trunc(base26to10calc(reverse(N), 0)),
-	Res.
-
-base26to10calc([], _Acc) -> 0;
-base26to10calc([H | T], Acc) -> 
-	Val = H - 97,
-	Res = (pow(26, Acc) * Val) + base26to10calc(T, Acc+1),
-	Res.
-
 createPairs([A , B | []], ACC) -> 
 	NEW_LIST = ACC ++ [{A, B}],
 	NEW_LIST;
@@ -46,3 +36,5 @@ createPairs([A | []], _ACC) ->
 createPairs([A , B | Tail], ACC) ->
 	NEW_LIST = ACC ++ [{A, B}],
 	createPairs([B] ++ Tail, NEW_LIST).
+
+arraySum(_A) -> 0.

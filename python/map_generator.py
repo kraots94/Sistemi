@@ -198,7 +198,7 @@ def create_file_dot(V, E):
     dot = Graph(name="City_Map", filename="map")
     
     for vertex in V:
-        dot.node(str(vertex[0]), label="{} ({},{})".format(vertex[0], vertex[1], vertex[2]))
+        dot.node(str(vertex[0]), label="{} {} ({},{})".format(str(base26to10(vertex[0])), vertex[0], vertex[1], vertex[2]))
 
     for edge in E:
         dot.edge(str(edge[1]), str(edge[2]), label=str(edge[0]))

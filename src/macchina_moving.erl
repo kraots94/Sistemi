@@ -1,7 +1,7 @@
 -module(macchina_moving).
 -compile(export_all).
 -behaviour(gen_statem).
--define(TICKTIME, 2).
+
 -define(HANDLE_COMMON,
     ?FUNCTION_NAME(T, C, D) -> handle_common(T, C,?FUNCTION_NAME, D)).
 

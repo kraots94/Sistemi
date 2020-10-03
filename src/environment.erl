@@ -86,4 +86,5 @@ get_cars(_Coord, _Range) -> ok.
 terminate(State) ->
 	PID_clock = State#state.tick_s_pid,
 	end_clock(PID_clock),
+%delete map
     ok.
