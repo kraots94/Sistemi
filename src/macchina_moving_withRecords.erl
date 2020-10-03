@@ -1,28 +1,17 @@
 -module(macchina_moving_withRecords).
 -compile(export_all).
 -behaviour(gen_statem).
--define(HANDLE_COMMON,
-    ?FUNCTION_NAME(T, C, D) -> handle_common(T, C,?FUNCTION_NAME, D)).
 -include("records.hrl").
 -include("globals.hrl").
 
--record(state, {tappe,
-				currentUser = none,
-				currentPos}).
+callback_mode() -> [state_functions,state_enter].
 
-callback_mode() ->
-    [state_functions,state_enter].
-
+%% ====================================================================
+%% API functions
+%% ====================================================================
 start(InitialPos) ->
 	{ok, Pid} = gen_statem:start_link(?MODULE, InitialPos, []),
 	Pid.
-
-init(InitialPos) ->
-	tick_server:start_clock(?TICKTIME, [self()]),
-	State = #state {tappe = [],
-					currentUser = none,
-					currentPos = InitialPos},
-	{ok, idle, State}.
 
 %update queue posseduta dal processo
 updateQueuePid_alone(Pid,Queue) ->
@@ -31,21 +20,38 @@ updateQueuePid_alone(Pid,Queue) ->
 crash(Pid) ->
 	gen_statem:cast(Pid, {crash}).
 
-%handle_common(cast, {updateQueue, RcvQueue}, _OldState, State) ->
-%	TappeAttuali = State#state.tappe,
-%	NewTappe = TappeAttuali ++ RcvQueue,
-%	my_util:println("ricevuto queue nuova"),
-%	{next_state, moving, State#state{tappe=NewTappe}}.
+areYouBusy(Pid) ->
+	gen_statem:call(Pid, {areYouBusy}).
+
+%% ====================================================================
+%% Automata Functions
+%% ====================================================================
+
+init(InitialPos) ->
+	tick_server:start_clock(?TICKTIME, [self()]),
+	State = #movingCarState {tappe = [],
+					currentUser = none,
+					currentPos = InitialPos},
+	{ok, idle, State}.
 
 handle_common(cast, {updateQueue, RcvQueue}, _OldState, State) ->
 	{First, Second, Third} = RcvQueue,
-	Actualpos = State#state.currentPos,
-	%calcola posizione finale nel caso di utenti in coda
+	Actualpos = State#movingCarState.currentPos,
+%calcola posizione finale nel caso di utenti in coda e usa quella in calculatePath
 	{_Costi, Tappe} = city_map:calculate_path(First,Actualpos,Second,Third),
 % Tolgo tappe colonnine  da TappeAttuali
 %	TappeAttuali = State#state.tappe
-	NewTappe = State#state.tappe ++ Tappe,
-	{next_state, moving, State#state{tappe=NewTappe}}.
+	NewTappe = State#movingCarState.tappe ++ Tappe,
+	{next_state, moving, State#movingCarState{tappe=NewTappe}};
+
+handle_common({call,From}, {areYouBusy}, OldState, State) ->
+	Reply = if OldState == idle -> false;
+	   		  true -> true
+			end,
+	{next_state, OldState, State, [{reply,From,Reply}]}.
+		
+	
+	
 
 idle(enter, _OldState, Stato) ->
 	my_util:println("sono in idle..."),
@@ -59,7 +65,7 @@ idle(info, {_From, tick}, _Stato) ->
 	  
 moving(enter, _OldState, State) ->
 	my_util:println("mi sto spostando..."),
-	PrimaTappa = hd(State#state.tappe),
+	PrimaTappa = hd(State#movingCarState.tappe),
 	FirstUser = PrimaTappa#tappa.user,
 	TipoTappa = PrimaTappa#tappa.type,
 	TempoTappa = PrimaTappa#tappa.t,
@@ -68,9 +74,9 @@ moving(enter, _OldState, State) ->
 	if 
 		(TipoTappa =:= user_start) and (TempoTappa == 0) -> %caso speciale in cui primo utente è nel nodo macchina
 			arrivedInUserPosition(FirstUser),
-			NuoveTappe = tl(State#state.tappe),
-			State#state{currentUser = FirstUser,tappe = NuoveTappe};
-		true -> State#state{currentUser = FirstUser}
+			NuoveTappe = tl(State#movingCarState.tappe),
+			State#movingCarState{currentUser = FirstUser,tappe = NuoveTappe};
+		true -> State#movingCarState{currentUser = FirstUser}
 	end,	
 	printState(ActualState),
 	{keep_state, ActualState};
@@ -78,7 +84,7 @@ moving(enter, _OldState, State) ->
 %gestione tick in movimento
 moving(info, {_From, tick}, State) ->
 	my_util:println("ricevuto tick...aggiorno spostamento"),
-	TappeAttuali = State#state.tappe,
+	TappeAttuali = State#movingCarState.tappe,
 	TappaAttuale = hd(TappeAttuali),
 	Time = TappaAttuale#tappa.t,
 	NewTime = Time - 1,
@@ -86,7 +92,7 @@ moving(info, {_From, tick}, State) ->
 		NewTime > 0 -> %sono nello spostamento fra due nodi, decremento il tempo
 			TappaConSpostamento = TappaAttuale#tappa{t = NewTime},
 			NuoveTappe = [TappaConSpostamento] ++ tl(TappeAttuali),
-			NuovoStato =  State#state{tappe=NuoveTappe},
+			NuovoStato =  State#movingCarState{tappe=NuoveTappe},
 			printState(NuovoStato),
 			{keep_state, NuovoStato};
 		true -> %tempo = 0 , quindi ho raggiunto nodo nuovo
@@ -110,23 +116,26 @@ moving(info, {_From, tick}, State) ->
 			end
 	end;
 	
-
 moving(cast, {crash}, State) ->
 	my_util:println("ho fatto un incidente!"),
-	sendUserCrashEvent(State#state.currentUser),
-	{next_state, crash, State#state{tappe = [],currentUser = none}};
+	sendUserCrashEvent(State#movingCarState.currentUser),
+	{next_state, crash, State#movingCarState{tappe = [],currentUser = none}};
 	?HANDLE_COMMON.
 	  
 crash(enter, _OldState, _Stato) ->
-	exit(crash).
+	exit(crash);
+	?HANDLE_COMMON.
+%% ====================================================================
+%% Internal functions
+%% ====================================================================
 
-%return cambiamento stato macchina dopo essere arrivato a nuovo nodo e stampa se servo nuovo utente
+%return cambiamento stato macchina dopo essere arrivato a nuovo nodo e invia relativi eventi a utenti nuovi o ragginti
 calculateNewState(Stato, TappaAttuale, Tappe) ->
 	NuoveTappe = tl(Tappe),
 	Pos = TappaAttuale#tappa.node_name,
 	sendPosToGps(Pos),
 	if 
-		NuoveTappe =:= [] -> Stato#state{tappe = [], currentUser = none, currentPos = Pos};
+		NuoveTappe =:= [] -> Stato#movingCarState{tappe = [], currentUser = none, currentPos = Pos};
 		true ->
 			ProssimaTappa = hd(NuoveTappe),
 			ProssimoUtente = ProssimaTappa#tappa.user,
@@ -137,12 +146,12 @@ calculateNewState(Stato, TappaAttuale, Tappe) ->
 					if (ProssimoTipo =:= user_start) -> %caso in cui il prossimo utente è nel nodo attuale
 						   arrivedInUserPosition(ProssimoUtente),
 						   NuoveNuoveTappe = tl(NuoveTappe),
-						   Stato#state{tappe = NuoveNuoveTappe, currentUser = ProssimoUtente, currentPos = Pos};
+						   Stato#movingCarState{tappe = NuoveNuoveTappe, currentUser = ProssimoUtente, currentPos = Pos};
 					   true ->
-						   Stato#state{tappe = NuoveTappe, currentUser = ProssimoUtente, currentPos = Pos}
+						   Stato#movingCarState{tappe = NuoveTappe, currentUser = ProssimoUtente, currentPos = Pos}
 					end;
 				true ->
-					Stato#state{tappe = NuoveTappe, currentPos = Pos}
+					Stato#movingCarState{tappe = NuoveTappe, currentPos = Pos}
 			end
 	end.
 

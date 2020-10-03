@@ -1,26 +1,31 @@
 -module(appUtente_flusso).
 -compile(export_all).
 -behaviour(gen_statem).
--define(HANDLE_COMMON,
-    ?FUNCTION_NAME(T, C, D) -> handle_common(T, C,?FUNCTION_NAME, D)).
 -include("globals.hrl").
 
-callback_mode() ->
-    [state_functions].
+callback_mode() -> [state_functions].
 
-start(TaxiPid) ->
-	{ok, Pid} = gen_statem:start_link(?MODULE, TaxiPid, []),
+%% ====================================================================
+%% API functions
+%% ====================================================================
+
+start(InitialPos) ->
+	{ok, Pid} = gen_statem:start_link(?MODULE, InitialPos, []),
 	Pid.
 
-init(InitialPos) ->
-	%tick_server:start_clock(?TICKTIME, [self()]),
-	{ok, idle, InitialPos}.
-
-%Request = {"a", "b"}.
+%Request è tipo = {"a", "b"}.
 sendRequest (TaxiPid, UserPid, Request) ->
 	%Richiesta = {self(), "f", "d"},}
 	gen_statem:cast(UserPid, {send_request,Request,TaxiPid}).
 
+
+%% ====================================================================
+%% Automata Functions
+%% ====================================================================
+
+init(InitialPos) ->
+	%tick_server:start_clock(?TICKTIME, [self()]),
+	{ok, idle, InitialPos}.
 
 idle(cast, {send_request, Request, PidTaxi}, Position) ->
 	checkValidityRequest(Position, Request),
@@ -57,6 +62,10 @@ moving(cast, {changeDest, _NewDest}, _Position) ->
 ending(enter, _OldState, _Position) ->
 	my_util:println("...Morto..."),
 	keep_state_and_data.
+
+%% ====================================================================
+%% Internal Functions
+%% ====================================================================
 
 %controllo validità richiesta e in caso negativo errore
 checkValidityRequest(UserPos, Request) ->

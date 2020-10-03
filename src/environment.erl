@@ -6,7 +6,6 @@
 -import('my_util',[println/1]).
 -import('send', [send_message/2, send_message/3]).
 -import('city_map', [init_city/0]).
--record(state, {cars, users, city, tick_s_pid}).
 -include("records.hrl").
 -include("globals.hrl").
 
@@ -18,7 +17,7 @@ init() ->
 	println("Start Environment~n"), 
 	City = init_city(),
 	Pid_Tick = start_clock(?TICKTIME, [self()]),
-	S = #state{cars = [], users = [], city = City, tick_s_pid = Pid_Tick},
+	S = #environmentState{cars = [], users = [], city = City, tick_s_pid = Pid_Tick},
 	loop(S).
 
 end_environment(Pid) ->
@@ -78,13 +77,23 @@ generate_event(N) ->
 		true -> println("nothing happened")
 	end.
 
+%generate_taxi(Stato) ->
+%	Position = %genera stringa random valida in base a numero nodi
+%	PidTaxi = macchina_moving_withRecords:start(Position),
+%	Stato#environmentState{cars = [PidTaxi] ++ cars}.
+	
+%generate_user(Stato) ->
+	%genera richiesta {From, To} e posizioneInizialeUtente
+	%PidUtente = appUtente_flusso:start(posizioneInizialeUtente),
+	%Stato#environmentState{users = [PidUtente] ++ users}
+	
 get_nearest(_Coord) -> ok.
 
 get_cars(_Coord, _Range) -> ok.
 
 % uccide l'orologio e gli automi delle macchine / utenti
 terminate(State) ->
-	PID_clock = State#state.tick_s_pid,
+	PID_clock = State#environmentState.tick_s_pid,
 	end_clock(PID_clock),
 %delete map
     ok.

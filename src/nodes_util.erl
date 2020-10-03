@@ -9,7 +9,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([load_nodes/0, print_nodes/1, getNodeID/2, getNodeName/2]).
+-export([load_nodes/0, print_nodes/1, getNodeID/2, getNodeName/2, getPositionFromNodeName/2]).
 
 load_nodes() -> 
 	{ok, IO} = file:open(?FILE_NODES, [read]),
@@ -25,6 +25,9 @@ getNodeID(NodeName,Nodes) ->
 
 getNodeName(NodeID,Nodes) -> 
 	getName(NodeID,Nodes).
+
+getPositionFromNodeName(NodeName, Nodes) ->
+	getPos(NodeName, Nodes).
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
@@ -43,6 +46,15 @@ getName(NodeID, [H | T]) ->
 	ID = H#node.id,
 	if NodeID == ID -> Name;
 	   true -> getName(NodeID, T)
+	end.
+
+getPos(_NodeName, []) -> -1;
+getPos(NodeName, [H | T]) -> 
+	Name = H#node.name,
+	PosX = H#node.pos_x,
+	PosY = H#node.pos_y,
+	if NodeName =:= Name -> {PosX, PosY};
+	   true -> getPos(NodeName, T)
 	end.
 
 read_node(Nodes, 0, _IO) -> Nodes;
