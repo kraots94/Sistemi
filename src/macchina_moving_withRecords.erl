@@ -24,12 +24,12 @@ init(InitialPos) ->
 					currentPos = InitialPos},
 	{ok, idle, State}.
 
-updateQueue(Pid, Queue) ->
-    gen_statem:cast(Pid, {updateQueue, Queue}).
-
 %update queue posseduta dal processo
 updateQueuePid_alone(Pid,Queue) ->
 	gen_statem:cast(Pid, {updateQueue, Queue}).
+
+crash(Pid) ->
+	gen_statem:cast(Pid, {crash}).
 
 %handle_common(cast, {updateQueue, RcvQueue}, _OldState, State) ->
 %	TappeAttuali = State#state.tappe,
@@ -40,6 +40,7 @@ updateQueuePid_alone(Pid,Queue) ->
 handle_common(cast, {updateQueue, RcvQueue}, _OldState, State) ->
 	{First, Second, Third} = RcvQueue,
 	Actualpos = State#state.currentPos,
+	%calcola posizione finale nel caso di utenti in coda
 	{_Costi, Tappe} = city_map:calculate_path(First,Actualpos,Second,Third),
 % Tolgo tappe colonnine  da TappeAttuali
 %	TappeAttuali = State#state.tappe
@@ -74,6 +75,7 @@ moving(enter, _OldState, State) ->
 	printState(ActualState),
 	{keep_state, ActualState};
 	
+%gestione tick in movimento
 moving(info, {_From, tick}, State) ->
 	my_util:println("ricevuto tick...aggiorno spostamento"),
 	TappeAttuali = State#state.tappe,
@@ -107,7 +109,16 @@ moving(info, {_From, tick}, State) ->
 					{keep_state, NewState}
 			end
 	end;
+	
+
+moving(cast, {crash}, State) ->
+	my_util:println("ho fatto un incidente!"),
+	sendUserCrashEvent(State#state.currentUser),
+	{next_state, crash, State#state{tappe = [],currentUser = none}};
 	?HANDLE_COMMON.
+	  
+crash(enter, _OldState, _Stato) ->
+	exit(crash).
 
 %return cambiamento stato macchina dopo essere arrivato a nuovo nodo e stampa se servo nuovo utente
 calculateNewState(Stato, TappaAttuale, Tappe) ->
@@ -135,6 +146,9 @@ calculateNewState(Stato, TappaAttuale, Tappe) ->
 			end
 	end.
 
+sendUserCrashEvent(PidUser) ->
+	gen_statem:cast(PidUser, crash).
+  
 sendPosToGps(_Position) ->
 	foo.
   
@@ -155,9 +169,7 @@ printState(State) ->
 	my_util:println("situazione Stato:", State).
 	
 
-
-%c(macchina_moving_withRecords),
-%c(appUtente_flusso),
+%make:all(),
 %f(),
 %PidTaxi = macchina_moving_withRecords:start("a"),
 %appUtente_flusso:start(PidTaxi).
