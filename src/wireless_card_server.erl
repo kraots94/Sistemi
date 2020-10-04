@@ -13,7 +13,7 @@
 
 -import('my_util',[println/1, println/2]).
 -import('send', [send_message/2, send_message/3]).
--export([start_wireless_server/1, init/1, end_wireless_server/1]).
+-export([start_wireless_server/1, init/1, end_wireless_server/1, sendPosToGps/2, deleteMyLocationTracks/1, getNearestCar/1, printInternalState/1]).
 
 %f(), make:all(), PID_Wireless_Server = wireless_card_server:start_wireless_server(nodes_util:load_nodes()).
 %PID_Wireless_Server ! {self(), {setPosition, "a"}},
@@ -24,6 +24,29 @@
 %PID_Wireless_Server ! {5, {setPosition, "f"}},
 %PID_Wireless_Server ! {6, {setPosition, "b"}},
 %PID_Wireless_Server ! {7, {setPosition, "a"}}.
+
+%% ====================================================================
+%% API functions
+%% ====================================================================
+
+sendPosToGps(WirelessCardPid, Position) ->
+	WirelessCardPid ! {self(), {setPosition, Position}}.
+	%WirelessCardPid ! {foo, {printState}}.
+
+deleteMyLocationTracks(WirelessCardPid) ->
+	WirelessCardPid ! {self(), {removeEntity}}.
+
+%torna entita' piu' vicina per ora (non necessariamente macchina)
+getNearestCar(WirelessCardPid) ->
+	WirelessCardPid ! {self(), {getNearestCar, self()}}.
+
+%for debugging porp.
+printInternalState(WirelessCardPid) ->
+	WirelessCardPid ! {printState}.
+
+%% ====================================================================
+%% Internal Functions
+%% ====================================================================
 
 start_wireless_server(Nodes) -> spawn_link('wireless_card_server', init, [Nodes]).
 
@@ -43,24 +66,24 @@ initNode([H | T], ACC) ->
 %metti invio msg al pid
 loop(S) ->
 	receive 
-		{Pid, {register, _Type, Pos}} -> io:format("Have to ADD: ~w~n", [Pid]),
-								  NewState = updateEntityPosition(S, Pid, Pos),
-								  loop(NewState);
-		{Pid, {setPosition, NewPos}} -> NewState = updateEntityPosition(S, Pid, NewPos),
-									 loop(NewState);
-		{Pid, {getPosition}}       ->  {Pos, _Res} = getPos(S#wirelessCardServerState.entityPositions, Pid),
-										Pid ! Pos,
-									   loop(S);
-		{_Pid, {printState}} 	-> 	my_util:println("Wireless Server State", S),
-									loop(S);
-		{Pid, {removeEntity}}   ->  NewState = removeEntity(S, Pid), 
-									  loop(NewState);
+		{Pid, {register, _Type, Pos}} 				->  io:format("Have to ADD: ~w~n", [Pid]),
+								  		   				NewState = updateEntityPosition(S, Pid, Pos),
+								           				loop(NewState);
+		{Pid, {setPosition, NewPos}}   	    		->  NewState = updateEntityPosition(S, Pid, NewPos),
+									       			    loop(NewState);
+		{Pid, {getPosition}}            			->  {Pos, _Res} = getPos(S#wirelessCardServerState.entityPositions, Pid),
+										   			    Pid ! Pos,
+									   					loop(S);
+		{printState}			 	    			->  my_util:println("Wireless Server State", S),
+									       				loop(S);
+		{Pid, {removeEntity}}   	    			->  NewState = removeEntity(S, Pid), 
+									       				loop(NewState);
 		{Pid, {getNearEntities, CurrentPos, Power}} -> 
-									Pid ! getNearEntities(S, CurrentPos, Power, Pid),
-									loop(S);
-		{Pid, {getNearestCar, CurrentPos}} -> 
-									Pid ! getNearestCar(S, CurrentPos, Pid),
-									loop(S);
+														Pid ! getNearEntities(S, CurrentPos, Power, Pid),
+														loop(S);
+		{Pid, {getNearestCar, CurrentPos}}			-> 
+														Pid ! getNearestCar(S, CurrentPos, Pid),
+														loop(S);
 		{Pid, Ref, terminate} ->
 			send_message(Pid, {Ref, ok}),
 			println("Exiting wireless server loop~n");

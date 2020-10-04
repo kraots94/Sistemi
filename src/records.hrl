@@ -25,3 +25,6 @@
 							wireless_card_server_pid, 
 							tick_counter}).
 
+-record(taxiListenerState, {pidMoving,
+							pidBattery,
+							pidElection}).

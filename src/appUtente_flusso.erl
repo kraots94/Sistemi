@@ -4,7 +4,7 @@
 -include("globals.hrl").
 -include("records.hrl").
 
-callback_mode() -> [state_functions].
+callback_mode() -> [state_functions, state_enter].
 %userState
 %                   pidEnv,
 %					pidWirelessCard,
@@ -17,7 +17,6 @@ callback_mode() -> [state_functions].
 start(InitialPos, PidEnv, PidWireless) ->
 	State = #userState{pidEnv = PidEnv, pidWirelessCard = PidWireless, currentPos = InitialPos},
 	{ok, Pid} = gen_statem:start_link(?MODULE,State, []),
-	sendPosToGps(PidWireless,InitialPos),
 	Pid.
 
 %Request è tipo = {"a", "b"}.
@@ -34,12 +33,14 @@ updatePosition(UserPid, NewNode) ->
 
 init(State) ->
 	%tick_server:start_clock(?TICKTIME, [self()]),
+	%in futuro qua devi mettere register, non sendPos
+	wireless_card_server:sendPosToGps(State#userState.pidWirelessCard,State#userState.currentPos),
 	{ok, idle, State}.
 
 %ricezione del cambiamento posizione auto che mi serve
 handle_common(cast, {newNodeReached, NewNode}, OldState, State) ->
 	NewState = if OldState == moving -> %ricevuto mentre sono in moving, la mia posizione cambia!
-					sendPosToGps(State#userState.pidWirelessCard, NewNode),
+					wireless_card_server:sendPosToGps(State#userState.pidWirelessCard, NewNode),
 		   			State#userState{currentPos = NewNode};
 				  true -> %ricevuto non in moving, potrei dire a utente dov'è auto se son servito
 					State
@@ -47,7 +48,8 @@ handle_common(cast, {newNodeReached, NewNode}, OldState, State) ->
 	{keep_state, NewState}.
   		   
 	
-
+idle(enter, _OldState, _Stato) -> keep_state_and_data;
+  
 idle(cast, {send_request, Request}, State) ->
 	checkValidityRequest(State#userState.currentPos, Request),
 	{From, To} = Request,
@@ -64,6 +66,8 @@ idle(cast, taxiServingYou, State) ->
 %	%invio evento non puoi cambiare path...
 %	keep_state_and_data.
 
+waiting_car(enter, _OldState, _Stato) -> keep_state_and_data;
+
 waiting_car(cast, arrivedUserPosition, State) ->
 	my_util:println("taxi arrivato da me USER: ", self()),
 	{next_state, moving, State};
@@ -74,10 +78,11 @@ waiting_car(cast, arrivedUserPosition, State) ->
 %	%invio evento cambio dest...
 %	keep_state_and_data.
 
+moving(enter, _OldState, _Stato) -> keep_state_and_data;
+
 moving(cast, arrivedTargetPosition, State) ->
 	my_util:println("sono arrivato a destinazione USER: ", self()),
 	my_util:println("ora vado a morire USER: ", self()),
-	deletePos(State#userState.pidWirelessCard),
 	{next_state, ending, State};
 
 %moving(cast, {changeDest, _NewDest}, _State) ->
@@ -87,8 +92,10 @@ moving(cast, arrivedTargetPosition, State) ->
 
 ?HANDLE_COMMON.
   
-ending(enter, _OldState, _State) ->
-	my_util:println("...Morto..."),
+ending(enter, _OldState, State) ->
+	wireless_card_server:deleteMyLocationTracks(State#userState.pidWirelessCard),
+	my_util:println("MORTO"),
+	%codice per la morte qua
 	keep_state_and_data.
 
 %% ====================================================================
@@ -108,21 +115,13 @@ checkValidityRequest(UserPos, Request) ->
 		   end
 	end.
 
+%trova il taxi piu' vicino (in futuro basic elezione)
 findTaxi(State) ->
 	WirelessCardPid = State#userState.pidWirelessCard,
-	MyPos = State#userState.currentPos,
-	WirelessCardPid ! {self(), {getNearEntities, MyPos, 50}},
+	wireless_card_server:getNearestCar(WirelessCardPid),
 	receive 
-				NearEntities -> hd(NearEntities)
+				Nearest -> Nearest
 	end.
-	
-sendPosToGps(WirelessCardPid, Position) ->
-	my_util:println("SONO UTENTE INVIO POS"),
-	WirelessCardPid ! {self(), {setPosition, Position}}.
-  
-deletePos(WirelessCardPid) ->
-	%wirelessCardPid ! {self(), {removePosition}}.
-	ok.
 
 %testing
 %make:all(),
@@ -138,3 +137,21 @@ deletePos(WirelessCardPid) ->
 %PidUser = appUtente_flusso:start("b", 0, 0),
 %appUtente_flusso:sendRequest(PidUser, {"b","i", PidTaxi}).
 
+%make:all(),
+%f(),
+%PidWifi = wireless_card_server:start_wireless_server(nodes_util:load_nodes()).
+%PidTaxi = macchina_moving_withRecords:start("a", PidWifi),
+%PidUser = appUtente_flusso:start("b", 0, PidWifi),
+%appUtente_flusso:sendRequest(PidUser, {"b","i"}).
+
+%PID_Wireless_Server = wireless_card_server:start_wireless_server(nodes_util:load_nodes()).
+
+%interesting One
+%make:all(),
+%f(),
+%PidWifi = wireless_card_server:start_wireless_server(nodes_util:load_nodes()).
+%PidTaxi1 = macchina_moving_withRecords:start("d", PidWifi),
+%PidTaxi2 = macchina_moving_withRecords:start("b", PidWifi),
+%PidTaxi3 = macchina_moving_withRecords:start("f", PidWifi),
+%PidUser = appUtente_flusso:start("a", 0, PidWifi),
+%appUtente_flusso:sendRequest(PidUser, {"a","d"}).

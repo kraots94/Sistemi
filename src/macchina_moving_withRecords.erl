@@ -6,6 +6,11 @@
 
 callback_mode() -> [state_functions,state_enter].
 
+%pidWirelessCard
+%				 tappe,
+%				 currentUser,
+%				 currentPos
+
 %% ====================================================================
 %% API functions
 %% ====================================================================
@@ -16,7 +21,6 @@ start(InitialPos, PidWireless) ->
 					currentUser = none,
 					currentPos = InitialPos},
 	{ok, Pid} = gen_statem:start_link(?MODULE,State, []),
-	sendPosToGps(PidWireless, InitialPos),
 	Pid.
 
 %update queue posseduta dal processo
@@ -35,7 +39,9 @@ areYouBusy(Pid) ->
 %% ====================================================================
 
 init(State) ->
+	%qua sara' da togliere quando farai ascoltatore
 	tick_server:start_clock(?TICKTIME, [self()]),
+	wireless_card_server:sendPosToGps(State#movingCarState.pidWirelessCard, State#movingCarState.currentPos),
 	{ok, idle, State}.
 
 handle_common(cast, {updateQueue, RcvQueue}, _OldState, State) ->
@@ -141,7 +147,7 @@ calculateNewState(Stato, TappaAttuale, Tappe) ->
 	NuoveTappe = tl(Tappe),
 	Pos = TappaAttuale#tappa.node_name,
 	sendPosToUser(Stato#movingCarState.currentUser,Pos),
-	sendPosToGps(Stato#movingCarState.pidWirelessCard, Pos),
+	wireless_card_server:sendPosToGps(Stato#movingCarState.pidWirelessCard, Pos),
 	if 
 		NuoveTappe =:= [] -> Stato#movingCarState{tappe = [], currentUser = none, currentPos = Pos};
 		true ->
@@ -166,12 +172,6 @@ calculateNewState(Stato, TappaAttuale, Tappe) ->
 sendUserCrashEvent(PidUser) ->
 	gen_statem:cast(PidUser, crash).
   
-sendPosToGps(WirelessCardPid, Position) ->
-	my_util:println("SONO MACCHINA INVIO POS"),
-	my_util:println("pos:", Position),
-	my_util:println("pid WIFI",WirelessCardPid),
-	WirelessCardPid ! {self(), {setPosition, Position}}.
-
 sendPosToUser(UserPid, Position) ->
 	appUtente_flusso:updatePosition(UserPid, Position).
   
