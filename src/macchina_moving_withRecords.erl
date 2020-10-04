@@ -167,8 +167,10 @@ sendUserCrashEvent(PidUser) ->
 	gen_statem:cast(PidUser, crash).
   
 sendPosToGps(WirelessCardPid, Position) ->
-	foo.
-	%WirelessCardPid ! {self(), {setPosition, Position}}.
+	my_util:println("SONO MACCHINA INVIO POS"),
+	my_util:println("pos:", Position),
+	my_util:println("pid WIFI",WirelessCardPid),
+	WirelessCardPid ! {self(), {setPosition, Position}}.
 
 sendPosToUser(UserPid, Position) ->
 	appUtente_flusso:updatePosition(UserPid, Position).

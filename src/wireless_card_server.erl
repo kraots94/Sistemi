@@ -42,7 +42,8 @@ loop(S) ->
 		{Pid, {setPosition, NewPos}} -> NewState = updateEntityPosition(S, Pid, NewPos),
 									 loop(NewState);
 		{Pid, {getPosition}}       ->  {Pos, _Res} = getPos(S#wirelessCardServerState.entityPositions, Pid),
-										Pid ! Pos;
+										Pid ! Pos,
+									   loop(S);
 		{_Pid, {printState}} 	-> 	my_util:println("Wireless Server State", S),
 									loop(S);
 %		{Pid, {removePosition}}   ->  NewState = removeEntityPosition(S, Pid), loop(NewState);

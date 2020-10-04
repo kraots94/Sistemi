@@ -50,9 +50,9 @@ handle_common(cast, {newNodeReached, NewNode}, OldState, State) ->
 
 idle(cast, {send_request, Request}, State) ->
 	checkValidityRequest(State#userState.currentPos, Request),
-	{From, To, PidWinnerTaxi} = Request,
+	{From, To} = Request,
 	CorrectReq = {self(), From, To},
-	%PidWinnerTaxi = findTaxi(CorrectReq, State),
+	PidWinnerTaxi = findTaxi(State),
 	macchina_moving_withRecords:updateQueuePid_alone(PidWinnerTaxi, CorrectReq),
 	keep_state_and_data;
 
@@ -97,7 +97,7 @@ ending(enter, _OldState, _State) ->
 
 %controllo validità richiesta e in caso negativo errore
 checkValidityRequest(UserPos, Request) ->
-	{From, To, Third} = Request,
+	{From, To} = Request,
 	if From /= UserPos -> 
 		   exit(wrongPosReq);
 	   true ->
@@ -108,15 +108,17 @@ checkValidityRequest(UserPos, Request) ->
 		   end
 	end.
 
-findTaxi(_Request, State) ->
-	_WirelessCardPid = State#userState.pidWirelessCard,
-	%NearestTaxi = WirelessCardPid ! {self(), {getNearest}}
-	%ti metti in rcv e torni NearestTaxi
-	0.
+findTaxi(State) ->
+	WirelessCardPid = State#userState.pidWirelessCard,
+	MyPos = State#userState.currentPos,
+	WirelessCardPid ! {self(), {getNearEntities, MyPos, 50}},
+	receive 
+				NearEntities -> hd(NearEntities)
+	end.
 	
 sendPosToGps(WirelessCardPid, Position) ->
-	my_util:println("SONO UTENTE INVIO POS").
-	%WirelessCardPid ! {self(), {setPosition, Position}}.
+	my_util:println("SONO UTENTE INVIO POS"),
+	WirelessCardPid ! {self(), {setPosition, Position}}.
   
 deletePos(WirelessCardPid) ->
 	%wirelessCardPid ! {self(), {removePosition}}.
