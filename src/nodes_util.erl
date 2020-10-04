@@ -9,7 +9,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([load_nodes/0, print_nodes/1, getNodeID/2, getNodeName/2, getPositionFromNodeName/2]).
+-export([load_nodes/0, print_nodes/1, getNodeID/2, getNodeName/2, getPositionFromNodeName/2, getRandomPositionName/1]).
 
 load_nodes() -> 
 	{ok, IO} = file:open(?FILE_NODES, [read]),
@@ -28,6 +28,13 @@ getNodeName(NodeID,Nodes) ->
 
 getPositionFromNodeName(NodeName, Nodes) ->
 	getPos(NodeName, Nodes).
+
+getRandomPositionName(Nodes) ->
+	TotalNodes = length(Nodes),
+	Random_ID = my_util:generate_random_number(TotalNodes),
+	NodeName = getNodeName(Random_ID, Nodes),
+	NodeName.
+
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
@@ -48,7 +55,7 @@ getName(NodeID, [H | T]) ->
 	   true -> getName(NodeID, T)
 	end.
 
-getPos(_NodeName, []) -> -1;
+getPos(_NodeName, []) -> {-1, -1};
 getPos(NodeName, [H | T]) -> 
 	Name = H#node.name,
 	PosX = H#node.pos_x,

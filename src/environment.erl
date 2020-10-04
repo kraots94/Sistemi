@@ -3,9 +3,11 @@
 -export([generate_event/1, start_link/0, get_nearest/1, get_cars/2, end_environment/1]).
 
 -import('tick_server',[start_clock/2, end_clock/1]).
--import('my_util',[println/1]).
+-import('my_util',[println/1, println/2]).
 -import('send', [send_message/2, send_message/3]).
 -import('city_map', [init_city/0]).
+-import('nodes_util',[getRandomPositionName/1]).
+
 -include("records.hrl").
 -include("globals.hrl").
 
@@ -17,8 +19,12 @@ init() ->
 	println("Start Environment~n"), 
 	City = init_city(),
 	Pid_Tick = start_clock(?TICKTIME, [self()]),
-	S = #environmentState{cars = [], users = [], city = City, tick_s_pid = Pid_Tick},
-	loop(S).
+	S = #environmentState{cars = [], users = [], city = City, tick_s_pid = Pid_Tick, tick_counter = 0},
+	NewState = generate_taxi(S),
+	NewState2 = generate_taxi(NewState),
+	%NewState3 = generate_user(NewState2),
+	%println("Stato: ", NewState3).
+	loop(NewState2).
 
 end_environment(Pid) ->
 	println("Killing Environment"),
@@ -40,9 +46,15 @@ loop(State) ->
 		{Pid, tot_nodes} -> 
 			Pid ! 12,
 			loop(State);
-		{_Pid, tick} -> println("Tick received"),
-							  generate_event(my_util:generate_random_number()),
-							  loop(State);
+		{_Pid, tick} -> CurrentTickCounter = State#environmentState.tick_counter,
+						NextTick = CurrentTickCounter + 1,
+						NewTickCounter =
+							if NextTick >= ?TICKS_EVENT -> 
+							  generate_event(my_util:generate_random_number(100)),
+							  0;
+							true -> NextTick
+							end,
+					    loop(State#environmentState{tick_counter = NewTickCounter});
         {Pid, Ref, terminate} ->
 			send_message(Pid, {Ref, ok}),
 			terminate(State),
@@ -77,15 +89,36 @@ generate_event(N) ->
 		true -> println("nothing happened")
 	end.
 
-%generate_taxi(Stato) ->
-%	Position = %genera stringa random valida in base a numero nodi
-%	PidTaxi = macchina_moving_withRecords:start(Position),
-%	Stato#environmentState{cars = [PidTaxi] ++ cars}.
-	
-%generate_user(Stato) ->
+getRandomName(S) -> 
+	Nodes = S#environmentState.city#city.nodes,
+	NodeName = getRandomPositionName(Nodes),
+	NodeName.
+
+generate_taxi(Stato) ->
+	Name = getRandomName(Stato),
+	PidTaxi = macchina_moving_withRecords:start(Name),
+	NewCars = [PidTaxi] ++ Stato#environmentState.cars,
+	Stato#environmentState{cars = NewCars}.
+
+generateUserRequest(Stato, User_Position) ->
+	{User_Position, getRandomName(Stato)}.
+
+getRandomCar(S) ->
+	Cars = S#environmentState.cars,
+	Total_Cars = length(Cars),
+	RandomN = my_util:generate_random_number(Total_Cars),
+	RandomCar = lists:nth(RandomN, Cars),
+	RandomCar.
+
+generate_user(Stato) ->
 	%genera richiesta {From, To} e posizioneInizialeUtente
-	%PidUtente = appUtente_flusso:start(posizioneInizialeUtente),
-	%Stato#environmentState{users = [PidUtente] ++ users}
+	Name = getRandomName(Stato),
+	Request = generateUserRequest(Stato, Name),
+	PidUtente = appUtente_flusso:start(Name),
+	Car = getRandomCar(Stato),
+	appUtente_flusso:sendRequest(Car, PidUtente, Request),
+	NewUsers = [PidUtente] ++ Stato#environmentState.users,
+	Stato#environmentState{users = NewUsers}.
 	
 get_nearest(_Coord) -> ok.
 

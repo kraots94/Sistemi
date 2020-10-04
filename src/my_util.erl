@@ -21,9 +21,9 @@ init_random_generator() ->
 	io:format("Current Timestamp: ~w ~w ~w ~n", [T_M, T_S, T_m]),
 	rand:seed(exro928ss, {T_M, T_S, T_m}).
 
-generate_random_number() ->
-	N = rand:uniform(100),
-	io:format("Generated number: ~w ~n", [N]),
+generate_random_number(MAX) ->
+	N = rand:uniform(MAX),
+%	io:format("Generated number: ~w ~n", [N]),
 	N.
 
 createPairs([A , B | []], ACC) -> 

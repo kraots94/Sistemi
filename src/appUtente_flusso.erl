@@ -4,7 +4,11 @@
 -include("globals.hrl").
 
 callback_mode() -> [state_functions].
-
+%                    pidEnv,
+%					cars,
+%					pidWirelessCard,
+%					currentPos,
+%					currentDestination
 %% ====================================================================
 %% API functions
 %% ====================================================================
@@ -25,6 +29,7 @@ sendRequest (TaxiPid, UserPid, Request) ->
 
 init(InitialPos) ->
 	%tick_server:start_clock(?TICKTIME, [self()]),
+	
 	{ok, idle, InitialPos}.
 
 idle(cast, {send_request, Request, PidTaxi}, Position) ->

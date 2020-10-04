@@ -6,5 +6,11 @@
 -record(movingCarState, {tappe,
 				currentUser = none,
 				currentPos}).
+-record(userState, {pidEnv,
+					cars,
+					pidWirelessCard,
+					currentPos,
+					currentDestination
+					})
 % stato environment:
--record(environmentState, {cars, users, city, tick_s_pid}).
+-record(environmentState, {cars, users, city, tick_s_pid, tick_counter}).
