@@ -7,7 +7,6 @@
 % environment:end_environment(PID_ENV).
 start_project() ->
 	println("Starting World!~n"),
-	init_random_generator(),
 	Pid_Environment = environment:start_link(),
 	Pid_Environment.
 	
