@@ -1,6 +1,6 @@
 -module(environment).
 
--export([generate_event/1, start_link/0, get_nearest/1, get_cars/2, end_environment/1]).
+-export([start_link/0, end_environment/1]).
 
 -import('tick_server',[start_clock/2, end_clock/1]).
 -import('my_util',[println/1, println/2]).
@@ -19,7 +19,15 @@ init() ->
 	println("Start Environment~n"), 
 	City = init_city(),
 	Pid_Tick = start_clock(?TICKTIME, [self()]),
-	S = #environmentState{cars = [], users = [], city = City, tick_s_pid = Pid_Tick, tick_counter = 0},
+	println("Start Wireless server"), 
+	Pid_Wireless_Server = wireless_card_server:start_link(City#city.nodes),
+	println("Started Server~n"), 
+	S = #environmentState{cars = [], 
+						  users = [], 
+						  city = City, 
+						  tick_s_pid = Pid_Tick, 
+						  wireless_card_server_pid = Pid_Wireless_Server, 
+						  tick_counter = 0},
 	NewState = generate_taxi(S),
 	NewState2 = generate_taxi(NewState),
 	%NewState3 = generate_user(NewState2),
@@ -119,10 +127,6 @@ generate_user(Stato) ->
 	appUtente_flusso:sendRequest(Car, PidUtente, Request),
 	NewUsers = [PidUtente] ++ Stato#environmentState.users,
 	Stato#environmentState{users = NewUsers}.
-	
-get_nearest(_Coord) -> ok.
-
-get_cars(_Coord, _Range) -> ok.
 
 % uccide l'orologio e gli automi delle macchine / utenti
 terminate(State) ->
