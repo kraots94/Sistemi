@@ -43,16 +43,17 @@ initNode([H | T], ACC) ->
 %metti invio msg al pid
 loop(S) ->
 	receive 
-		{Pid, {setPosition, NewPos}} -> 
-			io:format("Have to ADD: ~w~n", [Pid])						,
-			NewState = updateEntityPosition(S, Pid, NewPos),
+		{Pid, {register, _Type, Pos}} -> io:format("Have to ADD: ~w~n", [Pid]),
+								  NewState = updateEntityPosition(S, Pid, Pos),
+								  loop(NewState);
+		{Pid, {setPosition, NewPos}} -> NewState = updateEntityPosition(S, Pid, NewPos),
 									 loop(NewState);
 		{Pid, {getPosition}}       ->  {Pos, _Res} = getPos(S#wirelessCardServerState.entityPositions, Pid),
 										Pid ! Pos,
 									   loop(S);
 		{_Pid, {printState}} 	-> 	my_util:println("Wireless Server State", S),
 									loop(S);
-		{Pid, {removePosition}}   ->  NewState = removeEntity(S, Pid), 
+		{Pid, {removeEntity}}   ->  NewState = removeEntity(S, Pid), 
 									  loop(NewState);
 		{Pid, {getNearEntities, CurrentPos, Power}} -> 
 									Pid ! getNearEntities(S, CurrentPos, Power, Pid),

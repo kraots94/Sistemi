@@ -172,7 +172,7 @@ generate_user(Stato) ->
 	PidEnv = self(),
 	PidWireless = Stato#environmentState.wireless_card_server_pid,
 	PidUtente = appUtente_flusso:start(NodeStart, PidEnv, PidWireless),
-	appUtente_flusso:sendRequest(Request),
+	appUtente_flusso:sendRequest(PidUtente, Request),
 	NewUsers = [PidUtente] ++ Stato#environmentState.users,
 	Stato#environmentState{users = NewUsers}.
 
