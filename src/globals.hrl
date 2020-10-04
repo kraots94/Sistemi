@@ -12,3 +12,4 @@
 -define(TICKS_TIMEOUT, 2).
 -define(TICKS_EVENT, 100).
 
+-define(WIRELESS_CARD_POWER, 50).
