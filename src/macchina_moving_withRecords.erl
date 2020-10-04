@@ -9,8 +9,14 @@ callback_mode() -> [state_functions,state_enter].
 %% ====================================================================
 %% API functions
 %% ====================================================================
-start(InitialPos) ->
-	{ok, Pid} = gen_statem:start_link(?MODULE, InitialPos, []),
+start(InitialPos, PidWireless) ->
+	State = #movingCarState {
+					pidWirelessCard = PidWireless,
+					tappe = [],
+					currentUser = none,
+					currentPos = InitialPos},
+	{ok, Pid} = gen_statem:start_link(?MODULE,State, []),
+	sendPosToGps(PidWireless, InitialPos),
 	Pid.
 
 %update queue posseduta dal processo
@@ -20,6 +26,7 @@ updateQueuePid_alone(Pid,Queue) ->
 crash(Pid) ->
 	gen_statem:cast(Pid, {crash}).
 
+%NB: questo torna la risposta al chiamante, se imposti timer e non c'è risposta invece la chiamata fallisce
 areYouBusy(Pid) ->
 	gen_statem:call(Pid, {areYouBusy}).
 
@@ -27,11 +34,8 @@ areYouBusy(Pid) ->
 %% Automata Functions
 %% ====================================================================
 
-init(InitialPos) ->
+init(State) ->
 	tick_server:start_clock(?TICKTIME, [self()]),
-	State = #movingCarState {tappe = [],
-					currentUser = none,
-					currentPos = InitialPos},
 	{ok, idle, State}.
 
 handle_common(cast, {updateQueue, RcvQueue}, _OldState, State) ->
@@ -61,7 +65,8 @@ idle(enter, _OldState, Stato) ->
 %gestisco tick ricevuti in idle ignorandoli
 idle(info, {_From, tick}, _Stato) ->
 	keep_state_and_data;
-	?HANDLE_COMMON.
+	
+?HANDLE_COMMON.
 	  
 moving(enter, _OldState, State) ->
 	my_util:println("mi sto spostando..."),
@@ -83,7 +88,7 @@ moving(enter, _OldState, State) ->
 	
 %gestione tick in movimento
 moving(info, {_From, tick}, State) ->
-	my_util:println("ricevuto tick...aggiorno spostamento"),
+	%my_util:println("ricevuto tick...aggiorno spostamento"),
 	TappeAttuali = State#movingCarState.tappe,
 	TappaAttuale = hd(TappeAttuali),
 	Time = TappaAttuale#tappa.t,
@@ -93,7 +98,9 @@ moving(info, {_From, tick}, State) ->
 			TappaConSpostamento = TappaAttuale#tappa{t = NewTime},
 			NuoveTappe = [TappaConSpostamento] ++ tl(TappeAttuali),
 			NuovoStato =  State#movingCarState{tappe=NuoveTappe},
-			printState(NuovoStato),
+			io:format("-"),
+			%my_util:println("sto raggiungendo: ", TappaAttuale#tappa.node_name),
+			%printState(NuovoStato),
 			{keep_state, NuovoStato};
 		true -> %tempo = 0 , quindi ho raggiunto nodo nuovo
 			my_util:println("raggiunto nuovo nodo"),
@@ -133,7 +140,8 @@ crash(enter, _OldState, _Stato) ->
 calculateNewState(Stato, TappaAttuale, Tappe) ->
 	NuoveTappe = tl(Tappe),
 	Pos = TappaAttuale#tappa.node_name,
-	sendPosToGps(Pos),
+	sendPosToUser(Stato#movingCarState.currentUser,Pos),
+	sendPosToGps(Stato#movingCarState.pidWirelessCard, Pos),
 	if 
 		NuoveTappe =:= [] -> Stato#movingCarState{tappe = [], currentUser = none, currentPos = Pos};
 		true ->
@@ -158,8 +166,12 @@ calculateNewState(Stato, TappaAttuale, Tappe) ->
 sendUserCrashEvent(PidUser) ->
 	gen_statem:cast(PidUser, crash).
   
-sendPosToGps(_Position) ->
+sendPosToGps(WirelessCardPid, Position) ->
 	foo.
+	%WirelessCardPid ! {self(), {setPosition, Position}}.
+
+sendPosToUser(UserPid, Position) ->
+	appUtente_flusso:updatePosition(UserPid, Position).
   
 taxiServingAppId(User) ->
 	gen_statem:cast(User,taxiServingYou).

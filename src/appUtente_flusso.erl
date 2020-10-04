@@ -2,10 +2,11 @@
 -compile(export_all).
 -behaviour(gen_statem).
 -include("globals.hrl").
+-include("records.hrl").
 
 callback_mode() -> [state_functions].
-%                    pidEnv,
-%					cars,
+%userState
+%                   pidEnv,
 %					pidWirelessCard,
 %					currentPos,
 %					currentDestination
@@ -13,58 +14,80 @@ callback_mode() -> [state_functions].
 %% API functions
 %% ====================================================================
 
-start(InitialPos) ->
-	{ok, Pid} = gen_statem:start_link(?MODULE, InitialPos, []),
+start(InitialPos, PidEnv, PidWireless) ->
+	State = #userState{pidEnv = PidEnv, pidWirelessCard = PidWireless, currentPos = InitialPos},
+	{ok, Pid} = gen_statem:start_link(?MODULE,State, []),
+	sendPosToGps(PidWireless,InitialPos),
 	Pid.
 
 %Request è tipo = {"a", "b"}.
-sendRequest (TaxiPid, UserPid, Request) ->
+sendRequest (UserPid, Request) ->
 	%Richiesta = {self(), "f", "d"},}
-	gen_statem:cast(UserPid, {send_request,Request,TaxiPid}).
+	gen_statem:cast(UserPid, {send_request,Request}).
 
+updatePosition(UserPid, NewNode) ->
+	gen_statem:cast(UserPid, {newNodeReached, NewNode}).
 
 %% ====================================================================
 %% Automata Functions
 %% ====================================================================
 
-init(InitialPos) ->
+init(State) ->
 	%tick_server:start_clock(?TICKTIME, [self()]),
-	
-	{ok, idle, InitialPos}.
+	{ok, idle, State}.
 
-idle(cast, {send_request, Request, PidTaxi}, Position) ->
-	checkValidityRequest(Position, Request),
-	{From, To} = Request,
+%ricezione del cambiamento posizione auto che mi serve
+handle_common(cast, {newNodeReached, NewNode}, OldState, State) ->
+	NewState = if OldState == moving -> %ricevuto mentre sono in moving, la mia posizione cambia!
+					sendPosToGps(State#userState.pidWirelessCard, NewNode),
+		   			State#userState{currentPos = NewNode};
+				  true -> %ricevuto non in moving, potrei dire a utente dov'è auto se son servito
+					State
+			   end,
+	{keep_state, NewState}.
+  		   
+	
+
+idle(cast, {send_request, Request}, State) ->
+	checkValidityRequest(State#userState.currentPos, Request),
+	{From, To, PidWinnerTaxi} = Request,
 	CorrectReq = {self(), From, To},
-	macchina_moving_withRecords:updateQueuePid_alone(PidTaxi, CorrectReq),
+	%PidWinnerTaxi = findTaxi(CorrectReq, State),
+	macchina_moving_withRecords:updateQueuePid_alone(PidWinnerTaxi, CorrectReq),
 	keep_state_and_data;
 
-idle(cast, taxiServingYou, Position) ->
+idle(cast, taxiServingYou, State) ->
 	my_util:println("taxi mi sta servendo USER: ", self()),
-	{next_state, waiting_car, Position}.
+	{next_state, waiting_car, State}.
 
-waitin_car_queue(cast, {changeDest, _NewDest}, _Position) ->
-	%invio evento non puoi cambiare path...
-	keep_state_and_data.
+%waitin_car_queue(cast, {changeDest, _NewDest}, _State) ->
+%	%invio evento non puoi cambiare path...
+%	keep_state_and_data.
 
-waiting_car(cast, arrivedUserPosition, Position) ->
+waiting_car(cast, arrivedUserPosition, State) ->
 	my_util:println("taxi arrivato da me USER: ", self()),
-	{next_state, moving, Position};
+	{next_state, moving, State};
+	
+?HANDLE_COMMON.
 
-waiting_car(cast, {changeDest, _NewDest}, _Position) ->
-	%invio evento cambio dest...
-	keep_state_and_data.
+%waiting_car(cast, {changeDest, _NewDest}, _Position) ->
+%	%invio evento cambio dest...
+%	keep_state_and_data.
 
-moving(cast, arrivedTargetPosition, Position) ->
+moving(cast, arrivedTargetPosition, State) ->
 	my_util:println("sono arrivato a destinazione USER: ", self()),
 	my_util:println("ora vado a morire USER: ", self()),
-	{next_state, ending, Position};
+	deletePos(State#userState.pidWirelessCard),
+	{next_state, ending, State};
 
-moving(cast, {changeDest, _NewDest}, _Position) ->
-	%invio evento cambio dest...
-	keep_state_and_data.
+%moving(cast, {changeDest, _NewDest}, _State) ->
+%	%invio evento cambio dest...
+%	keep_state_and_data;
+	
 
-ending(enter, _OldState, _Position) ->
+?HANDLE_COMMON.
+  
+ending(enter, _OldState, _State) ->
 	my_util:println("...Morto..."),
 	keep_state_and_data.
 
@@ -74,7 +97,7 @@ ending(enter, _OldState, _Position) ->
 
 %controllo validità richiesta e in caso negativo errore
 checkValidityRequest(UserPos, Request) ->
-	{From, To} = Request,
+	{From, To, Third} = Request,
 	if From /= UserPos -> 
 		   exit(wrongPosReq);
 	   true ->
@@ -85,10 +108,31 @@ checkValidityRequest(UserPos, Request) ->
 		   end
 	end.
 
+findTaxi(_Request, State) ->
+	_WirelessCardPid = State#userState.pidWirelessCard,
+	%NearestTaxi = WirelessCardPid ! {self(), {getNearest}}
+	%ti metti in rcv e torni NearestTaxi
+	0.
+	
+sendPosToGps(WirelessCardPid, Position) ->
+	my_util:println("SONO UTENTE INVIO POS").
+	%WirelessCardPid ! {self(), {setPosition, Position}}.
+  
+deletePos(WirelessCardPid) ->
+	%wirelessCardPid ! {self(), {removePosition}}.
+	ok.
+
 %testing
 %make:all(),
 %f(),
 %PidTaxi = macchina_moving_withRecords:start("f"),
 %PidUtente = appUtente_flusso:start("h"),
 %appUtente_flusso:sendRequest(PidTaxi,PidUtente ,{"h", "a"}).
+
+
+%make:all(),
+%f(),
+%PidTaxi = macchina_moving_withRecords:start("a", 0),
+%PidUser = appUtente_flusso:start("b", 0, 0),
+%appUtente_flusso:sendRequest(PidUser, {"b","i", PidTaxi}).
 
