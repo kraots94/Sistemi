@@ -12,4 +12,5 @@
 -define(TICKS_TIMEOUT, 2).
 -define(TICKS_EVENT, 100).
 
--define(WIRELESS_CARD_POWER, 80).
+-define(GPS_MODULE_POWER, 50).
+-define(MAP_SIDE, 100).

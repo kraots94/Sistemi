@@ -14,11 +14,14 @@
 -record(nodeEntities, {nodeData, entities}).
 -record(gpsServerState, {entities, nodes}).
 
--export([start_gps_server/1, init/1, end_gps_server/1, sendPosToGps/2, deleteMyLocationTracks/1, getNearestCar/1, printInternalState/1]).
+-export([start_gps_server/1, init/1, end_gps_server/1, 
+		sendPosToGps/2, deleteMyLocationTracks/1, getNearestCar/1, printInternalState/1]).
 
 %% ====================================================================
 %% API functions
 %% ====================================================================
+
+%Testing Code
 
 sendPosToGps(PID_GPS_Server, Position) ->
 	PID_GPS_Server ! {self(), {setPosition, Position}}.
@@ -33,16 +36,41 @@ getNearestCar(PID_GPS_Server) ->
 %for debugging porp.
 printInternalState(PID_GPS_Server) ->
 	PID_GPS_Server ! {printState}.
+	
+start_gps_server(Nodes) -> 
+	spawn_link('gps_server', init, [Nodes]).
+
+end_gps_server(Pid) ->
+	println("Killing GPS Server"),
+	Ref = erlang:monitor(process, Pid),
+	send_message(Pid, {self(), Ref, terminate}),
+	
+	receive
+		{Ref, ok} ->
+			erlang:demonitor(Ref, [flush]),
+			ok;
+		{'DOWN', Ref, process, Pid, Reason} ->
+			erlang:error(Reason)
+	after 5000 ->
+		erlang:error(timeout)
+	end.
 
 %% ====================================================================
-%% Internal Functions
+%% Init Functions
 %% ====================================================================
-
-start_gps_server(Nodes) -> spawn_link('gps_server', init, [Nodes]).
 
 init(Nodes) -> 
 	S = #gpsServerState{entities = [], nodes = initNodes(Nodes)},
 	loop(S).
+
+initNodes(Nodes) -> initNode(Nodes, []).
+
+initNode([], ACC) -> ACC;
+initNode([H | T], ACC) -> 
+	StateNode = #nodeEntities{nodeData = H,
+							entities = []},
+	NewACC = [StateNode] ++ ACC,
+	initNode(T, NewACC).
 
 %% ====================================================================
 %% Server loop
@@ -70,15 +98,21 @@ loop(S) ->
 														my_util:println("GPS Server State", S),
 									       				loop(S);
 		{Pid, {removeEntity}}   	    			->  
-														NewState = removeEntity(S, Pid), 
+														{Ent, EntityIsRegistered} = getEntityFromEntities(S#gpsServerState.entities, Pid),
+														S1 =   if EntityIsRegistered == ok -> 
+																		removeEntityFromPosition(S, Ent#entity.position, Pid);
+																		true -> 
+																			S
+																end,
+														NewState = removeEntity(S1, Pid), 
 									       				loop(NewState);
 		{Pid, {getNearEntities, CurrentPos, Power}} -> 
 														Results = getNearEntities(S, CurrentPos, Power),
-														send_message(Pid, Results),
+														send_message(Pid, self(), Results),
 														loop(S);
 		{Pid, {getSortedEntities, CurrentPos, Power}} -> 
 														Results = getEntitiesSortedByDistance(S, CurrentPos, Power),
-														send_message(Pid, Results),
+														send_message(Pid, self(), Results),
 														loop(S);
 		{Pid, Ref, terminate}						->
 														send_message(Pid, {Ref, ok}),
@@ -244,15 +278,6 @@ getPos(NodeName, [H | T]) ->
 	   true -> getPos(NodeName, T)
 	end.
 
-initNodes(Nodes) -> initNode(Nodes, []).
-
-initNode([], ACC) -> ACC;
-initNode([H | T], ACC) -> 
-	StateNode = #nodeEntities{nodeData = H,
-							entities = []},
-	NewACC = [StateNode] ++ ACC,
-	initNode(T, NewACC).
-
 getEntityFromEntities(Entities, ToSearch) ->
 	Out = lists:filter(fun(X) -> (X#entity.pid == ToSearch) end, Entities),
 	if Out =:= [] -> {[], none};
@@ -266,42 +291,3 @@ packNodesEntities([H | T ], ACC) ->
 	NewACC = ACC ++ H#nodeDistance.entities,
 	packNodesEntities(T, NewACC).
 
-%% ====================================================================
-%% Various Functions
-%% ====================================================================
-
-end_gps_server(Pid) ->
-	println("Killing GPS Server"),
-	Ref = erlang:monitor(process, Pid),
-	send_message(Pid, {self(), Ref, terminate}),
-	
-	receive
-		{Ref, ok} ->
-			erlang:demonitor(Ref, [flush]),
-			ok;
-		{'DOWN', Ref, process, Pid, Reason} ->
-			erlang:error(Reason)
-	after 5000 ->
-		erlang:error(timeout)
-	end.
-
-
-%Testing Code
-%f(), make:all(), PID_GPS_Server = gps_server:start_gps_server(nodes_util:load_nodes()).
-%PID_GPS_Server ! {self(), {register, car, "a"}},
-%PID_GPS_Server ! {1, {register, car, "c"}},
-%PID_GPS_Server ! {2, {register, user,"c"}},
-%PID_GPS_Server ! {3, {register, user, "a"}},
-%PID_GPS_Server ! {4, {register, car, "e"}},
-%PID_GPS_Server ! {5, {register, user, "f"}},
-%PID_GPS_Server ! {6, {register, user, "b"}},
-%PID_GPS_Server ! {7, {register, car, "a"}}.
-%PID_GPS_Server ! {self(), {setPosition, "a"}},
-%PID_GPS_Server ! {1, {setPosition, "b"}},
-%PID_GPS_Server ! {2, {setPosition, "c"}},
-%PID_GPS_Server ! {3, {setPosition, "d"}},
-%PID_GPS_Server ! {4, {setPosition, "e"}},
-%PID_GPS_Server ! {5, {setPosition, "f"}},
-%PID_GPS_Server ! {6, {setPosition, "g"}},
-%PID_GPS_Server ! {7, {setPosition, "h"}}.
-%PID_GPS_Server ! {printState}.

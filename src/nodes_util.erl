@@ -31,7 +31,7 @@ getPositionFromNodeName(NodeName, Nodes) ->
 
 getRandomPositionName(Nodes) ->
 	TotalNodes = length(Nodes),
-	Random_ID = my_util:generate_random_number(TotalNodes),
+	Random_ID = my_util:generate_random_number(TotalNodes) - 1,
 	NodeName = getNodeName(Random_ID, Nodes),
 	NodeName.
 
