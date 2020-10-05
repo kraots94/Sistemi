@@ -37,3 +37,8 @@
 							starting_pos, 
 							signal_power, 
 							map_side}).
+
+-record(batteryState, {pidCar,
+					  sameBatteryCounter,
+					  tick_counter,
+					  columnPathEnabled}).

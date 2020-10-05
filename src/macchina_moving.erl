@@ -35,6 +35,12 @@ crash(Pid) ->
 areYouBusy(Pid) ->
 	gen_statem:call(Pid, {areYouBusy}).
 
+getBatteryLevel(Pid) ->
+	gen_statem:call(Pid, {getBattery}).
+
+enablePathCharge(Pid) ->
+	gen_statem:cast(Pid, {goToCharge}).
+
 %% ====================================================================
 %% Automata Functions
 %% ====================================================================
@@ -42,6 +48,7 @@ areYouBusy(Pid) ->
 init(State) ->
 	%qua sara' da togliere quando farai ascoltatore
 	tick_server:start_clock(?TICKTIME, [self()]),
+	%register quando dovrai fare refactoring con modulo gps
 	wireless_card_server:sendPosToGps(State#movingCarState.pidWirelessCard, State#movingCarState.currentPos),
 	{ok, idle, State}.
 
@@ -65,19 +72,30 @@ handle_common({call,From}, {areYouBusy}, OldState, State) ->
 			end,
 	{next_state, OldState, State, [{reply,From,Reply}]};
 		
+handle_common({call,From}, {getBattery}, OldState, State) ->
+	Battery = State#movingCarState.batteryLevel,
+	{next_state, OldState, State, [{reply,From,Battery}]};
 	
 %assumendo sia in idle (V0)
-%torna tupla con {cc, crdt}
+%torna tupla con {cc, crdt, Tappe}
+%le tappe sono incluse perche' in caso di vincita automa elettore le torna invia qua aggiornando coda
 handle_common(cast, {calculateElectionValues, ClientNode, Target}, _OldState, State) ->
 	Actualpos = State#movingCarState.currentPos,
-	{Costi, _Tappe} = city_map:calculate_path(self(),Actualpos,ClientNode,Target),
+	{Costi, Tappe} = city_map:calculate_path(self(),Actualpos,ClientNode,Target),
 	CostoAlClient = hd(Costi),
 	CostoAllaDestinazione = hd(tl(Costi)),
-	%Pvcr = ora non c'e'
+	%CostoAllaColonnina = ora non c'e'
 	BatteriaAttuale = State#movingCarState.batteryLevel,
 	CaricaDopoSpostamento = BatteriaAttuale - (CostoAlClient + CostoAllaDestinazione),
-	{CostoAlClient, CaricaDopoSpostamento}.
-	
+	{CostoAlClient, CaricaDopoSpostamento, Tappe};
+
+%aggiornamento queue dopo che elezione sarà finita
+handle_common(cast, {updateQueue2, _RcvQueue}, _OldState, _State) ->
+	%gli arriva {Tappe, CaricaDopoSpostamento}
+	%sottraggo alla batteria
+	%tolgo percorso colonnina (e metto in una variabile stato dedicata maybe) cosi' che quando automa batteria mi dice io lo rimetto in coda
+ 	%vai in moving con tappa.
+	toDo.
 
 idle(enter, _OldState, Stato) ->
 	my_util:println("sono in idle..."),

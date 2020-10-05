@@ -32,8 +32,7 @@ updatePosition(UserPid, NewNode) ->
 %% ====================================================================
 
 init(State) ->
-	%tick_server:start_clock(?TICKTIME, [self()]),
-	%in futuro qua devi mettere register, non sendPos
+	%register quando dovrai fare refactoring con modulo gps
 	wireless_card_server:sendPosToGps(State#userState.pidWirelessCard,State#userState.currentPos),
 	{ok, idle, State}.
 
@@ -155,3 +154,11 @@ findTaxi(State) ->
 %PidTaxi3 = macchina_moving:start("f", PidWifi),
 %PidUser = appUtente_flusso:start("a", 0, PidWifi),
 %appUtente_flusso:sendRequest(PidUser, {"a","d"}).
+
+
+%make:all(),
+%f(),
+%PidWifi = wireless_card_server:start_wireless_server(nodes_util:load_nodes()),
+%PidTaxi = macchina_moving:start("a", PidWifi),
+%PidUser = appUtente_flusso:start("g", 0, PidWifi),
+%appUtente_flusso:sendRequest(PidUser, {"g","q"}).
