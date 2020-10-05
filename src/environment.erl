@@ -152,7 +152,7 @@ getRandomNode(S) ->
 generate_taxi(Stato) ->
 	StartingPos = getRandomNode(Stato),
 	PidWireless = Stato#environmentState.wireless_card_server_pid,
-	PidTaxi = macchina_moving_withRecords:start(StartingPos, PidWireless),
+	PidTaxi = macchina_moving:start(StartingPos, PidWireless),
 	NewCars = [PidTaxi] ++ Stato#environmentState.cars,
 	Stato#environmentState{cars = NewCars}.
 

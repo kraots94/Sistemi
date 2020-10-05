@@ -1,4 +1,4 @@
--module(macchina_moving_withRecords).
+-module(macchina_moving).
 -compile(export_all).
 -behaviour(gen_statem).
 -include("records.hrl").
@@ -19,7 +19,8 @@ start(InitialPos, PidWireless) ->
 					pidWirelessCard = PidWireless,
 					tappe = [],
 					currentUser = none,
-					currentPos = InitialPos},
+					currentPos = InitialPos,
+					batteryLevel = 100},
 	{ok, Pid} = gen_statem:start_link(?MODULE,State, []),
 	Pid.
 
@@ -45,22 +46,37 @@ init(State) ->
 	{ok, idle, State}.
 
 handle_common(cast, {updateQueue, RcvQueue}, _OldState, State) ->
-	{First, Second, Third} = RcvQueue,
+	{UserPid, From, To} = RcvQueue,
 	Actualpos = State#movingCarState.currentPos,
 %calcola posizione finale nel caso di utenti in coda e usa quella in calculatePath
-	{_Costi, Tappe} = city_map:calculate_path(First,Actualpos,Second,Third),
+	{Costi, Tappe} = city_map:calculate_path(UserPid,Actualpos,From,To),
+	CostoAlCliente = hd(Costi),
+	CostoAlTarget = hd(tl(Costi)),
+	my_util:println("costi", CostoAlCliente),
 % Tolgo tappe colonnine  da TappeAttuali
 %	TappeAttuali = State#state.tappe
 	NewTappe = State#movingCarState.tappe ++ Tappe,
-	{next_state, moving, State#movingCarState{tappe=NewTappe}};
+	NuovaBatteria = State#movingCarState.batteryLevel - (CostoAlCliente + CostoAlTarget),
+	{next_state, moving, State#movingCarState{tappe=NewTappe, batteryLevel = NuovaBatteria}};
 
 handle_common({call,From}, {areYouBusy}, OldState, State) ->
 	Reply = if OldState == idle -> false;
 	   		  true -> true
 			end,
-	{next_state, OldState, State, [{reply,From,Reply}]}.
+	{next_state, OldState, State, [{reply,From,Reply}]};
 		
 	
+%assumendo sia in idle (V0)
+%torna tupla con {cc, crdt}
+handle_common(cast, {calculateElectionValues, ClientNode, Target}, _OldState, State) ->
+	Actualpos = State#movingCarState.currentPos,
+	{Costi, _Tappe} = city_map:calculate_path(self(),Actualpos,ClientNode,Target),
+	CostoAlClient = hd(Costi),
+	CostoAllaDestinazione = hd(tl(Costi)),
+	%Pvcr = ora non c'e'
+	BatteriaAttuale = State#movingCarState.batteryLevel,
+	CaricaDopoSpostamento = BatteriaAttuale - (CostoAlClient + CostoAllaDestinazione),
+	{CostoAlClient, CaricaDopoSpostamento}.
 	
 
 idle(enter, _OldState, Stato) ->
@@ -194,6 +210,6 @@ printState(State) ->
 
 %make:all(),
 %f(),
-%PidTaxi = macchina_moving_withRecords:start("a"),
+%PidTaxi = macchina_moving:start("a"),
 %appUtente_flusso:start(PidTaxi).
 	

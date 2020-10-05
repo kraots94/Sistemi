@@ -14,7 +14,7 @@ callback_mode() -> [state_functions].
 %% ====================================================================
 
 start(InitialPos, PidWireless) ->
-	PidMoving = macchina_moving_withRecords:start(InitialPos, PidWireless),
+	PidMoving = macchina_moving:start(InitialPos, PidWireless),
 	my_util:println("Pid moving creato:", PidMoving),
 	%PidElection = ...
 	%PidBattery  = ...
@@ -42,7 +42,7 @@ init(State) ->
 idle({call,From}, {beginElectionUser}, State) ->
 	PidMoving = State#taxiListenerState.pidMoving,
 	_PidElection = State#taxiListenerState.pidElection,
-	IsBusy = macchina_moving_withRecords:areYouBusy(PidMoving),
+	IsBusy = macchina_moving:areYouBusy(PidMoving),
 	if IsBusy -> 
 		   		%invii sto messaggio a PidElection (usando suo metodo api)
 				%dicendo che non puoi vincere (bridge mode)

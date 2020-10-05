@@ -55,7 +55,7 @@ idle(cast, {send_request, Request}, State) ->
 	{From, To} = Request,
 	CorrectReq = {self(), From, To},
 	PidWinnerTaxi = findTaxi(State),
-	macchina_moving_withRecords:updateQueuePid_alone(PidWinnerTaxi, CorrectReq),
+	macchina_moving:updateQueuePid_alone(PidWinnerTaxi, CorrectReq),
 	keep_state_and_data;
 
 idle(cast, taxiServingYou, State) ->
@@ -126,21 +126,21 @@ findTaxi(State) ->
 %testing
 %make:all(),
 %f(),
-%PidTaxi = macchina_moving_withRecords:start("f"),
+%PidTaxi = macchina_moving:start("f"),
 %PidUtente = appUtente_flusso:start("h"),
 %appUtente_flusso:sendRequest(PidTaxi,PidUtente ,{"h", "a"}).
 
 
 %make:all(),
 %f(),
-%PidTaxi = macchina_moving_withRecords:start("a", 0),
+%PidTaxi = macchina_moving:start("a", 0),
 %PidUser = appUtente_flusso:start("b", 0, 0),
 %appUtente_flusso:sendRequest(PidUser, {"b","i", PidTaxi}).
 
 %make:all(),
 %f(),
-%PidWifi = wireless_card_server:start_wireless_server(nodes_util:load_nodes()).
-%PidTaxi = macchina_moving_withRecords:start("a", PidWifi),
+%PidWifi = wireless_card_server:start_wireless_server(nodes_util:load_nodes()),
+%PidTaxi = macchina_moving:start("a", PidWifi),
 %PidUser = appUtente_flusso:start("b", 0, PidWifi),
 %appUtente_flusso:sendRequest(PidUser, {"b","i"}).
 
@@ -150,8 +150,8 @@ findTaxi(State) ->
 %make:all(),
 %f(),
 %PidWifi = wireless_card_server:start_wireless_server(nodes_util:load_nodes()).
-%PidTaxi1 = macchina_moving_withRecords:start("d", PidWifi),
-%PidTaxi2 = macchina_moving_withRecords:start("b", PidWifi),
-%PidTaxi3 = macchina_moving_withRecords:start("f", PidWifi),
+%PidTaxi1 = macchina_moving:start("d", PidWifi),
+%PidTaxi2 = macchina_moving:start("b", PidWifi),
+%PidTaxi3 = macchina_moving:start("f", PidWifi),
 %PidUser = appUtente_flusso:start("a", 0, PidWifi),
 %appUtente_flusso:sendRequest(PidUser, {"a","d"}).

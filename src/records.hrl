@@ -10,7 +10,8 @@
 				pidWirelessCard,
 				tappe,
 				currentUser = none,
-				currentPos}).
+				currentPos,
+				batteryLevel}).
 
 -record(userState, {pidEnv,
 					pidWirelessCard,
