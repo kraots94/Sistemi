@@ -1,6 +1,7 @@
 import random
 from random import randint
 from graphviz.dot import Graph
+from PIL import Image, ImageDraw
 import sys
 import math
 
@@ -205,6 +206,18 @@ def create_file_dot(V, E):
 
     dot.render(filename="map", directory=PATH_GRAPH, cleanup=True)
 
+def create_image(V):    
+    img = Image.new('RGB', (CARTESIAN_SIDE*3, CARTESIAN_SIDE*3), color = 'white')
+
+    d = ImageDraw.Draw(img)
+    for vertex in V:
+        name = vertex[0]
+        x = vertex[1] *2 + 50
+        y = vertex[2] *2 + 50
+        d.text((x,y), name, fill=(0,0,0))
+
+    img.save(PATH_GRAPH+'map.png')
+
 edges_to_add = TOTAL_EDGES - TOTAL_NODES + 1
 
 V = createNodes(TOTAL_NODES)
@@ -215,3 +228,4 @@ add_edges(E, V, TOTAL_NODES, edges_to_add)
 create_file_graph(V, E)
 create_file_nodes_positions(V)
 create_file_dot(V, E)
+create_image(V)
