@@ -208,16 +208,16 @@ def create_file_dot(V, E):
 
 def create_image(V):    
     tot_letters_name = len(V[0][0])
-    letter_width = 5
-    letter_height = 8
+    letter_width = 14
+    letter_height = 14
     img_width = CARTESIAN_SIDE*letter_width*tot_letters_name
     img_height = CARTESIAN_SIDE*letter_height
     img = Image.new('RGB', (img_width, img_height), color = 'white')
-    fnt = ImageFont.truetype(PATH_GRAPH+"digital_7_mono.ttf", 10)
+    fnt = ImageFont.truetype(PATH_GRAPH+"FiraMono-Medium.ttf", 20)
     d = ImageDraw.Draw(img)
     for vertex in V:
-        name = vertex[0]
-        x = vertex[1] * letter_width * tot_letters_name
+        name = vertex[0].upper()
+        x = vertex[1] * letter_width * tot_letters_name + 1
         y = img_height - vertex[2] * letter_height
         d.text((x,y), name, font=fnt, fill=(0,0,0))
 
