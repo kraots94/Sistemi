@@ -28,3 +28,6 @@
 -record(taxiListenerState, {pidMoving,
 							pidBattery,
 							pidElection}).
+
+% dati di inizializzazione del modulo gps
+-record(dataInitGPSModule, {pid_entity, type, pid_server_gps, starting_pos, signal_power}).
