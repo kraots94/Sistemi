@@ -16,14 +16,22 @@
 -export([start_wireless_server/1, init/1, end_wireless_server/1, sendPosToGps/2, deleteMyLocationTracks/1, getNearestCar/1, printInternalState/1]).
 
 %f(), make:all(), PID_Wireless_Server = wireless_card_server:start_wireless_server(nodes_util:load_nodes()).
+%PID_Wireless_Server ! {self(), {register, car, "a"}},
+%PID_Wireless_Server ! {1, {register, car, "c"}},
+%PID_Wireless_Server ! {2, {register, user,"c"}},
+%PID_Wireless_Server ! {3, {register, user, "a"}},
+%PID_Wireless_Server ! {4, {register, car, "e"}},
+%PID_Wireless_Server ! {5, {register, user, "f"}},
+%PID_Wireless_Server ! {6, {register, user, "b"}},
+%PID_Wireless_Server ! {7, {register, car, "a"}}.
 %PID_Wireless_Server ! {self(), {setPosition, "a"}},
-%PID_Wireless_Server ! {1, {setPosition, "c"}},
+%PID_Wireless_Server ! {1, {setPosition, "b"}},
 %PID_Wireless_Server ! {2, {setPosition, "c"}},
-%PID_Wireless_Server ! {3, {setPosition, "a"}},
+%PID_Wireless_Server ! {3, {setPosition, "d"}},
 %PID_Wireless_Server ! {4, {setPosition, "e"}},
 %PID_Wireless_Server ! {5, {setPosition, "f"}},
-%PID_Wireless_Server ! {6, {setPosition, "b"}},
-%PID_Wireless_Server ! {7, {setPosition, "a"}}.
+%PID_Wireless_Server ! {6, {setPosition, "g"}},
+%PID_Wireless_Server ! {7, {setPosition, "h"}}.
 
 %% ====================================================================
 %% API functions
@@ -31,7 +39,7 @@
 
 sendPosToGps(WirelessCardPid, Position) ->
 	WirelessCardPid ! {self(), {setPosition, Position}}.
-	%WirelessCardPid ! {foo, {printState}}.
+	%PID_Wireless_Server ! {foo, {printState}}.
 
 deleteMyLocationTracks(WirelessCardPid) ->
 	WirelessCardPid ! {self(), {removeEntity}}.
@@ -61,7 +69,7 @@ init(Nodes) ->
 loop(S) ->
 	receive 
 		{Pid, {register, Type, Pos}} 				->  
-														io:format("ADD: [PID ~w | TYPE ~w | POS~w]~n", [Pid, Type, Pos]),
+														io:format("ADD: [PID ~w | TYPE ~w | POS ~w]~n", [Pid, Type, Pos]),
 								  		   				NewState = registerNewEntity(S, Pid, Type, Pos),
 								           				loop(NewState);
 		{Pid, {setPosition, NewPos}}   	    		->  
@@ -74,7 +82,7 @@ loop(S) ->
 																		true -> 
 																			""
 																end,
-										   			    Pid ! Pos,
+														send_message(Pid, Pos),
 									   					loop(S);
 		{printState}			 	    			->  
 														my_util:println("Wireless Server State", S),
@@ -86,21 +94,24 @@ loop(S) ->
 														Results = getNearEntities(S, CurrentPos, Power),
 														MappedResults = mapResultsToPidsList(Results),
 														ClearedResults = lists:delete(Pid, MappedResults),
-														Pid ! ClearedResults,
+														send_message(Pid, ClearedResults),
 														loop(S);
-		{Pid, {getNearCars, CurrentPos, Power}} -> 
+		{Pid, {getNearCars, CurrentPos, Power}} 	-> 
 														Results = getNearEntities(S, CurrentPos, Power),
 														FilteredResults = filterResultsByType(Results, car),
 														MappedResults = mapResultsToPidsList(FilteredResults),
 														ClearedResults = lists:delete(Pid, MappedResults),
-														Pid ! ClearedResults,
+														send_message(Pid, ClearedResults),
 														loop(S);
 		{Pid, {getNearestCar, CurrentPos}}			-> 
 														Results = getEntitiesSortedByDistance(S, CurrentPos),
 														FilteredResults = filterResultsByType(Results, car),
 														MappedResults = mapResultsToPidsList(FilteredResults),
 														ClearedResults = lists:delete(Pid, MappedResults),
-														Pid ! hd(ClearedResults),
+														FirstCar = if ClearedResults =:= [] -> none;
+																		true -> hd(ClearedResults)
+																	end,
+														send_message(Pid, FirstCar),
 														loop(S);
 		{Pid, Ref, terminate}						->
 														send_message(Pid, {Ref, ok}),
@@ -147,8 +158,9 @@ updateEntityPosition(State, Pid, NewNodeName) ->
 
 	FinalState = if EntityIsRegistered == ok -> 
 						% rimuovere il pid da dov'è se l'entità è già presente
-						{S1, NodeEnt} = removeEntityFromPosition(State, Ent#entity.position, Pid),
+						S1 = removeEntityFromPosition(State, Ent#entity.position, Pid),
 						% metterlo nella lista nel nuovo nodo
+						NodeEnt = {Pid, Ent#entity.type},
 						S2 = insertEntityInPosition(S1, NewNodeName, NodeEnt),
 						% aggiornare la sua posizione nella hash
 
@@ -178,10 +190,12 @@ removeEntityFromPosition(State, NodeName, Pid) ->
 			EntitiesInNode = Node#nodeEntities.entities,
 			F = fun(X) -> {Pid_Ent, _Type} = X, 
 						not (Pid == Pid_Ent)
-			end,
-			NewEntities = if Name =:= NodeName -> lists:filter(F, EntitiesInNode);
-							true -> EntitiesInNode
-						end,
+				end,
+			NewEntities = if Name =:= NodeName -> 
+								 	lists:filter(F, EntitiesInNode);
+								true -> 
+									EntitiesInNode
+							end,
 			Node#nodeEntities{entities = NewEntities}
 		end,
 	NewNodesData = lists:map(F, CurrentNodesData),
@@ -212,14 +226,15 @@ getEntitiesSortedByDistance(State, CurrentPosName) ->
 	{StartNode_X, StartNode_Y} = nodes_util:getPositionFromNodeName(CurrentPosName, Nodes),
 	NodesWireless = State#wirelessCardServerState.nodes,
 	
-	MapFunc = fun(Node) ->	  NodeData = Node#nodeEntities.nodeData,
-								Curr_X = NodeData#node.pos_x,
-								Curr_Y = NodeData#node.pos_y,
-								SquaredDistanceNodes = calculateSquaredDistance({StartNode_X, StartNode_Y}, {Curr_X, Curr_Y}),
-								#nodeDistance{dist = SquaredDistanceNodes,
-											entities = Node#nodeEntities.entities
-											}
-							end,
+	MapFunc = fun(Node) ->	  
+				NodeData = Node#nodeEntities.nodeData,
+				Curr_X = NodeData#node.pos_x,
+				Curr_Y = NodeData#node.pos_y,
+				SquaredDistanceNodes = calculateSquaredDistance({StartNode_X, StartNode_Y}, {Curr_X, Curr_Y}),
+				#nodeDistance{dist = SquaredDistanceNodes,
+							entities = Node#nodeEntities.entities
+							}
+			end,
 	EntitiesDistances = lists:map(MapFunc, NodesWireless),	
 	SortFun = fun(A, B) -> 
 						A#nodeDistance.dist < B#nodeDistance.dist
@@ -234,13 +249,13 @@ getNearEntities(State, CurrentPosName, Max_Distance) ->
 	SquaredMaxRange = Max_Distance * Max_Distance,
 	
 	NodesWireless = State#wirelessCardServerState.nodes,
-	FilterFunc = fun(Node) -> %CurrentNodeName = X#nodeEntities.nodeData#node.name,
-								NodeData = Node#nodeEntities.nodeData,
-								Curr_X = NodeData#node.pos_x,
-								Curr_Y = NodeData#node.pos_y,
-								SquaredDistanceNodes = calculateSquaredDistance({StartNode_X, StartNode_Y}, {Curr_X, Curr_Y}),
-								SquaredDistanceNodes < SquaredMaxRange
-							end,
+	FilterFunc = fun(Node) ->
+					NodeData = Node#nodeEntities.nodeData,
+					Curr_X = NodeData#node.pos_x,
+					Curr_Y = NodeData#node.pos_y,
+					SquaredDistanceNodes = calculateSquaredDistance({StartNode_X, StartNode_Y}, {Curr_X, Curr_Y}),
+					SquaredDistanceNodes < SquaredMaxRange
+				end,
 	NearNodes = lists:filter(FilterFunc, NodesWireless),
 	MapFunc = fun(Node) -> #nodeDistance{dist = 0,
 								entities = Node#nodeEntities.entities
@@ -251,10 +266,6 @@ getNearEntities(State, CurrentPosName, Max_Distance) ->
 	PackedEntities = packNodesEntities(MappedNodes, []),
 	PackedEntities.
 	
-packNodesEntities([], ACC) -> ACC;	
-packNodesEntities([H | T ], ACC) -> 
-	NewACC = ACC ++ H#nodeDistance.entities,
-	packNodesEntities(T, NewACC).
 	
 %% ====================================================================
 %% Utils Functions
@@ -276,6 +287,11 @@ getEntityFromEntities(Entities, ToSearch) ->
 			{El, ok}
 	end.
 
+packNodesEntities([], ACC) -> ACC;	
+packNodesEntities([H | T ], ACC) -> 
+	NewACC = ACC ++ H#nodeDistance.entities,
+	packNodesEntities(T, NewACC).
+	
 % Get List in form of [{PID, type}, ...]
 filterResultsByType(Results, Type) ->
 	FilterFunc = fun(EL) ->
