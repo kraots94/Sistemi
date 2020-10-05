@@ -38,3 +38,9 @@ createPairs([A , B | Tail], ACC) ->
 	createPairs([B] ++ Tail, NEW_LIST).
 
 arraySum(_A) -> 0.
+
+calculateSquaredDistance({Px, Py}, {Qx, Qy}) ->
+	Diff_1 = Qx - Px,
+	Diff_2 = Qy - Py,
+	SquaredDistance = Diff_1 * Diff_1 + Diff_2 * Diff_2,
+	SquaredDistance.
