@@ -1,7 +1,7 @@
 import random
 from random import randint
 from graphviz.dot import Graph
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import sys
 import math
 
@@ -11,8 +11,8 @@ PATH_GRAPH = sys.path[0]+PATH_SEPARATOR
 
 WEIGHT_MIN = 5
 WEIGHT_MAX = 20
-TOTAL_NODES = 10
-TOTAL_EDGES = 20
+TOTAL_NODES = 20
+TOTAL_EDGES = 30
 CARTESIAN_SIDE = 100
 
 """convert positive decimal integer n to equivalent in another base (2-26)"""
@@ -207,14 +207,19 @@ def create_file_dot(V, E):
     dot.render(filename="map", directory=PATH_GRAPH, cleanup=True)
 
 def create_image(V):    
-    img = Image.new('RGB', (CARTESIAN_SIDE*3, CARTESIAN_SIDE*3), color = 'white')
-
+    tot_letters_name = len(V[0][0])
+    letter_width = 5
+    letter_height = 8
+    img_width = CARTESIAN_SIDE*letter_width*tot_letters_name
+    img_height = CARTESIAN_SIDE*letter_height
+    img = Image.new('RGB', (img_width, img_height), color = 'white')
+    fnt = ImageFont.truetype(PATH_GRAPH+"digital_7_mono.ttf", 10)
     d = ImageDraw.Draw(img)
     for vertex in V:
         name = vertex[0]
-        x = vertex[1] *2 + 50
-        y = vertex[2] *2 + 50
-        d.text((x,y), name, fill=(0,0,0))
+        x = vertex[1] * letter_width * tot_letters_name
+        y = img_height - vertex[2] * letter_height
+        d.text((x,y), name, font=fnt, fill=(0,0,0))
 
     img.save(PATH_GRAPH+'map.png')
 
