@@ -8,7 +8,7 @@
 
 -import('send', [send_message/2, send_message/3]).
 -import('my_util', [println/1, println/2]).
--record(gpsModuleState, {pid_entity, pid_gps_server, entity_type, current_position, module_range}).
+-record(gpsModuleState, {pid_entity, pid_gps_server, entity_type, current_position, module_range, map_side}).
 %% ====================================================================
 %% API functions
 %% ====================================================================
@@ -42,7 +42,15 @@ init(StartingData) ->
     Start_Pos = StartingData#dataInitGPSModule.starting_pos,
     Power = StartingData#dataInitGPSModule.signal_power,
     Pid_Entity = StartingData#dataInitGPSModule.pid_entity,
-	S = #gpsModuleState{pid_entity = Pid_Entity,pid_gps_server = Pid_S, entity_type = Type, current_position = Start_Pos, module_range = Power},
+    Map_Side = StartingData#dataInitGPSModule.map_side,
+	S = #gpsModuleState {
+        pid_entity = Pid_Entity,
+        pid_gps_server = Pid_S, 
+        entity_type = Type, 
+        current_position = Start_Pos, 
+        module_range = Power,
+        map_side = Map_Side
+    },
     registerModule(S),
 	loop(S).
 
@@ -77,20 +85,21 @@ loop(S) ->
                                 send_message(Pid_S, Pid_Entity, {removeEntity});
         {getNearestCar}         -> 
                                 Pid_Entity = S#gpsModuleState.pid_entity,
-                                Power = S#gpsModuleState.module_range,
+                                Power = S#gpsModuleState.map_side * 1.4142,
                                 Pid_S = S#gpsModuleState.pid_gps_server,
                                 CurrentPos = S#gpsModuleState.current_position,
                                 send_message(Pid_S, self(), {getSortedEntities, CurrentPos, Power}),
                                 receive
-                                    Results -> 
+                                    {_PID_S, Results} -> 
                                                 FilteredResults = filterResultsByType(Results, car),
                                                 MappedResults = mapResultsToPidsList(FilteredResults),
                                                 ClearedResults = lists:delete(Pid_Entity, MappedResults),
                                                 FirstCar = if ClearedResults =:= [] -> none;
                                                                     true -> hd(ClearedResults)
-                                                end,
-                                                send_message(Pid_Entity, FirstCar)
-                                   % Unknown -> io:format("Bad data received by Gps Server: ~p~n", [Unknown])
+                                                            end,
+                                                send_message(Pid_Entity, FirstCar);
+                                    Unknown -> 
+                                                io:format("Bad data received by Gps Server: ~p~n", [Unknown])
                                 end,
                                 loop(S);
         {getNearCars}           -> 
@@ -100,11 +109,13 @@ loop(S) ->
                                 CurrentPos = S#gpsModuleState.current_position,
                                 send_message(Pid_S, self(), {getNearEntities, CurrentPos, Power}),
                                 receive
-                                    Results -> 
+                                    {_PID_S, Results} -> 
                                             FilteredResults = filterResultsByType(Results, car),
                                             MappedResults = mapResultsToPidsList(FilteredResults),
                                             ClearedResults = lists:delete(Pid_Entity, MappedResults),
-                                            send_message(Pid_Entity, ClearedResults)
+                                            send_message(Pid_Entity, ClearedResults);
+                                    Unknown -> 
+                                            io:format("Bad data received by Gps Server: ~p~n", [Unknown])
                                 end,
                                 loop(S);
         {Pid, Ref, terminate}   ->

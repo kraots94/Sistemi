@@ -65,7 +65,8 @@ createRandomEntity(PID_GPS_Server, Nodes, N, ACC) ->
 				type = Type,
 				pid_server_gps = PID_GPS_Server,
 				starting_pos = Pos,
-				signal_power = 30
+				signal_power = ?GPS_MODULE_POWER,
+				map_side = ?MAP_SIDE
 			},
 	PidNewGPS = gps_module:start_gps_module(DataInit),
 	NewACC = [PidNewGPS] ++ ACC,
@@ -83,7 +84,8 @@ createRandomEntityFromPid(PID_GPS_Server, PID_ENT) ->
 				type = Type,
 				pid_server_gps = PID_GPS_Server,
 				starting_pos = Pos,
-				signal_power = 30
+				signal_power = ?GPS_MODULE_POWER,
+				map_side = ?MAP_SIDE
 			},
 	PidNewGPS = gps_module:start_gps_module(DataInit),
 	PidNewGPS.

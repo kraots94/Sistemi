@@ -112,7 +112,7 @@ loop(S) ->
 														loop(S);
 		{Pid, {getSortedEntities, CurrentPos, Power}} -> 
 														Results = getEntitiesSortedByDistance(S, CurrentPos, Power),
-														send_message(Pid, Results),
+														send_message(Pid, self(), Results),
 														loop(S);
 		{Pid, Ref, terminate}						->
 														send_message(Pid, {Ref, ok}),
