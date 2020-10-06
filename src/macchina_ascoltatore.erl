@@ -38,13 +38,14 @@ init(InitData) ->
 	PidMoving = macchina_moving:start(InitialPos, PidGpsModule),
 	PidBattery  = macchina_batteria:start(PidMoving),
 	PidElection = macchina_elezione:start(self(),PidMoving,PidGpsModule, City_Map),
+	PidClock = tick_server:start_clock([self(),PidMoving,PidBattery,PidElection]),
 	State = #taxiListenerState {
 					pidMoving   = PidMoving,
 					pidBattery  = PidBattery,
-					pidElection = PidElection
+					pidElection = PidElection,
+					pidClock = PidClock
 			},
 	my_util:printList("Pid creati:", [PidMoving, PidBattery, PidElection]),
-	tick_server:start_clock([self(),PidMoving,PidBattery,PidElection]),
 	{ok, idle, State}.
 	
 idle(info, {_From, tick}, _Stato) ->
@@ -69,6 +70,10 @@ idle(cast, {partecipateElection, Data}, Stato) ->
 %% ====================================================================
 %% ELECTION functions
 %% ====================================================================
+
+listen_election(info, {_From, tick}, _Stato) ->
+	keep_state_and_data; %per ora non fare nulla
+
 %rimbalzo roba elezione a automa elettore
 listen_election(cast, {election_data, Data}, Stato) ->
 	PidElezione = Stato#taxiListenerState.pidElection,
@@ -86,13 +91,14 @@ listen_election(cast, {beginElection, Data}, _Stato) ->
 
 listen_election(cast, {partecipateElection, Data}, _Stato) ->
 	PidSender = Data#dataElectionPartecipate.pidParent,
-	gen_statem:cast(PidSender, {election_data, {self(), i_can_not_join}}),
+	gen_statem:cast(PidSender, {election_data, {invite_result, {self(), i_can_not_join}}}),
 	keep_state_and_data;
 
 listen_election(cast, {election_results, Data}, Stato) ->
 	% notifico all'utente 
 	io:format("ASCOLTATORE - Winning Results: ~w~n", [Data]),
 	{next_state, idle, Stato}.
+
 
 %listen_election(cast, OtherEvents, Stato) ->
 %	postpone

@@ -87,9 +87,9 @@ idle(info, {_From, tick}, _Stato) ->
 
 idle(cast, {beginElection, Data}, S) ->
 	% Update State
-	S1 = S #electionState { currentRequest = Data#dataElectionBegin.request,
+	S1 = S#electionState { currentRequest = Data#dataElectionBegin.request,
 							pidAppUser =  Data#dataElectionBegin.pidAppUser},
-							
+
 %%% Recupero dati da altri automi della macchina
 	PID_GPS = S1#electionState.pidGps,
 	CloserCars = getDataFromAutomata(PID_GPS, {self(), getNearCars}),
@@ -125,12 +125,23 @@ idle(cast, {beginElection, Data}, S) ->
 		selfCost = {CC, CRDT}
 	},
 
-	{next_state, running_election, S2};
+	if S2#electionState.carsInvited =:= [] -> 
+		{Cost_Client, Charge_After_Client} = S2#electionState.selfCost,
+		Results = #electionCostData{
+						pid_source = S2#electionState.pidCar, 
+						cost_client = Cost_Client, 
+						charge_after_transport = Charge_After_Client},
+		%aspetto i risultati
+		calculate_final_results([Results], S2),
+		{next_state, idle, S2};
+	true ->  
+		{next_state, running_election, S2} 
+	end;
 
 idle(cast, {partecipateElection, Data}, S) ->
 	% Update State
-	S1 = S #electionState { currentRequest = Data#dataElectionPartecipate.request,
-							parent = Data#dataElectionPartecipate.pidParent},
+	S1 = S#electionState{currentRequest = Data#dataElectionPartecipate.request,
+	parent = Data#dataElectionPartecipate.pidParent},
 
 	CurrentTTL = Data#dataElectionPartecipate.ttl,
 
@@ -188,20 +199,23 @@ idle(cast, {partecipateElection, Data}, S) ->
 			{next_state, running_election, S2} 
 	end.
 
+running_election(info, {_From, tick}, _Stato) ->
+	keep_state_and_data; %per ora non fare nulla
 
 running_election(cast, {invite_result, Data}, S) -> 
 	{PID_Car, Partecipate} = Data,
 	NewInvited = lists:delete(PID_Car, S#electionState.carsInvited),
 	OldChildrenPartecipate = S#electionState.childrenPartecipate,
-	NewChildrenPartecipate =  if Partecipate == i_can_join -> 
-										{_El, State} = searchPartecipantInList(PID_Car, OldChildrenPartecipate),
-										if State == ok -> OldChildrenPartecipate;
-												true -> 
-													NewPartecipant = #carPartecipate{refCar = PID_Car, costsCar = [], sentResults = false},
-													[NewPartecipant] ++ OldChildrenPartecipate
-										end;	
-								true -> OldChildrenPartecipate
-							end,
+	NewChildrenPartecipate =  
+				if Partecipate == i_can_join 
+						-> {_El, State} = searchPartecipantInList(OldChildrenPartecipate, PID_Car),
+							if State == ok -> OldChildrenPartecipate;
+									true -> 
+										NewPartecipant = #carPartecipate{refCar = PID_Car, costsCar = [], sentResults = not_sended_results},
+										[NewPartecipant] ++ OldChildrenPartecipate
+							end;	
+					true -> OldChildrenPartecipate
+				end,
 	{next_state, running_election, S#electionState{carsInvited = NewInvited, 
 													childrenPartecipate = NewChildrenPartecipate}};
 
@@ -219,18 +233,20 @@ running_election(cast, {costs_results, Data}, S) ->
 			},
 			CurrentPartecipants ++ [NewPartecipant];
 		true ->
-				FuncMap = fun(Partecipant) -> 
+			FuncMap = fun(Partecipant) -> 
 				SentResults = Partecipant#carPartecipate.sentResults,
 				NewPartecipant = if
-					SentResults == ok -> Partecipant;					
+					SentResults == ok -> 
+						Partecipant;					
 					true ->
 						PID_Partecipant = Partecipant#carPartecipate.refCar,
-						if PID_Sender =:= PID_Partecipant -> Partecipant;
-							true ->
-								Partecipant#carPartecipate{
-									sentResults = ok, 
-									costsCar = Results
-								}
+						if PID_Sender =:= PID_Partecipant -> 
+							Partecipant#carPartecipate{
+								sentResults = sended_results, 
+								costsCar = Results
+							};
+						true ->
+							Partecipant
 					end
 				end,
 				NewPartecipant
@@ -241,7 +257,7 @@ running_election(cast, {costs_results, Data}, S) ->
 	S1 = S#electionState{carsInvited = NewInvited, 
 						childrenPartecipate = NewPartecipants},
 
-	FuncFilter = fun(Partecipant) -> Partecipant#carPartecipate.sentResults == false end,
+	FuncFilter = fun(Partecipant) -> Partecipant#carPartecipate.sentResults == not_sended_results end,
 	MissingAnswers = lists:filter(FuncFilter, NewPartecipants),
 	if  (MissingAnswers =:= []) and (NewInvited =:= []) -> 
 			ChildrenCosts = packChildrenCosts(NewPartecipants, []),
@@ -264,6 +280,7 @@ running_election(cast, {costs_results, Data}, S) ->
 	end.
 
 calculate_final_results(DataTree, S) -> 
+	io:format("Automa Election - calculate_final_results ~w~n", [S#electionState.pidCar]),
 	SortFun = fun(A, B) -> 
 		CostClient_A = A#electionCostData.cost_client, 
 		Final_Charge_A = A#electionCostData.charge_after_transport,  
@@ -275,8 +292,11 @@ calculate_final_results(DataTree, S) ->
 	end,
 	Sorted_Data = lists:sort(SortFun, DataTree),
 	io:format("Sorted_Data: ~w~n", [Sorted_Data]),
-	Winner_Data = hd(Sorted_Data),
-	ID_Winner = Winner_Data#electionCostData.pid_source,
+	Winner_Partecipant = hd(Sorted_Data),
+	Winner_Data = #election_result_to_car{id_winner = Winner_Partecipant#electionCostData.pid_source,
+										id_app_user = S#electionState.pidAppUser
+										},
+	ID_Winner = Winner_Data#election_result_to_car.id_winner,
 	My_Pid = S#electionState.pidCar,
 	if
 		My_Pid == ID_Winner ->
@@ -287,9 +307,14 @@ calculate_final_results(DataTree, S) ->
 		true ->
 			ok
 	end,
-	sendMessage(S#electionState.childrenPartecipate, Winner_Data, S),
+	FuncMap_2 = fun(Child) -> Child#carPartecipate.refCar end,
+	Pids_To_notify = lists:map(FuncMap_2, S#electionState.childrenPartecipate),
+
+	sendMessage(Pids_To_notify, {winning_results, Winner_Data}, S),
 	sendToListener({election_results, Winner_Data}, S).
 
+waiting_final_results(info, {_From, tick}, _Stato) ->
+	keep_state_and_data; %per ora non fare nulla
 
 waiting_final_results(cast, {winning_results, Data}, S) -> 
 	ID_Winner = Data#election_result_to_car.id_winner,
@@ -303,11 +328,16 @@ waiting_final_results(cast, {winning_results, Data}, S) ->
 		true ->
 			ok
 	end,
-	sendMessage(S#electionState.childrenPartecipate, Data, S),
+	FuncMap_2 = fun(Child) -> Child#carPartecipate.refCar end,
+	Pids_To_notify = lists:map(FuncMap_2, S#electionState.childrenPartecipate),
+	sendMessage(Pids_To_notify, {winning_results, Data}, S),
 	sendToListener({election_results, Data}, S),
 	S1 = resetState(S),
-	{next_state, idle, S1}.
+	{next_state, idle, S1};
 
+waiting_final_results(cast, {invite_result, _Data}, S) -> 
+	{next_state, waiting_final_results, S}.
+ 
 %running
 %-> wait_results
 %-> calculate_results
@@ -320,8 +350,7 @@ waiting_final_results(cast, {winning_results, Data}, S) ->
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
-calculateSelfCost(_Data, Battery_level, _Cost_To_Last_Target) -> 
-	io:format("Battery level: ~w~n", [Battery_level]),
+calculateSelfCost(_Data, _Battery_level, _Cost_To_Last_Target) -> 
 	{my_util:generate_random_number(100), my_util:generate_random_number(100)}.
 
 calculateNearestColumn(_Node) -> "".

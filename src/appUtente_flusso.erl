@@ -61,7 +61,6 @@ idle(enter, _OldState, _Stato) -> keep_state_and_data;
 idle(cast, {send_request, Request}, State) ->
 	checkValidityRequest(State#userState.currentPos, Request),
 	{From, To} = Request,
-	_CorrectReq = {self(), From, To},
 	NearestCar = findTaxi(State),
 	gen_statem:cast(NearestCar, {beginElection, {From,To, self()}}),
 	keep_state_and_data;

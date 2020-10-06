@@ -119,6 +119,7 @@ loop(S) ->
                                 end,
                                 loop(S);
         {PID, getNearCars}      -> 
+                                Pid_Entity = S#gpsModuleState.pid_entity,
                                 Power = S#gpsModuleState.module_range,
                                 Pid_S = S#gpsModuleState.pid_gps_server,
                                 CurrentPos = S#gpsModuleState.current_position,
@@ -127,7 +128,7 @@ loop(S) ->
                                     {_PID_S, Results} -> 
                                             FilteredResults = filterResultsByType(Results, car),
                                             MappedResults = mapResultsToPidsList(FilteredResults),
-                                            ClearedResults = lists:delete(PID, MappedResults),
+                                            ClearedResults = lists:delete(Pid_Entity, MappedResults),
                                             send_message(PID, ClearedResults);
                                     Unknown -> 
                                             io:format("Bad data received by Gps Server: ~p~n", [Unknown])
