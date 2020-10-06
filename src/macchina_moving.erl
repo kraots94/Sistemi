@@ -5,6 +5,9 @@
 -include("globals.hrl").
 
 callback_mode() -> [state_functions,state_enter].
+%getDataElection, deve tornare {Cost_To_last_Target, Current_Target, Battery_Level} , Current_Target = pos attuale se fermo, dest se moving, next node se vai verso colonnina (stringa)
+%diminuizione batteria a ogni tick, e anche cost to current target.
+%Current_Target = next node se stai andando verso colonnina
 
 %pidWirelessCard
 %				 tappe,
@@ -14,9 +17,9 @@ callback_mode() -> [state_functions,state_enter].
 %% ====================================================================
 %% API functions
 %% ====================================================================
-start(InitialPos, PidWireless) ->
+start(InitialPos, PidGps) ->
 	State = #movingCarState {
-					pidWirelessCard = PidWireless,
+					pidGps = PidGps,
 					tappe = [],
 					currentUser = none,
 					currentPos = InitialPos,
@@ -51,7 +54,7 @@ init(State) ->
 	%qua sara' da togliere quando farai ascoltatore
 	%tick_server:start_clock(?TICKTIME, [self()]),
 	%register quando dovrai fare refactoring con modulo gps
-	wireless_card_server:sendPosToGps(State#movingCarState.pidWirelessCard, State#movingCarState.currentPos),
+	%wireless_card_server:sendPosToGps(State#movingCarState.pidWirelessCard, State#movingCarState.currentPos),
 	{ok, idle, State}.
 
 %automa batt mi dice di andare a caricare, accodo percorso colonnina
@@ -210,7 +213,7 @@ calculateNewState(Stato, TappaAttuale, Tappe) ->
 	NuoveTappe = tl(Tappe),
 	Pos = TappaAttuale#tappa.node_name,
 	sendPosToUser(Stato#movingCarState.currentUser,Pos),
-	wireless_card_server:sendPosToGps(Stato#movingCarState.pidWirelessCard, Pos),
+	%wireless_card_server:sendPosToGps(Stato#movingCarState.pidWirelessCard, Pos),
 	if 
 		NuoveTappe =:= [] -> Stato#movingCarState{tappe = [], currentUser = none, currentPos = Pos};
 		true ->

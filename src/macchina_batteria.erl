@@ -32,7 +32,6 @@ start(AttachedCarPid) ->
 %% ====================================================================
 
 init(State) ->
-	tick_server:start_clock(?TICKTIME, [self()]),
 	{ok, check_battery, State}.
 
 check_battery(info, {_From, tick}, Stato) ->

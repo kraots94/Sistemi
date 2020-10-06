@@ -1,22 +1,23 @@
 -module(appUtente_flusso).
 -compile(export_all).
 -behaviour(gen_statem).
+-import('send', [send_message/2, send_message/3]).
 -include("globals.hrl").
 -include("records.hrl").
 
 callback_mode() -> [state_functions, state_enter].
 %userState
 %                   pidEnv,
-%					pidWirelessCard,
+%					pidGPSModule,
 %					currentPos,
 %					currentDestination
 %% ====================================================================
 %% API functions
 %% ====================================================================
 
-start(InitialPos, PidEnv, PidWireless) ->
-	State = #userState{pidEnv = PidEnv, pidWirelessCard = PidWireless, currentPos = InitialPos},
-	{ok, Pid} = gen_statem:start_link(?MODULE,State, []),
+start(InitialPos, PidEnv, PID_GPS_Server) ->
+	InitData = {PidEnv, InitialPos, PID_GPS_Server},
+	{ok, Pid} = gen_statem:start_link(?MODULE,InitData, []),
 	Pid.
 
 %Request è tipo = {"a", "b"}.
@@ -31,15 +32,23 @@ updatePosition(UserPid, NewNode) ->
 %% Automata Functions
 %% ====================================================================
 
-init(State) ->
-	%register quando dovrai fare refactoring con modulo gps
-	wireless_card_server:sendPosToGps(State#userState.pidWirelessCard,State#userState.currentPos),
+init(InitData) ->
+	{PidEnv, InitialPos, PID_GPS_Server} = InitData,
+	DataInitGPS = #dataInitGPSModule{
+							pid_entity = self(), 
+							type = user, 
+							pid_server_gps = PID_GPS_Server,
+							starting_pos = InitialPos,
+							signal_power = ?GPS_MODULE_POWER, 
+							map_side = ?MAP_SIDE},
+	PidGpsModule = gps_module:start_gps_module(DataInitGPS),
+	State = #userState{pidEnv = PidEnv, pidGPSModule = PidGpsModule, currentPos = InitialPos}, 
 	{ok, idle, State}.
 
 %ricezione del cambiamento posizione auto che mi serve
 handle_common(cast, {newNodeReached, NewNode}, OldState, State) ->
 	NewState = if OldState == moving -> %ricevuto mentre sono in moving, la mia posizione cambia!
-					wireless_card_server:sendPosToGps(State#userState.pidWirelessCard, NewNode),
+					send_message(State#userState.pidGPSModule, {setPosition, NewNode}),
 		   			State#userState{currentPos = NewNode};
 				  true -> %ricevuto non in moving, potrei dire a utente dov'è auto se son servito
 					State
@@ -52,9 +61,9 @@ idle(enter, _OldState, _Stato) -> keep_state_and_data;
 idle(cast, {send_request, Request}, State) ->
 	checkValidityRequest(State#userState.currentPos, Request),
 	{From, To} = Request,
-	CorrectReq = {self(), From, To},
-	PidWinnerTaxi = findTaxi(State),
-	macchina_moving:updateQueuePid_alone(PidWinnerTaxi, CorrectReq),
+	_CorrectReq = {self(), From, To},
+	NearestCar = findTaxi(State),
+	gen_statem:cast(NearestCar, {beginElection, {From,To, self()}}),
 	keep_state_and_data;
 
 idle(cast, taxiServingYou, State) ->
@@ -92,7 +101,7 @@ moving(cast, arrivedTargetPosition, State) ->
 ?HANDLE_COMMON.
   
 ending(enter, _OldState, State) ->
-	wireless_card_server:deleteMyLocationTracks(State#userState.pidWirelessCard),
+	wireless_card_server:deleteMyLocationTracks(State#userState.pidGPSModule),
 	my_util:println("MORTO"),
 	%codice per la morte qua
 	keep_state_and_data.
@@ -116,8 +125,7 @@ checkValidityRequest(UserPos, Request) ->
 
 %trova il taxi piu' vicino (in futuro basic elezione)
 findTaxi(State) ->
-	WirelessCardPid = State#userState.pidWirelessCard,
-	wireless_card_server:getNearestCar(WirelessCardPid),
+	send_message(State#userState.pidGPSModule, {getNearestCar}),
 	receive 
 				Nearest -> Nearest
 	end.

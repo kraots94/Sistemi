@@ -1,24 +1,24 @@
 -module(tick_server).
 -import('send', [send_message/2, send_message/3]).
 -import('my_util',[println/1]).
--export([start_clock/2, end_clock/1, tick_generation/2]).
-
+-export([start_clock/1, end_clock/1, tick_generation/1]).
+-include("globals.hrl").
 %timeToTick: espresso in secondi, tempo di attesa tra due tick
 %Subscribers: lista dei processi che ricevono il tick
-start_clock(TimeToTick, Subcribers) ->
-	Pid = spawn(tick_server, tick_generation, [TimeToTick, Subcribers]),
+start_clock(Subcribers) ->
+	Pid = spawn(tick_server, tick_generation, [Subcribers]),
 	Pid.
 
-tick_generation(TimeToTick,Subscribers) ->
+tick_generation(Subscribers) ->
 	receive 
 		{Pid, Ref, terminate} ->
 			send_message(Pid, {Ref, ok}),
 			println("Exiting clock loop");
 		Unknown ->
             io:format("Unknown message: ~p~n", [Unknown]),
-			tick_generation(TimeToTick,Subscribers)
-	after TimeToTick*1000 -> send_notification(Subscribers),
-						tick_generation(TimeToTick,Subscribers)
+			tick_generation(Subscribers)
+	after ?TICKTIME*1000 -> send_notification(Subscribers),
+						tick_generation(Subscribers)
 	end.
 
 send_notification([]) -> ok;

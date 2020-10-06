@@ -334,6 +334,7 @@ Sono stati individuati due insiemi di funzionalità che è necessario supportare
 	\item Partecipazione della macchina già impegnata alla leader election.
 	\item Possibilità di rimuovere la prenotazione
 	\item Possibilità di cambiare destinazione anche se ci sono altri utenti nella coda della macchina candidata. Questa funzionalità vale per tutti gli utenti in coda, tuttavia è limitata dalla nuova destinazione che deve costare meno rispetto alla precedente.
+	\item Creazione della tabella di routing per inviare l'id dell'utente solo al vincitore dell'elezione.
 	\item Car sharing fino a tre persone.
 \end{itemize}
 
@@ -349,5 +350,5 @@ Lo sviluppo dell'applicazione verrà suddiviso in diverse versioni via via estes
 	\item Le connessioni tra le macchine possono perdere andare perse mentre si elegge il leader.
 	\item Rimuovere prenotazione.
 	\item Cambio direzione anche se in lista.
-	\item Implementazione del car-sharing fino a 3 clienti.
+	\item Implementazione del car-sharing fino a 3 clienti, creazione della tabella di routing per inviare l'id dell'utente solo al vincitore dell'elezione.
 \end{enumerate}

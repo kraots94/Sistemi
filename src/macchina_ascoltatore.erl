@@ -13,7 +13,7 @@ callback_mode() -> [state_functions].
 %% API functions
 %% ====================================================================
 
-%si crea con {"nodo iniziale", PidWireless, mappa}
+%si crea con {"nodo iniziale", PID_GPS_Server, mappa}
 start(InitData) ->
 	{ok, Pid} = gen_statem:start_link(?MODULE,InitData, []),
 	Pid.
@@ -26,17 +26,25 @@ beginElection(Pid) ->
 %% ====================================================================
 
 init(InitData) -> 
-	{InitialPos, PidWireless, City_Map} = InitData,
-	PidMoving = macchina_moving:start(InitialPos, PidWireless),
+	{InitialPos, PID_GPS_Server, City_Map} = InitData,
+	StartingDataGps = #dataInitGPSModule{
+							pid_entity = self(), 
+							type = car, 
+							pid_server_gps = PID_GPS_Server,
+							starting_pos = InitialPos, 
+							signal_power = ?GPS_MODULE_POWER, 
+							map_side = ?MAP_SIDE},
+	PidGpsModule = gps_module:start_gps_module(StartingDataGps),
+	PidMoving = macchina_moving:start(InitialPos, PidGpsModule),
 	PidBattery  = macchina_batteria:start(PidMoving),
-	PidElection = macchina_elezione:start(self(), PidWireless, City_Map),
+	PidElection = macchina_elezione:start(self(),PidMoving,PidGpsModule, City_Map),
 	State = #taxiListenerState {
 					pidMoving   = PidMoving,
 					pidBattery  = PidBattery,
 					pidElection = PidElection
 			},
 	my_util:printList("Pid creati:", [PidMoving, PidBattery, PidElection]),
-	tick_server:start_clock(?TICKTIME, [self(),PidMoving,PidBattery,PidElection]),
+	tick_server:start_clock([self(),PidMoving,PidBattery,PidElection]),
 	{ok, idle, State}.
 	
 idle(info, {_From, tick}, _Stato) ->
@@ -46,26 +54,45 @@ idle(info, {_From, tick}, _Stato) ->
 %Data = {From,To,PidAppUser}
 idle(cast, {beginElection, Data}, Stato) ->
 	{From,To,PidAppUser} = Data,
-	%piazzo dentro anche pid moving cosi' che automa prenda queue se serve
-	NewData = {From,To,PidAppUser,self(),Stato#taxiListenerState.pidMoving},
+	Request = #user_request{from = From, to = To},
+	NewData = #dataElectionBegin{request = Request, pidAppUser = PidAppUser},
 	PidElezione = Stato#taxiListenerState.pidElection,
 	gen_statem:cast(PidElezione, {beginElection,NewData}),
 	{next_state, listen_election, Stato};
 
 %partecipate election ricevuto da altra macchina
 idle(cast, {partecipateElection, Data}, Stato) ->
-	{From,To,PidParent} = Data,
-	%piazzo dentro anche pid moving cosi' che automa prenda queue se serve
-	NewData = {From,To,PidParent,self(),Stato#taxiListenerState.pidMoving},
 	PidElezione = Stato#taxiListenerState.pidElection,
-	gen_statem:cast(PidElezione, {partecipateElection,NewData}),
+	gen_statem:cast(PidElezione, {partecipateElection, Data}),
 	{next_state, listen_election, Stato}.
 
+%% ====================================================================
+%% ELECTION functions
+%% ====================================================================
 %rimbalzo roba elezione a automa elettore
 listen_election(cast, {election_data, Data}, Stato) ->
 	PidElezione = Stato#taxiListenerState.pidElection,
 	gen_statem:cast(PidElezione, Data),
-	keep_stata_and_data.
+	keep_state_and_data;
+
+listen_election(cast, {to_outside, {Target, Data}}, _Stato) ->
+	gen_statem:cast(Target, Data),
+	keep_state_and_data;
+
+listen_election(cast, {beginElection, Data}, _Stato) ->
+	{PID_APP_USER, _Request} = Data,
+	gen_statem:cast(PID_APP_USER, {already_running_election_wait}),
+	keep_state_and_data;
+
+listen_election(cast, {partecipateElection, Data}, _Stato) ->
+	PidSender = Data#dataElectionPartecipate.pidParent,
+	gen_statem:cast(PidSender, {election_data, {self(), i_can_not_join}}),
+	keep_state_and_data;
+
+listen_election(cast, {election_results, Data}, Stato) ->
+	% notifico all'utente 
+	io:format("ASCOLTATORE - Winning Results: ~w~n", [Data]),
+	{next_state, idle, Stato}.
 
 %listen_election(cast, OtherEvents, Stato) ->
 %	postpone

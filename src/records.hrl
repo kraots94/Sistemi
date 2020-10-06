@@ -5,9 +5,13 @@
 
 -record(city, {total_nodes, total_edges, city_graph, nodes}).
 
+-record(user_request,{from, to}).
+-record(election_result_to_car,{id_winner, id_app_user}).
+-record(election_result_to_user,{id_car_winner, time_to_wait}).
+
 %stato macchina in movimento:
 -record(movingCarState, {
-				pidWirelessCard,
+				pidGps,
 				tappe,
 				currentUser = none,
 				currentPos,
@@ -16,7 +20,7 @@
 				mustCharge}).
 
 -record(userState, {pidEnv,
-					pidWirelessCard,
+					pidGPSModule,
 					currentPos,
 					currentDestination
 					}).
@@ -44,3 +48,12 @@
 					  sameBatteryCounter,
 					  tick_counter,
 					  columnPathEnabled}).
+
+-record(dataElectionBegin,{
+	request,
+	pidAppUser}).
+
+-record(dataElectionPartecipate, {
+	pidParent,
+	request, %la tupla {From,To}
+	ttl}).
