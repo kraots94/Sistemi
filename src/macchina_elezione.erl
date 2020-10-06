@@ -66,8 +66,10 @@ start(PidMacchina,PidWifi,City_Map) ->
 
 
 init(State) ->
-	tick_server:start_clock(?TICKTIME, [self()]),
 	{ok, idle, State}.
+
+idle(info, {_From, tick}, _Stato) ->
+	keep_state_and_data; %per ora non fare nulla
 
 idle(cast, {beginElection, Data}, S) ->
 	% Update State

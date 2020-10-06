@@ -49,7 +49,7 @@ enablePathCharge(Pid) ->
 
 init(State) ->
 	%qua sara' da togliere quando farai ascoltatore
-	tick_server:start_clock(?TICKTIME, [self()]),
+	%tick_server:start_clock(?TICKTIME, [self()]),
 	%register quando dovrai fare refactoring con modulo gps
 	wireless_card_server:sendPosToGps(State#movingCarState.pidWirelessCard, State#movingCarState.currentPos),
 	{ok, idle, State}.

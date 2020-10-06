@@ -57,7 +57,7 @@ check_threshold(BatteryLevel, Stato) ->
 	NewState = if (BatteryLevel < 78) and not(AlreadyEnabledColPath) ->
 		   			macchina_moving:enablePathCharge(PidAttachedCar), %macchina accoda tappe colonnina e poi va in stato ricarica...
 		   			Stato#batteryState{columnPathEnabled = true};
-				  (BatteryLevel == 100) and (AlreadyEnabledColPath) ->
+				  (BatteryLevel == 100) and (AlreadyEnabledColPath) -> %(?) relazione sbagliata (?)
 					macchina_moving:fullBattery(PidAttachedCar), %...e questo lo fa tornare in idle
 					Stato#batteryState{columnPathEnabled = false};
 				  true -> Stato

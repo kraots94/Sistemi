@@ -13,15 +13,9 @@ callback_mode() -> [state_functions].
 %% API functions
 %% ====================================================================
 
-start(InitialPos, PidWireless) ->
-	PidMoving = macchina_moving:start(InitialPos, PidWireless),
-	my_util:println("Pid moving creato:", PidMoving),
-	%PidElection = ...
-	%PidBattery  = ...
-	State = #taxiListenerState {
-					pidMoving = PidMoving,
-					pidBattery = none},
-	{ok, Pid} = gen_statem:start_link(?MODULE,State, []),
+%si crea con {"nodo iniziale", PidWireless, mappa}
+start(InitData) ->
+	{ok, Pid} = gen_statem:start_link(?MODULE,InitData, []),
 	Pid.
 
 beginElection(Pid) ->
@@ -31,34 +25,51 @@ beginElection(Pid) ->
 %% Automata functions
 %% ====================================================================
 
-init(State) -> 
-	PidMoving = State#taxiListenerState.pidMoving,
-	%PidElection = ...
-	%PidBattery  = ...
-	tick_server:start_clock(?TICKTIME, [self(),PidMoving]), %+ tutti gli altri...
+init(InitData) -> 
+	{InitialPos, PidWireless, City_Map} = InitData,
+	PidMoving = macchina_moving:start(InitialPos, PidWireless),
+	PidBattery  = macchina_batteria:start(PidMoving),
+	PidElection = macchina_elezione:start(self(), PidWireless, City_Map),
+	State = #taxiListenerState {
+					pidMoving   = PidMoving,
+					pidBattery  = PidBattery,
+					pidElection = PidElection
+			},
+	my_util:printList("Pid creati:", [PidMoving, PidBattery, PidElection]),
+	tick_server:start_clock(?TICKTIME, [self(),PidMoving,PidBattery,PidElection]),
 	{ok, idle, State}.
 	
-%V0 features 
-idle({call,From}, {beginElectionUser}, State) ->
-	PidMoving = State#taxiListenerState.pidMoving,
-	_PidElection = State#taxiListenerState.pidElection,
-	IsBusy = macchina_moving:areYouBusy(PidMoving),
-	if IsBusy -> 
-		   		%invii sto messaggio a PidElection (usando suo metodo api)
-				%dicendo che non puoi vincere (bridge mode)
-				foo;
-	   true ->
-		   %invii sto messaggio a PidElection (usando suo metodo api)
-				%dicendo che puoi vincere (bridge mode)
-				foo2
-	end,
-	{next_state, listen_election, State, [{reply,From,yes}]};
+idle(info, {_From, tick}, _Stato) ->
+	keep_state_and_data; %per ora non fare nulla
+	
+%begin election ricevuto da app utente
+%Data = {From,To,PidAppUser}
+idle(cast, {beginElection, Data}, Stato) ->
+	{From,To,PidAppUser} = Data,
+	%piazzo dentro anche pid moving cosi' che automa prenda queue se serve
+	NewData = {From,To,PidAppUser,self(),Stato#taxiListenerState.pidMoving},
+	PidElezione = Stato#taxiListenerState.pidElection,
+	gen_statem:cast(PidElezione, {beginElection,NewData}),
+	{next_state, listen_election, Stato};
 
-%come sopra sostanzialmente solo che devi dire a automa elezione che sei partecipating non initiating
-idle(cast, {partecipateElection}, State) ->
-	PidElection = State#taxiListenerState.pidElection,
-	%invii sto messaggio a PidElection (usando suo metodo api)
+%partecipate election ricevuto da altra macchina
+idle(cast, {partecipateElection, Data}, Stato) ->
+	{From,To,PidParent} = Data,
+	%piazzo dentro anche pid moving cosi' che automa prenda queue se serve
+	NewData = {From,To,PidParent,self(),Stato#taxiListenerState.pidMoving},
+	PidElezione = Stato#taxiListenerState.pidElection,
+	gen_statem:cast(PidElezione, {partecipateElection,NewData}),
+	{next_state, listen_election, Stato}.
+
+%rimbalzo roba elezione a automa elettore
+listen_election(cast, {election_data, Data}, Stato) ->
+	PidElezione = Stato#taxiListenerState.pidElection,
+	gen_statem:cast(PidElezione, Data),
 	keep_stata_and_data.
+
+%listen_election(cast, OtherEvents, Stato) ->
+%	postpone
+
 
 %% ====================================================================
 %% Internal functions
