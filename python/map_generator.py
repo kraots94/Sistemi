@@ -9,10 +9,10 @@ PATH_SEPARATOR = "\\"
 PATH_MAP = sys.path[0]+PATH_SEPARATOR+".."+ PATH_SEPARATOR +"map" + PATH_SEPARATOR
 PATH_GRAPH = sys.path[0]+PATH_SEPARATOR
 
-WEIGHT_MIN = 5
-WEIGHT_MAX = 20
-TOTAL_NODES = 20
-TOTAL_EDGES = 30
+WEIGHT_MIN = 3
+WEIGHT_MAX = 10
+TOTAL_NODES = 100
+TOTAL_EDGES = 300
 CARTESIAN_SIDE = 100
 
 """convert positive decimal integer n to equivalent in another base (2-26)"""
@@ -211,14 +211,15 @@ def create_image(V):
     letter_width = 14
     letter_height = 14
     img_width = CARTESIAN_SIDE*letter_width*tot_letters_name
-    img_height = CARTESIAN_SIDE*letter_height
+    img_height = CARTESIAN_SIDE*letter_height*tot_letters_name
     img = Image.new('RGB', (img_width, img_height), color = 'white')
     fnt = ImageFont.truetype(PATH_GRAPH+"FiraMono-Medium.ttf", 20)
     d = ImageDraw.Draw(img)
     for vertex in V:
         name = vertex[0].upper()
         x = vertex[1] * letter_width * tot_letters_name + 1
-        y = img_height - vertex[2] * letter_height
+        increment = (letter_height*tot_letters_name - letter_height) /2
+        y = img_height - vertex[2] * letter_height*tot_letters_name + increment
         d.text((x,y), name, font=fnt, fill=(0,0,0))
 
     img.save(PATH_GRAPH+'map.png')

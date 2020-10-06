@@ -30,9 +30,10 @@ delete_map(_Map) -> ok.
 %% ====================================================================
 %% User -> Reference to user
 %% All three points are names in name format, not refs.
-%% P1 -> Position Car after served user 
-%% P2 -> Position user start
-%% P3 -> Position user targat
+%% P1 -> Position Car after served last user in queue
+%% P2 -> Position new user start
+%% P3 -> Position new user target
+%% P4 -> Position nearest column
 %% City -> City refs
 %% ====================================================================
 calculate_path(User, P1, P2, P3) -> 
