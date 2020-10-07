@@ -53,7 +53,7 @@ init(InitData) ->
 					pidGps = PidGpsModule,
 					pidClock = PidClock
 			},
-	my_util:printList("Pid creati:", [PidMoving, PidBattery, PidElection]),
+	%my_util:printList("Pid creati:", [PidMoving, PidBattery, PidElection]),
 	{ok, idle, State}.
 	
 %roba che deve uscire

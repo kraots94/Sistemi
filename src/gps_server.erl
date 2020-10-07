@@ -79,7 +79,7 @@ initNode([H | T], ACC) ->
 loop(S) ->
 	receive 
 		{Pid, {register, Type, Pos}} 				->  
-														io:format("ADD: [PID ~w | TYPE ~w | POS ~w]~n", [Pid, Type, Pos]),
+														%io:format("ADD: [PID ~w | TYPE ~w | POS ~w]~n", [Pid, Type, Pos]),
 								  		   				NewState = registerNewEntity(S, Pid, Type, Pos),
 								           				loop(NewState);
 		{Pid, {setPosition, NewPos}}   	    		->  
