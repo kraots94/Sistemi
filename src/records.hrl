@@ -9,16 +9,6 @@
 -record(election_result_to_car,{id_winner, id_app_user}).
 -record(election_result_to_user,{id_car_winner, time_to_wait}).
 
-%stato macchina in movimento:
--record(movingCarState, {
-				pidGps,
-				tappe,
-				currentUser = none,
-				currentPos,
-				batteryLevel,
-				pathCol,
-				mustCharge}).
-
 -record(userState, {pidEnv,
 					pidGPSModule,
 					currentPos,
@@ -31,11 +21,6 @@
 							tick_s_pid, 
 							wireless_card_server_pid, 
 							tick_counter}).
-
--record(taxiListenerState, {pidMoving,
-							pidBattery,
-							pidElection,
-							pidClock}).
 
 % dati di inizializzazione del modulo gps
 -record(dataInitGPSModule, {pid_entity, 

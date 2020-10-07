@@ -9,6 +9,12 @@
 
 callback_mode() -> [state_functions].
 
+-record(taxiListenerState, {pidMoving,
+							pidBattery,
+							pidElection,
+							pidGps,
+							pidClock}).
+
 %% ====================================================================
 %% API functions
 %% ====================================================================
@@ -35,7 +41,7 @@ init(InitData) ->
 							signal_power = ?GPS_MODULE_POWER, 
 							map_side = ?MAP_SIDE},
 	PidGpsModule = gps_module:start_gps_module(StartingDataGps),
-	PidMoving = macchina_moving:start(InitialPos, PidGpsModule),
+	PidMoving = macchina_moving:start(InitialPos,self(),PidGpsModule),
 	PidBattery  = macchina_batteria:start(PidMoving),
 	PidElection = macchina_elezione:start(self(),PidMoving,PidGpsModule, City_Map),
 	PidClock = tick_server:start_clock([self(),PidMoving,PidBattery,PidElection]),
@@ -43,6 +49,7 @@ init(InitData) ->
 					pidMoving   = PidMoving,
 					pidBattery  = PidBattery,
 					pidElection = PidElection,
+					pidGps = PidGpsModule,
 					pidClock = PidClock
 			},
 	my_util:printList("Pid creati:", [PidMoving, PidBattery, PidElection]),
@@ -50,6 +57,11 @@ init(InitData) ->
 	
 idle(info, {_From, tick}, _Stato) ->
 	keep_state_and_data; %per ora non fare nulla
+
+%macchina Vuole aggiornare posizione
+idle(cast, {updatePosition, CurrentPosition}, Stato) ->
+	PidGps = Stato#taxiListenerState.pidGps,
+	gps_module:setPosition(PidGps, CurrentPosition);
 	
 %begin election ricevuto da app utente
 %Data = {From,To,PidAppUser}

@@ -6,19 +6,26 @@
 
 callback_mode() -> [state_functions,state_enter].
 %getDataElection, deve tornare {Cost_To_last_Target, Current_Target, Battery_Level} , Current_Target = pos attuale se fermo, dest se moving, next node se vai verso colonnina (stringa)
-%diminuizione batteria a ogni tick, e anche cost to current target.
+%diminuizione batteria a ogni tick, e anche cost to last target.
 %Current_Target = next node se stai andando verso colonnina
 
-%pidWirelessCard
-%				 tappe,
-%				 currentUser,
-%				 currentPos
+%stato macchina in movimento:
+-record(movingCarState, {
+				pidListener,
+				pidGps,
+				tappe,
+				currentUser = none,
+				currentPos,
+				batteryLevel,
+				pathCol,
+				mustCharge}).
 
 %% ====================================================================
 %% API functions
 %% ====================================================================
-start(InitialPos, PidGps) ->
+start(InitialPos, PidListener, PidGps) ->
 	State = #movingCarState {
+					pidListener = PidListener,
 					pidGps = PidGps,
 					tappe = [],
 					currentUser = none,
@@ -51,10 +58,6 @@ enablePathCharge(Pid) ->
 %% ====================================================================
 
 init(State) ->
-	%qua sara' da togliere quando farai ascoltatore
-	%tick_server:start_clock(?TICKTIME, [self()]),
-	%register quando dovrai fare refactoring con modulo gps
-	%wireless_card_server:sendPosToGps(State#movingCarState.pidWirelessCard, State#movingCarState.currentPos),
 	{ok, idle, State}.
 
 %automa batt mi dice di andare a caricare, accodo percorso colonnina
@@ -213,7 +216,7 @@ calculateNewState(Stato, TappaAttuale, Tappe) ->
 	NuoveTappe = tl(Tappe),
 	Pos = TappaAttuale#tappa.node_name,
 	sendPosToUser(Stato#movingCarState.currentUser,Pos),
-	%wireless_card_server:sendPosToGps(Stato#movingCarState.pidWirelessCard, Pos),
+	sendPosToGps(Pos, Stato),
 	if 
 		NuoveTappe =:= [] -> Stato#movingCarState{tappe = [], currentUser = none, currentPos = Pos};
 		true ->
@@ -234,6 +237,10 @@ calculateNewState(Stato, TappaAttuale, Tappe) ->
 					Stato#movingCarState{tappe = NuoveTappe, currentPos = Pos}
 			end
 	end.
+
+sendPosToGps(CurrentPosition,S) ->
+	ListenerePid = S#movingCarState.pidListener,
+	gen_statem:cast(ListenerePid, {updatePosition, CurrentPosition}).
 
 sendUserCrashEvent(PidUser) ->
 	gen_statem:cast(PidUser, crash).

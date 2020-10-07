@@ -32,6 +32,9 @@ end_gps_module(Pid) ->
 		erlang:error(timeout)
 	end.
 
+setPosition(GpsPid, Position) ->
+	gen_statem:cast(GpsPid, {setPosition, Position}).
+
 %% ====================================================================
 %% Init functions
 %% ====================================================================
