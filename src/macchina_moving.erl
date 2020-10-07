@@ -123,7 +123,7 @@ handle_common(cast, {updateQueue2, _RcvQueue}, _OldState, _State) ->
 
 idle(enter, _OldState, State) ->
 	print_debug_message(self(), "Sono in idle", []),
-	printState(State),
+	%printState(State),
 	keep_state_and_data;
 
 %gestisco tick ricevuti in idle ignorandoli
