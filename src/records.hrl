@@ -9,14 +9,6 @@
 -record(election_result_to_car,{id_winner, id_app_user}).
 -record(election_result_to_user,{id_car_winner, time_to_wait}).
 
-% stato environment:
--record(environmentState, {cars, 
-							users, 
-							city, 
-							tick_s_pid, 
-							wireless_card_server_pid, 
-							tick_counter}).
-
 % dati di inizializzazione del modulo gps
 -record(dataInitGPSModule, {pid_entity, 
 							type, 

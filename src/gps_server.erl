@@ -6,7 +6,7 @@
 -include("records.hrl").
 -include("globals.hrl").
 
--import('my_util',[println/1, println/2, calculateSquaredDistance/2]).
+-import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3, calculateSquaredDistance/2]).
 -import('send', [send_message/2, send_message/3]).
 
 -record(nodeDistance,{dist, entities}).
@@ -41,7 +41,7 @@ start_gps_server(Nodes) ->
 	spawn_link('gps_server', init, [Nodes]).
 
 end_gps_server(Pid) ->
-	println("Killing GPS Server"),
+	print_debug_message("Killing GPS Server", []),
 	Ref = erlang:monitor(process, Pid),
 	send_message(Pid, {self(), Ref, terminate}),
 	
@@ -78,8 +78,7 @@ initNode([H | T], ACC) ->
 
 loop(S) ->
 	receive 
-		{Pid, {register, Type, Pos}} 				->  
-														%io:format("ADD: [PID ~w | TYPE ~w | POS ~w]~n", [Pid, Type, Pos]),
+		{Pid, {register, Type, Pos}} 				->  %print_debug_message(self(), "ADD: [PID ~w | TYPE ~w | POS ~w]", [Pid, Type, Pos])
 								  		   				NewState = registerNewEntity(S, Pid, Type, Pos),
 								           				loop(NewState);
 		{Pid, {setPosition, NewPos}}   	    		->  
@@ -95,7 +94,7 @@ loop(S) ->
 														send_message(Pid, Pos),
 									   					loop(S);
 		{printState}			 	    			->  
-														my_util:println("GPS Server State", S),
+														print_debug_message(self(), "GPS Server State: ~w", S),
 									       				loop(S);
 		{Pid, {removeEntity}}   	    			->  
 														{Ent, EntityIsRegistered} = getEntityFromEntities(S#gpsServerState.entities, Pid),
@@ -116,9 +115,9 @@ loop(S) ->
 														loop(S);
 		{Pid, Ref, terminate}						->
 														send_message(Pid, {Ref, ok}),
-														println("Exiting gps server loop~n");
+														print_debug_message(self(), "Exiting Gps Server loop", []);
         Unknown ->
-														io:format("Unknown message reseived by Gps Server: ~p~n", [Unknown]),
+														print_debug_message(self(), "Gps Server Received Unknown: ~p.", [Unknown]),
 														loop(S)
 	end.
 

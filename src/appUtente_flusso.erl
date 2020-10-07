@@ -2,25 +2,20 @@
 -compile(export_all).
 -behaviour(gen_statem).
 -import('send', [send_message/2, send_message/3]).
+-import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3]).
 -include("globals.hrl").
 -include("records.hrl").
 
 callback_mode() -> [state_functions, state_enter].
-%userState
-%                   pidEnv,
-%					pidGPSModule,
-%					currentPos,
-%					currentDestination
-%% ====================================================================
-%% API functions
-%% ====================================================================
-
-
 -record(userState, {
 					pidGPSModule,
 					currentPos,
-					currentDestination
+					currentDestination,
+					carLinkedPid
 					}).
+%% ====================================================================
+%% API functions
+%% ====================================================================
 
 start(InitialPos, PID_GPS_Server) ->
 	InitData = {InitialPos, PID_GPS_Server},
@@ -41,7 +36,12 @@ updatePosition(UserPid, NewNode) ->
 init(InitData) ->
 	{InitialPos, PidGpsServer} = InitData,
 	PidGpsModule = gps_module:start_gps_module(initDataGpsModule(PidGpsServer,InitialPos)), %start gps module (and register)
-	State = #userState{pidGPSModule = PidGpsModule, currentPos = InitialPos}, 
+	State = #userState{
+		pidGPSModule = PidGpsModule, 
+		currentPos = InitialPos,
+		currentDestination = none,
+		carLinkedPid = none
+		}, 
 	{ok, idle, State}.
 
 %ricezione del cambiamento posizione auto che mi serve
@@ -73,7 +73,7 @@ idle(cast, {send_requestNoElection, Request}, State) ->
 	keep_state_and_data;
 
 idle(cast, taxiServingYou, State) ->
-	my_util:println("taxi mi sta servendo USER: ", self()),
+	print_debug_message(self(), "Taxi ~w is serving me", [State#userState.carLinkedPid]),
 	{next_state, waiting_car, State}.
 
 %waitin_car_queue(cast, {changeDest, _NewDest}, _State) ->
@@ -83,7 +83,7 @@ idle(cast, taxiServingYou, State) ->
 waiting_car(enter, _OldState, _Stato) -> keep_state_and_data;
 
 waiting_car(cast, arrivedUserPosition, State) ->
-	my_util:println("taxi arrivato da me USER: ", self()),
+	print_debug_message(self(), "Taxi ~w is arrived to my node", [State#userState.carLinkedPid]),
 	{next_state, moving, State};
 	
 ?HANDLE_COMMON.
@@ -95,8 +95,7 @@ waiting_car(cast, arrivedUserPosition, State) ->
 moving(enter, _OldState, _Stato) -> keep_state_and_data;
 
 moving(cast, arrivedTargetPosition, State) ->
-	my_util:println("sono arrivato a destinazione USER: ", self()),
-	my_util:println("ora vado a morire USER: ", self()),
+	print_debug_message(self(), "I'm in Target Position", []),
 	{next_state, ending, State};
 
 %moving(cast, {changeDest, _NewDest}, _State) ->
@@ -108,7 +107,7 @@ moving(cast, arrivedTargetPosition, State) ->
   
 ending(enter, _OldState, State) ->
 	deletePosGps(State),
-	my_util:println("MORTO"),
+	print_debug_message(self(), "I'm dying", []),
 	%codice per la morte qua
 	keep_state_and_data.
 

@@ -6,6 +6,7 @@
 
 -include("records.hrl").
 -include("globals.hrl").
+-import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3, print_debug_message_raw/1]).
 %% ====================================================================
 %% API functions
 %% ====================================================================
@@ -17,7 +18,7 @@ load_nodes() ->
 	Nodes = read_node([], Total_Nodes, IO),
 	Nodes.
 
-print_nodes(Nodes) -> io:format("id name x y~n"),
+print_nodes(Nodes) -> print_debug_message_raw("id name x y~n"),
 					  print_node(Nodes).
 
 getNodeID(NodeName,Nodes) -> 
@@ -31,7 +32,7 @@ getPositionFromNodeName(NodeName, Nodes) ->
 
 getRandomPositionName(Nodes) ->
 	TotalNodes = length(Nodes),
-	Random_ID = my_util:generate_random_number(TotalNodes) - 1,
+	Random_ID = utilities:generate_random_number(TotalNodes) - 1,
 	NodeName = getNodeName(Random_ID, Nodes),
 	NodeName.
 
@@ -80,5 +81,5 @@ read_node(Nodes, N, IO) ->
 
 print_node([]) -> ok;
 print_node([H | Nodes]) -> 
-	io:format("~w ~w ~w ~w~n",[H#node.id, H#node.name, H#node.pos_x, H#node.pos_y]),
+	print_debug_message("~w ~w ~w ~w~n",[H#node.id, H#node.name, H#node.pos_x, H#node.pos_y]),
 	print_node(Nodes).

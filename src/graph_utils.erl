@@ -3,6 +3,7 @@
 
 
 -module(graph_utils).
+-import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3]).
 
 %% ====================================================================
 %% API functions

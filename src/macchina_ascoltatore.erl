@@ -6,6 +6,7 @@
 -behaviour(gen_statem).
 -include("records.hrl").
 -include("globals.hrl").
+-import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3]).
 
 callback_mode() -> [state_functions].
 
@@ -54,7 +55,7 @@ init(InitData) ->
 					pidGps = PidGpsModule,
 					pidClock = PidClock
 			},
-	%my_util:printList("Pid creati:", [PidMoving, PidBattery, PidElection]),
+	%print_debug_message(self(), "Pids Created: ~w", [PidMoving, PidBattery, PidElection]),
 	{ok, idle, State}.
 	
 %roba che deve uscire
@@ -123,7 +124,7 @@ listen_election(cast, {partecipateElection, Data}, _Stato) ->
 
 listen_election(cast, {election_results, Data}, Stato) ->
 	% notifico l'utente - to do
-	io:format("ASCOLTATORE - Winning Results: ~w~n", [Data]),
+	print_debug_message(self(), "Listener - Winning Results: ~w", [Data]),
 	{next_state, idle, Stato}.
 
 

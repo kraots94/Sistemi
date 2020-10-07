@@ -9,6 +9,7 @@
 %% ====================================================================
 -export([println/1, 
 		 println/2, 
+		 print_debug_message_raw/1,
 		 print_debug_message/1,
 		 print_debug_message/2,
 		 print_debug_message/3, 
@@ -25,6 +26,7 @@ println(String) ->
 println(String,Var) ->
 	io:format(String ++ " ~p~n" , [Var]).
 
+print_debug_message_raw(Text) -> io:format(Text).
 print_debug_message(Message) -> print_debug_message("", Message, []).
 print_debug_message(Format, Data) -> print_debug_message("", Format, Data).
 print_debug_message(PID, Format, Data) ->

@@ -1,6 +1,6 @@
 -module(tick_server).
 -import('send', [send_message/2, send_message/3]).
--import('my_util',[println/1]).
+-import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3]).
 -export([start_clock/1, end_clock/1, tick_generation/1]).
 -include("globals.hrl").
 %timeToTick: espresso in secondi, tempo di attesa tra due tick
@@ -13,10 +13,11 @@ tick_generation(Subscribers) ->
 	receive 
 		{Pid, Ref, terminate} ->
 			send_message(Pid, {Ref, ok}),
-			println("Exiting clock loop");
+			print_debug_message(self(), "Exiting clock loop", []);
 		Unknown ->
-            io:format("Unknown message: ~p~n", [Unknown]),
+			print_debug_message(self(), "Tick Server Received Unknown: ~p", [Unknown]),
 			tick_generation(Subscribers)
+
 	after ?TICKTIME*1000 -> send_notification(Subscribers),
 						tick_generation(Subscribers)
 	end.
@@ -28,7 +29,7 @@ send_notification([H | T]) ->
 
 
 end_clock(Pid) ->
-	println("Killing clock."),
+	print_debug_message("Killing clock"),
 	Ref = erlang:monitor(process, Pid),
 	send_message(Pid, {self(), Ref, terminate}),
 	receive

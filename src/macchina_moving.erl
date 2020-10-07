@@ -3,6 +3,7 @@
 -behaviour(gen_statem).
 -include("records.hrl").
 -include("globals.hrl").
+-import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3, print_debug_message_raw/1]).
 
 callback_mode() -> [state_functions,state_enter].
 %getDataElection, deve tornare {Cost_To_last_Target, Current_Target, Battery_Level} , Current_Target = pos attuale se fermo, dest se moving, next node se vai verso colonnina (stringa)
@@ -56,9 +57,10 @@ init(State) ->
 
 %automa batt mi dice di andare a caricare, accodo percorso colonnina
 handle_common(cast, {goToCharge}, OldState, State) ->
-	if OldState /= moving -> my_util:println("qualcosa sbagliato 1");
+	if OldState /= moving -> 
+			print_debug_message(self(), "qualcosa sabagliato", []);
 	   true ->
-		   	my_util:println("aggiorno tappe aggiungendo patch carica"),
+			print_debug_message(self(), "aggiorno tappe aggiungendo patch carica", []),
 			{keep_state, State#movingCarState{mustCharge = true}}
 	end;
 
@@ -69,7 +71,8 @@ handle_common(cast, {requestRcv, Request}, _OldState, State) ->
 	{Costi, Tappe} = city_map:calculate_path(UserPid,Actualpos,From,To),
 	CostoAlCliente = hd(Costi),
 	_CostoAlTarget = hd(tl(Costi)),
-	my_util:println("costi", CostoAlCliente),
+	print_debug_message(self(), "Costi: ~p", [CostoAlCliente]),
+
 % Tolgo tappe colonnine  da TappeAttuali
 %imposto tappe colonnina nell'attributo:
 	PathColonnina = ["test"],
@@ -119,7 +122,7 @@ handle_common(cast, {updateQueue2, _RcvQueue}, _OldState, _State) ->
 	toDo.
 
 idle(enter, _OldState, State) ->
-	my_util:println("sono in idle..."),
+	print_debug_message(self(), "Sono in idle", []),
 	printState(State),
 	keep_state_and_data;
 
@@ -130,7 +133,7 @@ idle(info, {_From, tick}, _State) ->
 ?HANDLE_COMMON.
 	  
 moving(enter, _OldState, State) ->
-	my_util:println("mi sto spostando..."),
+	print_debug_message(self(), "Sono in moving", []),
 	PrimaTappa = hd(State#movingCarState.tappe),
 	FirstUser = PrimaTappa#tappa.user,
 	TipoTappa = PrimaTappa#tappa.type,
@@ -149,7 +152,7 @@ moving(enter, _OldState, State) ->
 	
 %gestione tick in movimento
 moving(info, {_From, tick}, State) ->
-	%my_util:println("ricevuto tick...aggiorno spostamento"),
+	% print_debug_message(self(), "Ricevuto tick...aggiorno spostamento", []),
 	NewBattery = State#movingCarState.batteryLevel - 1,
 	TappeAttuali = State#movingCarState.tappe,
 	TappaAttuale = hd(TappeAttuali),
@@ -160,12 +163,12 @@ moving(info, {_From, tick}, State) ->
 			TappaConSpostamento = TappaAttuale#tappa{t = NewTime},
 			NuoveTappe = [TappaConSpostamento] ++ tl(TappeAttuali),
 			NuovoStato =  State#movingCarState{tappe=NuoveTappe},
-			io:format("-"),
-			%my_util:println("sto raggiungendo: ", TappaAttuale#tappa.node_name),
+			print_debug_message_raw("-"),
+			% print_debug_message(self(), "Sto raggiungendo: ~w", [TappaAttuale#tappa.node_name]),
 			%printState(NuovoStato),
 			{keep_state, NuovoStato#movingCarState{batteryLevel = NewBattery}};
 		true -> %tempo = 0 , quindi ho raggiunto nodo nuovo
-			my_util:println("raggiunto nuovo nodo"),
+			print_debug_message(self(), "Raggiunto nuovo nodo", []),
 			TipoNodoAttuale = TappaAttuale#tappa.type,
 			PersonaAttuale = TappaAttuale#tappa.user,
 			NewState = calculateNewState(State, TappaAttuale, TappeAttuali),
@@ -179,10 +182,10 @@ moving(info, {_From, tick}, State) ->
 			if 
 				tl(TappeAttuali) =:= [] -> %ho finito il servizio
 					if (State#movingCarState.mustCharge) -> %devo andare a caricare
-						   my_util:println("mi muovo per caricare"),
-						   {next_state, movingToCharge, NewState#movingCarState{batteryLevel = NewBattery}};
+							print_debug_message(self(), "Moving to charging", []),
+						   	{next_state, movingToCharge, NewState#movingCarState{batteryLevel = NewBattery}};
 					    true -> 
-						   {next_state, idle, NewState#movingCarState{batteryLevel = NewBattery}}
+						   	{next_state, idle, NewState#movingCarState{batteryLevel = NewBattery}}
 					end;
 				true -> %ho ancora tappe
 					printState(NewState),
@@ -191,13 +194,13 @@ moving(info, {_From, tick}, State) ->
 	end;
 	
 moving(cast, {crash}, State) ->
-	my_util:println("ho fatto un incidente!"),
+	print_debug_message(self(), "Incidente!", []),
 	sendUserCrashEvent(State#movingCarState.currentUser, State),
 	{next_state, crash, State#movingCarState{tappe = [],currentUser = none}};
 	?HANDLE_COMMON.
 	  
 movingToCharge(enter, _OldState, _State) ->
-	my_util:println("mi sto muovendo verso la colonnina ricarica!"),
+	print_debug_message(self(), "Sono in moving verso la colonnina", []),
 	keep_state_and_data;
 	
 	  
@@ -267,7 +270,7 @@ arrivedInTargetPosition(UserPid, S) ->
 
 
 printState(State) ->
-	my_util:println("situazione Stato:", State).
+	print_debug_message(self(), "Car State: ~w", [State]).
 	
 
 %make:all(),

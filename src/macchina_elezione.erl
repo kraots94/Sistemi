@@ -1,7 +1,7 @@
 -module(macchina_elezione).
 -compile(export_all).
 -import('send', [send_message/2, send_message/3]).
--import('utilities', [print_debug_message/3]).
+-import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3]).
 -behaviour(gen_statem).
 -include("records.hrl").
 -include("globals.hrl").
@@ -88,7 +88,6 @@ idle(info, {_From, tick}, _Stato) ->
 
 idle(cast, {beginElection, Data}, S) ->
 	print_debug_message(S#electionState.pidCar, "Begin Election", []),
-	io:format("{~w} Begin Election~n", [S#electionState.pidCar]),
 	% Update State
 	S1 = S#electionState { currentRequest = Data#dataElectionBegin.request,
 							pidAppUser =  Data#dataElectionBegin.pidAppUser},
@@ -312,7 +311,8 @@ calculate_final_results(DataTree, S) ->
 		end
 	end,
 	Sorted_Data = lists:sort(SortFun, DataTree),
-%	io:format("Sorted_Data: ~w~n", [Sorted_Data]),
+	
+% print_debug_message(S#electionState.pidCar, "SortedData: ~w", [Sorted_Data]),
 	Winner_Partecipant = hd(Sorted_Data),
 	Winner_Data = #election_result_to_car{id_winner = Winner_Partecipant#electionCostData.pid_source,
 										id_app_user = S#electionState.pidAppUser
@@ -375,7 +375,7 @@ waiting_final_results(cast, {invite_result, _Data}, S) ->
 %% ====================================================================
 calculateSelfCost(_Data, Battery_level, _Cost_To_Last_Target, S) -> 
 	print_debug_message(S#electionState.pidCar, "Battery Level: ~w", [Battery_level]),
-	{my_util:generate_random_number(100), my_util:generate_random_number(100)}.
+	{utilities:generate_random_number(100), utilities:generate_random_number(100)}.
 
 calculateNearestColumn(_Node) -> "".
 

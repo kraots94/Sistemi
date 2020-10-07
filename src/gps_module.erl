@@ -7,7 +7,7 @@
 -include("globals.hrl").
 
 -import('send', [send_message/2, send_message/3]).
--import('my_util', [println/1, println/2]).
+-import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3]).
 -export([setPosition/2, deleteLocationTracks/1]).
 -record(gpsModuleState, {pid_entity, pid_gps_server, entity_type, current_position, module_range, map_side}).
 %% ====================================================================
@@ -19,7 +19,7 @@ start_gps_module(StartingData) ->
     spawn_link('gps_module', init, [StartingData]).
 
 end_gps_module(Pid) ->
-	println("Killing GPS Module"),
+    print_debug_message("Killing GPS Module"),
 	Ref = erlang:monitor(process, Pid),
 	send_message(Pid, {self(), Ref, terminate}),
 	
@@ -84,7 +84,7 @@ loop(S) ->
                                 send_message(Pid_Entity, S#gpsModuleState.current_position),
                                 loop(S);
         {printState}            ->  
-                                my_util:println("GPS Module State", S),
+                                print_debug_message(self(), "GPS Module State: ~w", S),
                                 loop(S);
         {removeEntity}          ->  % Calling this means to remove entry in gps server and kill this module instance
                                 Pid_S = S#gpsModuleState.pid_gps_server,
@@ -106,7 +106,7 @@ loop(S) ->
                                                             end,
                                                 send_message(Pid_Entity, FirstCar);
                                     Unknown -> 
-                                                io:format("Bad data received by Gps Server: ~p~n", [Unknown])
+                                                print_debug_message(self(), "Bad data received: ~p", [Unknown])
                                 end,
                                 loop(S);
         {getNearCars}           -> 
@@ -122,7 +122,7 @@ loop(S) ->
                                             ClearedResults = lists:delete(Pid_Entity, MappedResults),
                                             send_message(Pid_Entity, ClearedResults);
                                     Unknown -> 
-                                            io:format("Bad data received by Gps Server: ~p~n", [Unknown])
+                                            print_debug_message(self(), "Bad data received: ~p", [Unknown])
                                 end,
                                 loop(S);
         {PID, getNearCars}      -> 
@@ -138,7 +138,7 @@ loop(S) ->
                                             ClearedResults = lists:delete(Pid_Entity, MappedResults),
                                             send_message(PID, ClearedResults);
                                     Unknown -> 
-                                            io:format("Bad data received by Gps Server: ~p~n", [Unknown])
+                                            print_debug_message(self(), "Bad data received: ~p", [Unknown])
                                 end,
                                 loop(S);
         {Pid, Ref, terminate}   ->
@@ -146,9 +146,9 @@ loop(S) ->
                                 Pid_S = S#gpsModuleState.pid_gps_server,
                                 Pid_Entity = S#gpsModuleState.pid_entity,
                                 send_message(Pid_S, Pid_Entity, {removeEntity}),
-                                println("Exiting gps module loop~n");
+                                print_debug_message(self(), "Exiting gps module loop", []);
         Unknown                 ->
-                                io:format("Unknown message reseived by Gps Module: ~p~n", [Unknown]),
+                    			print_debug_message(self(), "Gps Module Received Unknown: ~p.", [Unknown]),
                                 loop(S)
 	end.
 

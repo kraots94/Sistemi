@@ -9,8 +9,8 @@
 -import('graph', [from_file/1, num_of_edges/1, num_of_vertices/1, del_graph/1, pprint/1, edges_with_weights/1]).
 -import('graph_utils', [getDataPath/2, getWeight/3]).
 -import('dijkstra', [run/2]).
--import('my_util', [createPairs/2]).
 -import('nodes_util', [load_nodes/0, getNodeID/2, getNodeName/2]).
+-import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3, createPairsFromList/1]).
 %% ====================================================================
 %% API functions
 %% ====================================================================
@@ -70,7 +70,7 @@ load_map() ->
 % {TOTAL_COST, [{0,4}, {9, 6}, {6, 5}, {5, 2}]}
 calculate_path_costs(EdgesWeights, Djkstra_Out, _From_ID, Target_ID) -> 
 	{Cost, Points} = getDataPath(Djkstra_Out, Target_ID),
-	Pairs = createPairs(Points, []),
+	Pairs = createPairsFromList(Points),
 	CarQueue = createCosts(Pairs, [], EdgesWeights),
 	OutCosts = {Cost, CarQueue},
 	OutCosts.
