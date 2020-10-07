@@ -8,6 +8,7 @@
 
 -import('send', [send_message/2, send_message/3]).
 -import('my_util', [println/1, println/2]).
+-export([setPosition/2, deleteLocationTracks/1]).
 -record(gpsModuleState, {pid_entity, pid_gps_server, entity_type, current_position, module_range, map_side}).
 %% ====================================================================
 %% API functions
@@ -31,6 +32,12 @@ end_gps_module(Pid) ->
 	after 5000 ->
 		erlang:error(timeout)
 	end.
+
+setPosition(GpsPid, Position) ->
+	send_message(GpsPid, {setPosition, Position}).
+
+deleteLocationTracks(GpsPid) ->
+	send_message(GpsPid, {removeEntity}).
 
 %% ====================================================================
 %% Init functions
