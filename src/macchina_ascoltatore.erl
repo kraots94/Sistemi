@@ -45,7 +45,7 @@ init(InitData) ->
 					pidElection = PidElection,
 					pidClock = PidClock
 			},
-	my_util:printList("Pid creati:", [PidMoving, PidBattery, PidElection]),
+	%my_util:printList("Pid creati:", [PidMoving, PidBattery, PidElection]),
 	{ok, idle, State}.
 	
 idle(info, {_From, tick}, _Stato) ->

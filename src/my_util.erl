@@ -5,15 +5,20 @@
 -include("records.hrl").
 -include("globals.hrl").
 
--compile(export_all).
-
-%print text e variabile
-println(String,Var) ->
-	io:format(String ++ " ~p~n" , [Var]).
+-export([print_debug_message/3, 
+		 calculateSquaredDistance/2, 
+		 createRandomEntities/2, 
+		 createPairs/2, 
+		 createPairsFromList/1,
+		 generate_random_number/1]).
 
 %print normal text
 println(String) ->
 	io:format(String ++ "~n", []).
+
+%print text e variabile
+println(String,Var) ->
+	io:format(String ++ " ~p~n" , [Var]).
 
 %print list
 printList(String,List) -> 
@@ -25,10 +30,15 @@ init_random_generator() ->
 	io:format("Current Timestamp: ~w ~w ~w ~n", [T_M, T_S, T_m]),
 	rand:seed(exro928ss, {T_M, T_S, T_m}).
 
+% Generates a number 1 <= x <= MAX
 generate_random_number(MAX) ->
 	N = rand:uniform(MAX),
 %	io:format("Generated number: ~w ~n", [N]),
 	N.
+
+createPairsFromList(List) -> createPairs(List, []).
+
+createPairs([], ACC) -> ACC;
 
 createPairs([A , B | []], ACC) -> 
 	NEW_LIST = ACC ++ [{A, B}],
@@ -56,42 +66,13 @@ createRandomEntities(PID_GPS_Server, N) ->
 createRandomEntity(_PID_GPS_Server,_Nodes, 0, ACC) -> ACC;
 createRandomEntity(PID_GPS_Server, Nodes, N, ACC) -> 
 	Pos = nodes_util:getRandomPositionName(Nodes),
-	RandomNumber = my_util:generate_random_number(2),
-	Type = if RandomNumber == 1 -> car;
-					true -> user
-			end,
-	DataInit = #dataInitGPSModule{
-				pid_entity = N,
-				type = Type,
-				pid_server_gps = PID_GPS_Server,
-				starting_pos = Pos,
-				signal_power = ?GPS_MODULE_POWER,
-				map_side = ?MAP_SIDE
-			},
-	PidNewGPS = gps_module:start_gps_module(DataInit),
-	NewACC = [PidNewGPS] ++ ACC,
+	PID_CAR = macchina_ascoltatore:start({Pos, PID_GPS_Server, 0}),
+	NewACC = [PID_CAR] ++ ACC,
 	createRandomEntity(PID_GPS_Server, Nodes, N-1, NewACC).
 
-createRandomEntityFromPid(PID_GPS_Server, PID_ENT) ->
-	Nodes = nodes_util:load_nodes(),
-	Pos = nodes_util:getRandomPositionName(Nodes),
-	RandomNumber = my_util:generate_random_number(2),
-	Type = if RandomNumber == 1 -> car;
-					true -> user
-			end,
-	DataInit = #dataInitGPSModule{
-				pid_entity = PID_ENT,
-				type = Type,
-				pid_server_gps = PID_GPS_Server,
-				starting_pos = Pos,
-				signal_power = ?GPS_MODULE_POWER,
-				map_side = ?MAP_SIDE
-			},
-	PidNewGPS = gps_module:start_gps_module(DataInit),
-	PidNewGPS.
+print_debug_message(PID, Format, Data) ->
+	Message = construct_string(Format, Data),
+	io:format("{~w} - ~p ~n", [PID, Message]).
 
-%	f(), make:all(), PID_GPS_Server = gps_server:start_gps_server(nodes_util:load_nodes()).
-%	PID_ENTS = my_util:createRandomEntities(PID_GPS_Server, 20).
-%	PID_GPS_CONSOLE = my_util:createRandomEntityFromPid(PID_GPS_Server, self()).
-	
-	
+construct_string(Format, Data) ->
+	lists:flatten(io_lib:format(Format, Data)).  

@@ -112,9 +112,9 @@ handle_common(cast, {updateQueue2, _RcvQueue}, _OldState, _State) ->
  	%vai in moving con tappa.
 	toDo.
 
-idle(enter, _OldState, Stato) ->
-	my_util:println("sono in idle..."),
-	printState(Stato),
+idle(enter, _OldState, _Stato) ->
+	%my_util:println("sono in idle..."),
+	%printState(Stato),
 	keep_state_and_data;
 
 %gestisco tick ricevuti in idle ignorandoli
