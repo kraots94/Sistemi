@@ -29,7 +29,8 @@ callback_mode() -> [state_functions].
 				flag_initiator,
 				dijkstra_results,
 				battery_level,
-				total_tree_costs}).
+				total_tree_costs,
+				dataToSendPartecipate}).
 
 %% ====================================================================
 %% API functions
@@ -54,7 +55,8 @@ start(PidMacchina,PidMovingCar, PidWifi,City_Map) ->
 							flag_initiator = false,
 							dijkstra_results = [],
 							battery_level = 0,
-							total_tree_costs = []},
+							total_tree_costs = [],
+							dataToSendPartecipate = none},
 
 	{ok, Pid} = gen_statem:start_link(?MODULE,State, []),
 	Pid.
@@ -103,14 +105,6 @@ idle(cast, {beginElection, Data}, S) ->
 	Cost_To_Last_Target = 0,
 	Current_Last_Target = "hmmsii",
 %%------------------------------------------------
-
-	DataPartecipate = #dataElectionPartecipate{
-								pidParent = S1#electionState.pidCar,
-								request = S1#electionState.currentRequest,
-								ttl = 2},
-
-	%invio partecipateElection ai vicini
-	sendInvitesPartecipation(CloserCars, DataPartecipate, S),
 										
 	From = S1#electionState.currentRequest#user_request.from,
 	To = S1#electionState.currentRequest#user_request.to,
@@ -142,6 +136,14 @@ idle(cast, {beginElection, Data}, S) ->
 	true ->  
 		print_debug_message(S2#electionState.pidCar, "All cars invited", []),
 		print_debug_message(S2#electionState.pidCar, "Waiting For: ~w", [S2#electionState.carsInvited]),
+		
+		DataPartecipate = #dataElectionPartecipate{
+			pidParent = S2#electionState.pidCar,
+			request = S2#electionState.currentRequest,
+			ttl = ?MAX_HOPES_ELECTION},
+
+		%invio partecipateElection ai vicini
+		sendInvitesPartecipation(S2#electionState.carsInvited, DataPartecipate, S2),
 		{next_state, running_election, S2} 
 	end;
 
@@ -149,7 +151,10 @@ idle(cast, {partecipateElection, Data}, S) ->
 	print_debug_message(S#electionState.pidCar, "Partecipate Election", []),
 	% Update State
 	S1 = S#electionState{currentRequest = Data#dataElectionPartecipate.request,
-	parent = Data#dataElectionPartecipate.pidParent},
+						parent = Data#dataElectionPartecipate.pidParent},
+
+	Parent_Pid = S1#electionState.parent,
+	sendMessageElection(Parent_Pid, {invite_result, {S1#electionState.pidCar, i_can_join}}, S1),
 
 	CurrentTTL = Data#dataElectionPartecipate.ttl,
 
@@ -168,16 +173,8 @@ idle(cast, {partecipateElection, Data}, S) ->
 	Current_Last_Target = "hmmsii",
 	%%------------------------------------------------	
 
-	CloserCars = lists:delete(S1#electionState.pidCar, CloserCars_All),
-	DataPartecipate = #dataElectionPartecipate{
-								pidParent = S1#electionState.pidCar,
-								request = S1#electionState.currentRequest,
-								ttl = CurrentTTL - 1},
-
-	%invio partecipateElection ai vicini
-	sendInvitesPartecipation(CloserCars, DataPartecipate, S1),
-	Target = S1#electionState.parent,
-	sendMessageElection(Target, {invite_result, {S1#electionState.pidCar, i_can_join}}, S1),
+	CloserCars = lists:delete(S1#electionState.parent, CloserCars_All),
+	print_debug_message(S#electionState.pidCar, "Close Cars: ~w", [CloserCars]),
 
 % Calcolo dei miei costi
 	From = S1#electionState.currentRequest#user_request.from,
@@ -192,8 +189,9 @@ idle(cast, {partecipateElection, Data}, S) ->
 		selfCost = {CC, CRDT}
 	},
 
-	print_debug_message(S#electionState.pidCar, "Current Parent Election: ~w", [S2#electionState.parent]),
-	if S#electionState.carsInvited =:= [] -> 
+	print_debug_message(S2#electionState.pidCar, "Current Parent Election: ~w", [S2#electionState.parent]),
+	print_debug_message(S2#electionState.pidCar, "Invited Cars: ~w", [S2#electionState.carsInvited]),
+	if S2#electionState.carsInvited =:= [] -> 
 			%mando i dati a mio padre
 			{Cost_Client, Charge_After_Client} = S2#electionState.selfCost,
 			Results = #electionCostData{
@@ -205,12 +203,18 @@ idle(cast, {partecipateElection, Data}, S) ->
 			%aspetto i risultati
 			{next_state, waiting_final_results, S2};
 		true ->  
+			%invio partecipateElection ai vicini
+			DataPartecipate = #dataElectionPartecipate{
+					pidParent = S2#electionState.pidCar,
+					request = S2#electionState.currentRequest,
+					ttl = CurrentTTL - 1},
+			sendInvitesPartecipation(S2#electionState.carsInvited, DataPartecipate, S2),
 			{next_state, running_election, S2} 
 	end.
 
 running_election(info, {_From, tick}, _Stato) ->
 	keep_state_and_data; %per ora non fare nulla
-
+	
 running_election(cast, {invite_result, Data}, S) -> 
 	print_debug_message(S#electionState.pidCar, "Running Election - Invite Results", []),
 	{PID_Car, Partecipate} = Data,
@@ -292,7 +296,7 @@ running_election(cast, {costs_results, Data}, S) ->
 					{next_state, idle, S2};
 				true -> 					
 					print_debug_message(S1#electionState.pidCar, "Sending Costs To Parent", []),
-					sendMessageElection(S1#electionState.parent, {costs_results, {S1#electionState.pidCar, [Results]}}, S1),
+					sendMessageElection(S1#electionState.parent, {costs_results, {S1#electionState.pidCar, TotalCosts}}, S1),
 				{next_state, waiting_final_results, S1} 
 			end;
 		true -> 

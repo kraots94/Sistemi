@@ -90,6 +90,7 @@ idle(cast, {beginElection, Data}, Stato) ->
 
 %partecipate election ricevuto da altra macchina
 idle(cast, {partecipateElection, Data}, Stato) ->
+	print_debug_message(self(), "Listener - partecipateElection - ~w", [Data]),
 	PidElezione = Stato#taxiListenerState.pidElection,
 	gen_statem:cast(PidElezione, {partecipateElection, Data}),
 	{next_state, listen_election, Stato}.
@@ -102,7 +103,8 @@ listen_election(info, {_From, tick}, _Stato) ->
 	keep_state_and_data; %per ora non fare nulla
 
 %rimbalzo roba elezione a automa elettore
-listen_election(cast, {election_data, Data}, Stato) ->
+listen_election(cast, {election_data, Data}, Stato) ->	
+	print_debug_message(self(), "Listener - election_data - ~w", [Data]),
 	PidElezione = Stato#taxiListenerState.pidElection,
 	gen_statem:cast(PidElezione, Data),
 	keep_state_and_data;
@@ -120,6 +122,7 @@ listen_election(cast, {beginElection, Data}, _Stato) ->
 listen_election(cast, {partecipateElection, Data}, _Stato) ->
 	PidSender = Data#dataElectionPartecipate.pidParent,
 	gen_statem:cast(PidSender, {election_data, {invite_result, {self(), i_can_not_join}}}),
+	print_debug_message(self(), "Listener - i_can_not_join To ~w", [PidSender]),
 	keep_state_and_data;
 
 listen_election(cast, {election_results, Data}, Stato) ->
