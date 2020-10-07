@@ -12,7 +12,6 @@ callback_mode() -> [state_functions,state_enter].
 %stato macchina in movimento:
 -record(movingCarState, {
 				pidListener,
-				pidGps,
 				tappe,
 				currentUser = none,
 				currentPos,
@@ -23,10 +22,9 @@ callback_mode() -> [state_functions,state_enter].
 %% ====================================================================
 %% API functions
 %% ====================================================================
-start(InitialPos, PidListener, PidGps) ->
+start(InitialPos, PidListener) ->
 	State = #movingCarState {
 					pidListener = PidListener,
-					pidGps = PidGps,
 					tappe = [],
 					currentUser = none,
 					currentPos = InitialPos,
@@ -35,10 +33,6 @@ start(InitialPos, PidListener, PidGps) ->
 					mustCharge = false},
 	{ok, Pid} = gen_statem:start_link(?MODULE,State, []),
 	Pid.
-
-%update queue posseduta dal processo
-updateQueuePid_alone(Pid,Queue) ->
-	gen_statem:cast(Pid, {updateQueue, Queue}).
 
 crash(Pid) ->
 	gen_statem:cast(Pid, {crash}).
@@ -68,8 +62,8 @@ handle_common(cast, {goToCharge}, OldState, State) ->
 			{keep_state, State#movingCarState{mustCharge = true}}
 	end;
 
-handle_common(cast, {updateQueue, RcvQueue}, _OldState, State) ->
-	{UserPid, From, To} = RcvQueue,
+handle_common(cast, {requestRcv, Request}, _OldState, State) ->
+	{From, To, UserPid} = Request,
 	Actualpos = State#movingCarState.currentPos,
 %calcola posizione finale nel caso di utenti in coda e usa quella in calculatePath
 	{Costi, Tappe} = city_map:calculate_path(UserPid,Actualpos,From,To),
@@ -77,11 +71,20 @@ handle_common(cast, {updateQueue, RcvQueue}, _OldState, State) ->
 	_CostoAlTarget = hd(tl(Costi)),
 	my_util:println("costi", CostoAlCliente),
 % Tolgo tappe colonnine  da TappeAttuali
-%imposto tappe colonnina nell'attroituo:
+%imposto tappe colonnina nell'attributo:
 	PathColonnina = ["test"],
 %	TappeAttuali = State#state.tappe
 	NewTappe = State#movingCarState.tappe ++ Tappe,
 	%NuovaBatteria = State#movingCarState.batteryLevel - (CostoAlCliente + CostoAlTarget),
+	{next_state, moving, State#movingCarState{tappe=NewTappe, pathCol = PathColonnina}};
+
+%la ricezione della queue con elezione fatta
+%Queue = {costi,Tappe}
+handle_common(cast, {updateQueue, Queue}, _OldState, State) ->
+	{Costi, Tappe} = Queue,
+	NewTappe = State#movingCarState.tappe ++ Tappe,
+	%estrappolo path colonnina dalle tappe
+	PathColonnina = ["test"],
 	{next_state, moving, State#movingCarState{tappe=NewTappe, pathCol = PathColonnina}};
 
 handle_common({call,From}, {areYouBusy}, OldState, State) ->
@@ -115,13 +118,13 @@ handle_common(cast, {updateQueue2, _RcvQueue}, _OldState, _State) ->
  	%vai in moving con tappa.
 	toDo.
 
-idle(enter, _OldState, Stato) ->
+idle(enter, _OldState, State) ->
 	my_util:println("sono in idle..."),
-	printState(Stato),
+	printState(State),
 	keep_state_and_data;
 
 %gestisco tick ricevuti in idle ignorandoli
-idle(info, {_From, tick}, _Stato) ->
+idle(info, {_From, tick}, _State) ->
 	keep_state_and_data;
 	
 ?HANDLE_COMMON.
@@ -132,11 +135,11 @@ moving(enter, _OldState, State) ->
 	FirstUser = PrimaTappa#tappa.user,
 	TipoTappa = PrimaTappa#tappa.type,
 	TempoTappa = PrimaTappa#tappa.t,
-	taxiServingAppId(FirstUser),
+	taxiServingAppId(FirstUser, State),
 	ActualState = 
 	if 
 		(TipoTappa =:= user_start) and (TempoTappa == 0) -> %caso speciale in cui primo utente è nel nodo macchina
-			arrivedInUserPosition(FirstUser),
+			arrivedInUserPosition(FirstUser, State),
 			NuoveTappe = tl(State#movingCarState.tappe),
 			State#movingCarState{currentUser = FirstUser,tappe = NuoveTappe};
 		true -> State#movingCarState{currentUser = FirstUser}
@@ -168,9 +171,9 @@ moving(info, {_From, tick}, State) ->
 			NewState = calculateNewState(State, TappaAttuale, TappeAttuali),
 			if  %controllo se sono arrivato al target oppure se sono arrivato da utente nuovo
 				TipoNodoAttuale =:= user_target ->
-					arrivedInTargetPosition(PersonaAttuale);
+					arrivedInTargetPosition(PersonaAttuale, State);
 				TipoNodoAttuale =:= user_start ->
-					arrivedInUserPosition(PersonaAttuale);
+					arrivedInUserPosition(PersonaAttuale, State);
 				true -> foo
 			end,
 			if 
@@ -189,7 +192,7 @@ moving(info, {_From, tick}, State) ->
 	
 moving(cast, {crash}, State) ->
 	my_util:println("ho fatto un incidente!"),
-	sendUserCrashEvent(State#movingCarState.currentUser),
+	sendUserCrashEvent(State#movingCarState.currentUser, State),
 	{next_state, crash, State#movingCarState{tappe = [],currentUser = none}};
 	?HANDLE_COMMON.
 	  
@@ -198,13 +201,13 @@ movingToCharge(enter, _OldState, _State) ->
 	keep_state_and_data;
 	
 	  
-movingToCharge(info, {_From, tick}, _Stato) ->
+movingToCharge(info, {_From, tick}, _State) ->
 	keep_state_and_data;
 
 ?HANDLE_COMMON.
   
 
-crash(enter, _OldState, _Stato) ->
+crash(enter, _OldState, _State) ->
 	exit(crash);
 	?HANDLE_COMMON.
 %% ====================================================================
@@ -215,7 +218,7 @@ crash(enter, _OldState, _Stato) ->
 calculateNewState(Stato, TappaAttuale, Tappe) ->
 	NuoveTappe = tl(Tappe),
 	Pos = TappaAttuale#tappa.node_name,
-	sendPosToUser(Stato#movingCarState.currentUser,Pos),
+	sendPosToUser(Stato#movingCarState.currentUser,Pos,Stato),
 	sendPosToGps(Pos, Stato),
 	if 
 		NuoveTappe =:= [] -> Stato#movingCarState{tappe = [], currentUser = none, currentPos = Pos};
@@ -225,9 +228,9 @@ calculateNewState(Stato, TappaAttuale, Tappe) ->
 			ProssimoTipo = ProssimaTappa#tappa.type,
 			if 
 				ProssimoUtente /= TappaAttuale#tappa.user ->
-					taxiServingAppId(ProssimoUtente),
+					taxiServingAppId(ProssimoUtente, Stato),
 					if (ProssimoTipo =:= user_start) -> %caso in cui il prossimo utente è nel nodo attuale
-						   arrivedInUserPosition(ProssimoUtente),
+						   arrivedInUserPosition(ProssimoUtente, Stato),
 						   NuoveNuoveTappe = tl(NuoveTappe),
 						   Stato#movingCarState{tappe = NuoveNuoveTappe, currentUser = ProssimoUtente, currentPos = Pos};
 					   true ->
@@ -239,26 +242,28 @@ calculateNewState(Stato, TappaAttuale, Tappe) ->
 	end.
 
 sendPosToGps(CurrentPosition,S) ->
-	ListenerePid = S#movingCarState.pidListener,
-	gen_statem:cast(ListenerePid, {updatePosition, CurrentPosition}).
+	ListenerPid = S#movingCarState.pidListener,
+	macchina_ascoltatore:updatePosition(ListenerPid, CurrentPosition).
 
-sendUserCrashEvent(PidUser) ->
-	gen_statem:cast(PidUser, crash).
+sendUserCrashEvent(UserPid,S) ->
+	ListenerPid = S#movingCarState.pidListener,
+	gen_statem:cast(ListenerPid, {to_outside, {UserPid, crash}}).
   
-sendPosToUser(UserPid, Position) ->
-	appUtente_flusso:updatePosition(UserPid, Position).
-  
-taxiServingAppId(User) ->
-	gen_statem:cast(User,taxiServingYou).
-	%my_util:println("sto servendo: ", User).
+sendPosToUser(UserPid, Position, S) ->
+	ListenerPid = S#movingCarState.pidListener,
+	gen_statem:cast(ListenerPid, {to_outside, {UserPid, {newNodeReached, Position}}}).
 
-arrivedInUserPosition(User) ->
-	gen_statem:cast(User,arrivedUserPosition).
-	%my_util:println("sono arrivato da", User).
+taxiServingAppId(UserPid, S) ->
+	ListenerPid = S#movingCarState.pidListener,
+	gen_statem:cast(ListenerPid, {to_outside, {UserPid, taxiServingYou}}).
 
-arrivedInTargetPosition(User) ->
-	gen_statem:cast(User,arrivedTargetPosition).
-	%my_util:println("ho servito: ", User).
+arrivedInUserPosition(UserPid, S) ->
+	ListenerPid = S#movingCarState.pidListener,
+	gen_statem:cast(ListenerPid, {to_outside, {UserPid, arrivedUserPosition}}).
+
+arrivedInTargetPosition(UserPid, S) ->
+	ListenerPid = S#movingCarState.pidListener,
+	gen_statem:cast(ListenerPid, {to_outside, {UserPid, arrivedTargetPosition}}).
 
 
 printState(State) ->

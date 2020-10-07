@@ -13,7 +13,8 @@ callback_mode() -> [state_functions].
 							pidBattery,
 							pidElection,
 							pidGps,
-							pidClock}).
+							pidClock,
+							pidServingUser}). %una lista in 
 
 %% ====================================================================
 %% API functions
@@ -27,23 +28,24 @@ start(InitData) ->
 beginElection(Pid) ->
 	gen_statem:call(Pid, {beginElectionUser}).
 
+updatePosition(ListenerPid, Position) ->
+	gen_statem:cast(ListenerPid, {updatePosition, Position}).
+
+%already to use in other automata
+sendToEsternalAutomata(ListenerdPid, Target, Data) ->
+	gen_statem:cast(ListenerdPid, {to_outside, {Target, Data}}).
+
 %% ====================================================================
 %% Automata functions
 %% ====================================================================
 
 init(InitData) -> 
-	{InitialPos, PID_GPS_Server, City_Map} = InitData,
-	StartingDataGps = #dataInitGPSModule{
-							pid_entity = self(), 
-							type = car, 
-							pid_server_gps = PID_GPS_Server,
-							starting_pos = InitialPos, 
-							signal_power = ?GPS_MODULE_POWER, 
-							map_side = ?MAP_SIDE},
-	PidGpsModule = gps_module:start_gps_module(StartingDataGps),
-	PidMoving = macchina_moving:start(InitialPos,self(),PidGpsModule),
+	{InitialPos, PidGpsServer, City_Map} = InitData,
+	%creo pid delle entita' associate
+	PidGpsModule = gps_module:start_gps_module(initDataGpsModule(PidGpsServer,InitialPos)), %start gps module (and register)
+	PidMoving = macchina_moving:start(InitialPos,self()),
 	PidBattery  = macchina_batteria:start(PidMoving),
-	PidElection = macchina_elezione:start(self(),PidMoving,PidGpsModule, City_Map),
+	PidElection = macchina_elezione:start(self(),PidMoving,PidGpsModule,City_Map),
 	PidClock = tick_server:start_clock([self(),PidMoving,PidBattery,PidElection]),
 	State = #taxiListenerState {
 					pidMoving   = PidMoving,
@@ -55,13 +57,26 @@ init(InitData) ->
 	my_util:printList("Pid creati:", [PidMoving, PidBattery, PidElection]),
 	{ok, idle, State}.
 	
+%roba che deve uscire
+idle(cast, {to_outside, {Target, Data}}, _Stato) ->
+	gen_statem:cast(Target, Data),
+	keep_state_and_data;
+	
+%ricezione del tick
 idle(info, {_From, tick}, _Stato) ->
 	keep_state_and_data; %per ora non fare nulla
 
-%macchina Vuole aggiornare posizione
+%macchina vuole aggiornare posizione
 idle(cast, {updatePosition, CurrentPosition}, Stato) ->
 	PidGps = Stato#taxiListenerState.pidGps,
-	gps_module:setPosition(PidGps, CurrentPosition);
+	gps_module:setPosition(PidGps, CurrentPosition),
+	keep_state_and_data;
+
+%richiesta senza elezione (debugging porp.)
+idle(cast, {send_requestNoElection, Request}, Stato) ->
+	%{From,To,PidAppUser} = Request,
+	gen_statem:cast(Stato#taxiListenerState.pidMoving, {requestRcv,Request}),
+	keep_state_and_data;
 	
 %begin election ricevuto da app utente
 %Data = {From,To,PidAppUser}
@@ -107,7 +122,7 @@ listen_election(cast, {partecipateElection, Data}, _Stato) ->
 	keep_state_and_data;
 
 listen_election(cast, {election_results, Data}, Stato) ->
-	% notifico all'utente 
+	% notifico l'utente - to do
 	io:format("ASCOLTATORE - Winning Results: ~w~n", [Data]),
 	{next_state, idle, Stato}.
 
@@ -120,4 +135,12 @@ listen_election(cast, {election_results, Data}, Stato) ->
 %% Internal functions
 %% ====================================================================
 
+initDataGpsModule(PidGpsServer,InitialPosition) ->
+	#dataInitGPSModule{
+							pid_entity = self(), 
+							type = car, 
+							pid_server_gps = PidGpsServer,
+							starting_pos = InitialPosition, 
+							signal_power = ?GPS_MODULE_POWER, 
+							map_side = ?MAP_SIDE}.
 

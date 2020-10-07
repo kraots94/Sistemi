@@ -9,11 +9,6 @@
 -record(election_result_to_car,{id_winner, id_app_user}).
 -record(election_result_to_user,{id_car_winner, time_to_wait}).
 
--record(userState, {pidEnv,
-					pidGPSModule,
-					currentPos,
-					currentDestination
-					}).
 % stato environment:
 -record(environmentState, {cars, 
 							users, 

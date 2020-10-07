@@ -62,6 +62,8 @@ check_threshold(BatteryLevel, Stato) ->
 				  true -> Stato
 			   end,
 	NewState#batteryState{tick_counter = 0}.
+
+
 					
 		   
 		   
