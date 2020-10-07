@@ -125,7 +125,6 @@ listen_election(cast, {partecipateElection, Data}, _Stato) ->
 	keep_state_and_data;
 
 listen_election(cast, {election_results, Data}, Stato) ->
-	% notifico l'utente - to do
 %[Debug] {<0.10850.0>} - Listener - Winning Results: [{election_result_to_car,<0.10838.0>,<0.10856.0>}]
 	Pid_Car = Data#election_result_to_car.id_winner,
 

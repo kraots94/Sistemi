@@ -11,7 +11,8 @@ callback_mode() -> [state_functions, state_enter].
 					pidGPSModule,
 					currentPos,
 					currentDestination,
-					carLinkedPid
+  					request,
+					picCarServing
 					}).
 %% ====================================================================
 %% API functions
@@ -29,6 +30,10 @@ sendRequest (UserPid, Request) ->
 updatePosition(UserPid, NewNode) ->
 	gen_statem:cast(UserPid, {newNodeReached, NewNode}).
 
+%send to nearest req without election (debugging)
+sendRequestNoElection(UserPid, Request) ->
+	gen_statem:cast(UserPid, {send_requestNoElection, Request}).
+
 %% ====================================================================
 %% Automata Functions
 %% ====================================================================
@@ -40,7 +45,8 @@ init(InitData) ->
 		pidGPSModule = PidGpsModule, 
 		currentPos = InitialPos,
 		currentDestination = none,
-		carLinkedPid = none
+		request = none,
+		picCarServing= none
 		}, 
 	{ok, idle, State}.
 
@@ -56,13 +62,13 @@ handle_common(cast, {newNodeReached, NewNode}, OldState, State) ->
   		   
 	
 idle(enter, _OldState, _Stato) -> keep_state_and_data;
-  
+ 
+idle(internal,{send_request, Request}, State) ->
+	sendRequestToTaxi(Request,State);
+
+%env manda qua la richiesta sostanzialmente
 idle(cast, {send_request, Request}, State) ->
-	checkValidityRequest(State#userState.currentPos, Request),
-	NearestCar = findTaxi(State),
-	{From, To} = Request,
-	gen_statem:cast(NearestCar, {beginElection, {From,To, self()}}),
-	{next_state, waiting_election, State};
+	sendRequestToTaxi(Request,State);
 
 %richiesta senza la elezione (prende il piu' vicino)
 idle(cast, {send_requestNoElection, Request}, State) ->
@@ -73,14 +79,25 @@ idle(cast, {send_requestNoElection, Request}, State) ->
 	keep_state_and_data;
 
 idle(cast, taxiServingYou, State) ->
-	print_debug_message(self(), "Taxi ~w is serving me", [State#userState.carLinkedPid]),
+	print_debug_message(self(), "Taxi ~w is serving me", [State#userState.picCarServing]),
 	{next_state, waiting_car, State}.
 
-waiting_election(enter, _OldState, _Stato) -> keep_state_and_data;
+waiting_election(enter, _OldState, _Stato) -> 
+	%richiesta inviata, aspetto risultati
+	keep_state_and_data;
 
-waiting_election(cast, {winner, Data}, _Stato) -> 
-	print_debug_message(self(), "Winner Taxi_Data: ~w", Data),
-	keep_state_and_data.
+waiting_election(cast, {winner, Data}, Stato) -> 
+	IdCarWinner = Data#election_result_to_user.id_car_winner,
+	if IdCarWinner == -1 -> %non c'è un vincitore, devo riprovare fra un po' di tempo
+		   Request = Stato#userState.request, %prendo la request
+		   timer:sleep(3000), %aspetto un tempo random 
+		   io:format("riprovo!"),
+		   {next_state, idle, Stato, [{next_event,internal,{send_request,Request}}]};
+	true -> %hooray vincitore trovato
+			print_debug_message(self(), "Winner Taxi_Data: ~w", Data),
+			{next_state, waiting_car, Stato#userState{picCarServing = IdCarWinner}}
+	end.
+
 
 %waitin_car_queue(cast, {changeDest, _NewDest}, _State) ->
 %	%invio evento non puoi cambiare path...
@@ -89,7 +106,7 @@ waiting_election(cast, {winner, Data}, _Stato) ->
 waiting_car(enter, _OldState, _Stato) -> keep_state_and_data;
 
 waiting_car(cast, arrivedUserPosition, State) ->
-	print_debug_message(self(), "Taxi ~w is arrived to my node", [State#userState.carLinkedPid]),
+	print_debug_message(self(), "Taxi ~w is arrived to my node", [State#userState.picCarServing]),
 	{next_state, moving, State};
 	
 ?HANDLE_COMMON.
@@ -146,6 +163,15 @@ findTaxi(State) ->
 	receive 
 				Nearest -> Nearest
 	end.
+
+sendRequestToTaxi(Request, State) ->
+	checkValidityRequest(State#userState.currentPos, Request),
+	NearestCar = findTaxi(State),
+	{From, To} = Request,
+	CorrectRequest = {From, To, self()},
+	gen_statem:cast(NearestCar, {beginElection, CorrectRequest}),
+	{next_state, waiting_election, State#userState{request = Request}}.
+	
 
 initDataGpsModule(PidGpsServer,InitialPosition) ->
 	#dataInitGPSModule{

@@ -54,7 +54,7 @@ check_battery(info, {_From, tick}, Stato) ->
 check_threshold(BatteryLevel, Stato) ->
 	PidAttachedCar = Stato#batteryState.pidCar,
 	AlreadyEnabledColPath = Stato#batteryState.columnPathEnabled,
-	NewState = if (BatteryLevel < 78) and not(AlreadyEnabledColPath) ->
+	NewState = if (BatteryLevel < 1) and not(AlreadyEnabledColPath) ->
 		   			macchina_moving:enablePathCharge(PidAttachedCar), %macchina accoda tappe colonnina e poi va in stato ricarica...
 		   			Stato#batteryState{columnPathEnabled = true};
 				  (BatteryLevel == 100) and (AlreadyEnabledColPath) -> %(?) relazione sbagliata (?)
