@@ -6,7 +6,7 @@
 -behaviour(gen_statem).
 -include("records.hrl").
 -include("globals.hrl").
--import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3]).
+-import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3, generate_random_number/1]).
 
 callback_mode() -> [state_functions].
 
@@ -90,7 +90,7 @@ idle(cast, {beginElection, Data}, Stato) ->
 
 %partecipate election ricevuto da altra macchina
 idle(cast, {partecipateElection, Data}, Stato) ->
-	print_debug_message(self(), "Listener - partecipateElection - ~w", [Data]),
+	%print_debug_message(self(), "Listener - partecipateElection - ~w", [Data]),
 	PidElezione = Stato#taxiListenerState.pidElection,
 	gen_statem:cast(PidElezione, {partecipateElection, Data}),
 	{next_state, listen_election, Stato}.
@@ -104,11 +104,10 @@ listen_election(info, {_From, tick}, _Stato) ->
 
 %rimbalzo roba elezione a automa elettore
 listen_election(cast, {election_data, Data}, Stato) ->	
-	print_debug_message(self(), "Listener - election_data - ~w", [Data]),
+	%print_debug_message(self(), "Listener - election_data - ~w", [Data]),
 	PidElezione = Stato#taxiListenerState.pidElection,
 	gen_statem:cast(PidElezione, Data),
 	keep_state_and_data;
-
 %roba che deve uscire
 listen_election(cast, {to_outside, {Target, Data}}, _Stato) ->
 	gen_statem:cast(Target, Data),
@@ -122,12 +121,24 @@ listen_election(cast, {beginElection, Data}, _Stato) ->
 listen_election(cast, {partecipateElection, Data}, _Stato) ->
 	PidSender = Data#dataElectionPartecipate.pidParent,
 	gen_statem:cast(PidSender, {election_data, {invite_result, {self(), i_can_not_join}}}),
-	print_debug_message(self(), "Listener - i_can_not_join To ~w", [PidSender]),
+	%print_debug_message(self(), "Listener - i_can_not_join To ~w", [PidSender]),
 	keep_state_and_data;
 
 listen_election(cast, {election_results, Data}, Stato) ->
 	% notifico l'utente - to do
-	print_debug_message(self(), "Listener - Winning Results: ~w", [Data]),
+%[Debug] {<0.10850.0>} - Listener - Winning Results: [{election_result_to_car,<0.10838.0>,<0.10856.0>}]
+	Pid_Car = Data#election_result_to_car.id_winner,
+
+	if Pid_Car == self() -> 
+			Pid_User = Data#election_result_to_car.id_app_user,
+			DataToUser = #election_result_to_user{
+					id_car_winner = Pid_Car, 
+					time_to_wait = utilities:generate_random_number(100)
+				},
+			gen_statem:cast(Pid_User, {winner, DataToUser});
+		true -> ok
+	end,
+	%print_debug_message(self(), "Listener - Winning Results: ~w", [Data]),
 	{next_state, idle, Stato}.
 
 

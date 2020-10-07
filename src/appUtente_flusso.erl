@@ -62,7 +62,7 @@ idle(cast, {send_request, Request}, State) ->
 	NearestCar = findTaxi(State),
 	{From, To} = Request,
 	gen_statem:cast(NearestCar, {beginElection, {From,To, self()}}),
-	keep_state_and_data;
+	{next_state, waiting_election, State};
 
 %richiesta senza la elezione (prende il piu' vicino)
 idle(cast, {send_requestNoElection, Request}, State) ->
@@ -75,6 +75,12 @@ idle(cast, {send_requestNoElection, Request}, State) ->
 idle(cast, taxiServingYou, State) ->
 	print_debug_message(self(), "Taxi ~w is serving me", [State#userState.carLinkedPid]),
 	{next_state, waiting_car, State}.
+
+waiting_election(enter, _OldState, _Stato) -> keep_state_and_data;
+
+waiting_election(cast, {winner, Data}, _Stato) -> 
+	print_debug_message(self(), "Winner Taxi_Data: ~w", Data),
+	keep_state_and_data.
 
 %waitin_car_queue(cast, {changeDest, _NewDest}, _State) ->
 %	%invio evento non puoi cambiare path...

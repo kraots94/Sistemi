@@ -31,9 +31,8 @@ print_debug_message(Message) -> print_debug_message("", Message, []).
 print_debug_message(Format, Data) -> print_debug_message("", Format, Data).
 print_debug_message(PID, Format, Data) ->
 	if PID == "" -> 
-		   if Data == [] -> io:format("[Debug] ~p~n", [Format]);
-				   
-		   		true ->	io:format("[Debug] "++Format++"~n", Data)
+		   if Data == [] -> io:format("[Debug] " ++"~p"++"~n", [Format]);
+				true ->	io:format("[Debug] "++Format++"~n", Data)
 		   end;
 		true -> io:format("[Debug] {~w} - "++Format++"~n", [PID, Data])
 	end.
