@@ -6,7 +6,7 @@
 -include("records.hrl").
 -include("globals.hrl").
 
-callback_mode() -> [state_functions].
+callback_mode() -> [state_functions, state_enter].
 
 -record(carPartecipate, {refCar, costsCar, sentResults}).
 -record(electionCostData, {pid_source, cost_client, charge_after_transport}).
@@ -84,6 +84,11 @@ resetState(S) ->
 
 init(State) ->
 	{ok, idle, State}.
+
+idle (enter, _OldState, _State) ->
+	%stuff
+	%{next_state, idle, NewState};
+	keep_state_and_data;
 
 idle(info, {_From, tick}, _Stato) ->
 	keep_state_and_data; %per ora non fare nulla
@@ -212,6 +217,9 @@ idle(cast, {partecipateElection, Data}, S) ->
 			{next_state, running_election, S2} 
 	end.
 
+running_election (enter, _OldState, _State) ->
+	keep_state_and_data;
+	
 running_election(info, {_From, tick}, _Stato) ->
 	keep_state_and_data; %per ora non fare nulla
 	
@@ -337,6 +345,9 @@ calculate_final_results(DataTree, S) ->
 
 	sendMessage(Pids_To_notify, {winning_results, Winner_Data}, S),
 	sendToListener({election_results, Winner_Data}, S).
+
+waiting_final_results (enter, _OldState, _State) ->
+	keep_state_and_data;
 
 waiting_final_results(info, {_From, tick}, _Stato) ->
 	keep_state_and_data; %per ora non fare nulla
