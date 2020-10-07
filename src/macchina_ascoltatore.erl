@@ -14,8 +14,7 @@ callback_mode() -> [state_functions].
 							pidBattery,
 							pidElection,
 							pidGps,
-							pidClock,
-							pidServingUser}). %una lista in 
+							pidClock}).
 
 %% ====================================================================
 %% API functions
@@ -108,6 +107,7 @@ listen_election(cast, {election_data, Data}, Stato) ->
 	gen_statem:cast(PidElezione, Data),
 	keep_state_and_data;
 
+%roba che deve uscire
 listen_election(cast, {to_outside, {Target, Data}}, _Stato) ->
 	gen_statem:cast(Target, Data),
 	keep_state_and_data;
