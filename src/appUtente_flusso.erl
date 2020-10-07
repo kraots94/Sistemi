@@ -24,7 +24,7 @@ start(InitialPos, PID_GPS_Server) ->
 
 %Request è tipo = {"a", "b"}.
 sendRequest (UserPid, Request) ->
-	gen_statem:cast(UserPid, {send_requestNoElection,Request}).
+	gen_statem:cast(UserPid, {send_request,Request}).
 
 updatePosition(UserPid, NewNode) ->
 	gen_statem:cast(UserPid, {newNodeReached, NewNode}).
