@@ -247,24 +247,23 @@ sendPosToGps(CurrentPosition,S) ->
 
 sendUserCrashEvent(UserPid,S) ->
 	ListenerPid = S#movingCarState.pidListener,
-	gen_statem:cast(ListenerPid, {to_outside, {UserPid, crash}}).
+	macchina_ascoltatore:sendToEsternalAutomata(ListenerPid, UserPid, crash).
   
 sendPosToUser(UserPid, Position, S) ->
 	ListenerPid = S#movingCarState.pidListener,
-	gen_statem:cast(ListenerPid, {to_outside, {UserPid, {newNodeReached, Position}}}).
+	macchina_ascoltatore:sendToEsternalAutomata(ListenerPid, UserPid, {newNodeReached, Position}).
 
 taxiServingAppId(UserPid, S) ->
 	ListenerPid = S#movingCarState.pidListener,
-	gen_statem:cast(ListenerPid, {to_outside, {UserPid, taxiServingYou}}).
+	macchina_ascoltatore:sendToEsternalAutomata(ListenerPid, UserPid, taxiServingYou).
 
 arrivedInUserPosition(UserPid, S) ->
 	ListenerPid = S#movingCarState.pidListener,
-	gen_statem:cast(ListenerPid, {to_outside, {UserPid, arrivedUserPosition}}).
+	macchina_ascoltatore:sendToEsternalAutomata(ListenerPid, UserPid, arrivedUserPosition).
 
 arrivedInTargetPosition(UserPid, S) ->
 	ListenerPid = S#movingCarState.pidListener,
-	gen_statem:cast(ListenerPid, {to_outside, {UserPid, arrivedTargetPosition}}).
-
+	macchina_ascoltatore:sendToEsternalAutomata(ListenerPid, UserPid, arrivedTargetPosition).
 
 printState(State) ->
 	my_util:println("situazione Stato:", State).
