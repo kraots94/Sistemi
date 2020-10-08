@@ -126,10 +126,15 @@ listen_election(cast, {partecipateElection, Data}, _Stato) ->
 
 listen_election(cast, {election_results, Data}, Stato) ->
 %[Debug] {<0.10850.0>} - Listener - Winning Results: [{election_result_to_car,<0.10838.0>,<0.10856.0>}]
-	Pid_Car = Data#election_result_to_car.id_winner,
+    DataToUse = if is_list(Data) -> PidElezione = Stato#taxiListenerState.pidElection,
+                                    gen_statem:cast(PidElezione, {exit_final_state_initator}),
+                                    hd(Data);
+                   true -> Data
+                end,
+	Pid_Car = DataToUse#election_result_to_car.id_winner,
 
 	if Pid_Car == self() -> 
-			Pid_User = Data#election_result_to_car.id_app_user,
+			Pid_User = DataToUse#election_result_to_car.id_app_user,
 			DataToUser = #election_result_to_user{
 					id_car_winner = Pid_Car, 
 					time_to_wait = utilities:generate_random_number(100)

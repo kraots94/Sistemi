@@ -141,7 +141,7 @@ idle(cast, {beginElection, Data}, S) ->
 						cost_client = Cost_Client, 
 						charge_after_transport = Charge_After_Client},
 		%aspetto i risultati
-		S3 = S2#electionState{totalCosts = Results},
+		S3 = S2#electionState{totalCosts = [Results]},
 		{next_state, initiator_final_state, S3};
 	true ->  
 		%print_debug_message(S2#electionState.pidCar, "All cars invited", []),
@@ -369,10 +369,10 @@ initiator_final_state(enter, _OldState ,S) ->
 	My_Pid = S#electionState.pidCar,
 	if
 		My_Pid == ID_Winner ->
-			_ID_APP_User = Winner_Data#election_result_to_car.id_app_user;
+			_ID_APP_User = Winner_Data#election_result_to_car.id_app_user,
 			% creo i record per la coda
 			% aggiorno la coda movement all'automa
-			%print_debug_message(S#electionState.pidCar, "I Won Election", []);
+			print_debug_message(S#electionState.pidCar, "I Won Election", []);
 		true ->
 			ok
 	end,
@@ -380,11 +380,12 @@ initiator_final_state(enter, _OldState ,S) ->
 	Pids_To_notify = lists:map(FuncMap_2, S#electionState.childrenPartecipate),
 
 	sendMessage(Pids_To_notify, {winning_results, Winner_Data}, S),
-	sendToListener({election_results, Winner_Data}, S),
-	S2 = resetState(S),
-	{next_state, idle, S2};
+	sendToListener({election_results, [Winner_Data]}, S),
+    keep_state_and_data;
 
-initiator_final_state(cast, _Data, S) -> {next_state, idle, S}.
+initiator_final_state(cast, {exit_final_state_initator}, S) -> 
+    S1 = resetState(S),
+    {next_state, idle, S1}.
 
 waiting_final_results (enter, _OldState, _State) ->
 	keep_state_and_data;
