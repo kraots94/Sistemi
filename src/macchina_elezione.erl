@@ -268,7 +268,8 @@ running_election(cast, {invite_result, Data}, S) ->
 					{next_state, initiator_final_state, S2};
 				true -> 					
 					%print_debug_message(S1#electionState.pidCar, "Sending Costs To Parent", []),
-					sendMessageElection(S1#electionState.parent, {costs_results, {S1#electionState.pidCar, TotalCosts}}, S1),
+					Winner_Result = findBestResult(TotalCosts),
+					sendMessageElection(S1#electionState.parent, {costs_results, {S1#electionState.pidCar, [Winner_Result]}}, S1),
 				{next_state, waiting_final_results, S1} 
 			end;
 		true -> 
@@ -336,7 +337,8 @@ running_election(cast, {costs_results, Data}, S) ->
 					{next_state, initiator_final_state, S2};
 				true -> 					
 					%print_debug_message(S1#electionState.pidCar, "Sending Costs To Parent", []),
-					sendMessageElection(S1#electionState.parent, {costs_results, {S1#electionState.pidCar, TotalCosts}}, S1),
+                    Winner_Result = findBestResult(TotalCosts),
+					sendMessageElection(S1#electionState.parent, {costs_results, {S1#electionState.pidCar, [Winner_Result]}}, S1),
 				{next_state, waiting_final_results, S1} 
 			end;
 		true -> 
@@ -349,19 +351,7 @@ running_election(cast, {costs_results, Data}, S) ->
 initiator_final_state(enter, _OldState ,S) ->
 	%print_debug_message(S#electionState.pidCar, "Calculating Final Results", []),
 	TotalCosts = S#electionState.totalCosts,
-	SortFun = fun(A, B) -> 
-		CostClient_A = A#electionCostData.cost_client, 
-		Final_Charge_A = A#electionCostData.charge_after_transport,  
-		CostClient_B = B#electionCostData.cost_client, 
-		Final_Charge_B  = B#electionCostData.charge_after_transport, 
-		if CostClient_A == CostClient_B -> Final_Charge_A > Final_Charge_B;
-				true -> CostClient_A < CostClient_B
-		end
-	end,
-	Sorted_Data = lists:sort(SortFun, TotalCosts),
-	
-% %print_debug_message(S#electionState.pidCar, "SortedData: ~w", [Sorted_Data]),
-	Winner_Partecipant = hd(Sorted_Data),
+	Winner_Partecipant = findBestResult(TotalCosts),
 	Winner_Data = #election_result_to_car{id_winner = Winner_Partecipant#electionCostData.pid_source,
 										id_app_user = S#electionState.pidAppUser
 										},
@@ -420,6 +410,20 @@ waiting_final_results(cast, {invite_result, _Data}, S) ->
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
+findBestResult(Results) ->
+	SortFun = fun(A, B) -> 
+		CostClient_A = A#electionCostData.cost_client, 
+		Final_Charge_A = A#electionCostData.charge_after_transport,  
+		CostClient_B = B#electionCostData.cost_client, 
+		Final_Charge_B  = B#electionCostData.charge_after_transport, 
+		if CostClient_A == CostClient_B -> Final_Charge_A > Final_Charge_B;
+				true -> CostClient_A < CostClient_B
+		end
+	end,
+	Sorted_Data = lists:sort(SortFun, Results),
+% %print_debug_message(S#electionState.pidCar, "SortedData: ~w", [Sorted_Data]),
+	Best_Partecipant = hd(Sorted_Data),
+	Best_Partecipant.
 
 sendInvitesPartecipation([], _Data, _S) -> sendedAll;
 sendInvitesPartecipation([H | T], Data, S) -> 
