@@ -31,6 +31,7 @@ callback_mode() -> [state_functions, state_enter].
 				dijkstra_results,
 				battery_level,
 				total_tree_costs,
+				my_election_cost,
 				dataToSendPartecipate,
 				totalCosts}).
 
@@ -59,6 +60,7 @@ start(PidMacchina, PidMovingCar, Pid_Gps_Car, City_Map) ->
 							dijkstra_results = [],
 							battery_level = 0,
 							total_tree_costs = [],
+							my_election_cost = [],
 							dataToSendPartecipate = none,
 							totalCosts = []},
 
@@ -82,6 +84,7 @@ resetState(S) ->
 					dijkstra_results = [],
 					battery_level = 0,
 					total_tree_costs = [],
+					my_election_cost = [],
 					dataToSendPartecipate = none,
 					totalCosts = []}.
 %% ====================================================================
@@ -111,19 +114,20 @@ idle(cast, {beginElection, Data}, S) ->
 	CloserCars = getDataFromAutomata(PID_GPS, {self(), getNearCars}),
 
 	%print_debug_message(Self_Pid, "Close Cars: ~w", [CloserCars]),
-	
-    SelfCost =  manage_self_cost(S, CurrentRequest),
+
+	My_Election_Cost= manage_self_cost(S, CurrentRequest),
+
 	S1 = S#electionState { 
 		flag_initiator = true,
 		carsInvited = CloserCars,
-        selfCost = SelfCost,
-        pidAppUser = Pid_App_User
+		pidAppUser = Pid_App_User,
+		my_election_cost = My_Election_Cost
 	},
 
 	if CloserCars =:= [] -> 
 			%print_debug_message(Self_Pid, "No people to invite", none),
-			ElectionCosts = create_election_cost_data(Self_Pid, SelfCost),
-			S2 = S1#electionState{totalCosts = [ElectionCosts]},
+
+			S2 = S1#electionState{totalCosts = My_Election_Cost},
 			{next_state, initiator_final_state, S2};
 		true ->  
 			%print_debug_message(Self_Pid, "All cars invited", none),
@@ -153,19 +157,18 @@ idle(cast, {partecipateElection, Data}, S) ->
 	CloserCars = lists:delete(Parent_Pid, CloserCars_All),
 	%print_debug_message(Self_Pid, "Close Cars: ~w", [CloserCars]),
 
-	SelfCost =  manage_self_cost(S, CurrentRequest),
+	My_Election_Cost = manage_self_cost(S, CurrentRequest),
 	S1 = S#electionState{currentRequest = CurrentRequest,
 		parent = Parent_Pid,
 		carsInvited = CloserCars,
-		selfCost = SelfCost
+		my_election_cost = My_Election_Cost
 	},
 
 	%print_debug_message(Self_Pid, "Current Parent Election: ~w", [Parent_Pid]),
 	%print_debug_message(Self_Pid, "Invited Cars: ~w", [CloserCars]),
 	if CloserCars =:= [] -> 
 			%mando i dati a mio padre
-			ElectionCosts = create_election_cost_data(Self_Pid, SelfCost),
-			sendMessageElection(Parent_Pid, {costs_results, {Self_Pid, [ElectionCosts]}}, S1),
+			sendMessageElection(Parent_Pid, {costs_results, {Self_Pid, My_Election_Cost}}, S1),
 			%aspetto i risultati
 			{next_state, waiting_final_results, S1};
 		true ->  
@@ -268,19 +271,16 @@ calculate_next_state_running_election(S) ->
 	%print_debug_message(S#electionState.pidCar, "Missing Answers: ~w", [MissingAnswers]),
 	if  (MissingAnswers =:= []) and (InvitedCars =:= []) -> 
 			ChildrenCosts = packChildrenCosts(Partecipans),
-			{Cost_Client, Charge_After_Client} = S#electionState.selfCost,
-			My_Results = #electionCostData{
-							pid_source = S#electionState.pidCar, 
-							cost_client = Cost_Client, 
-							charge_after_transport = Charge_After_Client},
-			TotalCosts = [My_Results] ++ ChildrenCosts,
+			My_Election_Cost = S#electionState.my_election_cost,
+			TotalCosts = My_Election_Cost ++ ChildrenCosts,
+
 			if S#electionState.flag_initiator -> 
 					S1 = S#electionState{totalCosts = TotalCosts},
 					{next_state, initiator_final_state, S1};
 				true -> 					
 					%print_debug_message(S#electionState.pidCar, "Sending Costs To Parent", none),
 					Winner_Result = findBestResult(TotalCosts),
-					sendMessageElection(S#electionState.parent, {costs_results, {S#electionState.pidCar, [Winner_Result]}}, S),
+					sendMessageElection(S#electionState.parent, {costs_results, {S#electionState.pidCar, Winner_Result}}, S),
 					{next_state, waiting_final_results, S} 
 			end;
 		true -> 
@@ -290,15 +290,29 @@ calculate_next_state_running_election(S) ->
 %% Final States functions
 %% ====================================================================
 initiator_final_state(enter, _OldState ,S) ->
-	%print_debug_message(S#electionState.pidCar, "Calculating Final Results", none),
+	print_debug_message(S#electionState.pidCar, "Calculating Final Results", none),
 	TotalCosts = S#electionState.totalCosts,
 	Winner_Partecipant = findBestResult(TotalCosts),
-	Winner_Data = #election_result_to_car  {id_winner = Winner_Partecipant#electionCostData.pid_source,
-											id_app_user = S#electionState.pidAppUser
-											},
+	
+	print_debug_message(S#electionState.pidCar, "Winner Data: ~w", Winner_Partecipant),
+	Winner_Data = if 
+			Winner_Partecipant =:= [] -> 	#election_result_to_car{
+												id_winner = -1,
+												id_app_user = -1
+											};
+			true -> 						
+											WinnerData = hd(Winner_Partecipant),
+											#election_result_to_car{
+												id_winner = WinnerData#electionCostData.pid_source,
+												id_app_user = S#electionState.pidAppUser
+											}
+				end,
 	manage_winner_data(Winner_Data, S),
 	sendToListener({election_results, [Winner_Data]}, S),
     keep_state_and_data;
+
+initiator_final_state(info, {_From, tick}, _Stato) ->
+	keep_state_and_data; %per ora non fare nulla
 
 initiator_final_state(cast, {exit_final_state_initator}, S) -> 
     S1 = resetState(S),
@@ -325,9 +339,16 @@ waiting_final_results(cast, {invite_result, _Data}, S) ->
 %% Internal functions
 %% ====================================================================
 
+%% If car can win returns his costs inside a list, otherwise empty list []
 manage_self_cost(S, CurrentRequest) ->
+	Self_Pid = S#electionState.pidCar,
 	From = CurrentRequest#user_request.from,
 	To = CurrentRequest#user_request.to,
+	%Current_Last_Target
+	%Current_Cost_To_Last_Target
+	%NearestColumnNode
+	%Current_Battery_Level
+	%City_Graph
 
 	%{Cost_To_Last_Target, Current_Last_Target, Battery_Level} = getDataFromAutomata(PID_MOV, {getDataElection}),
 	Battery_level = 200000,
@@ -337,9 +358,13 @@ manage_self_cost(S, CurrentRequest) ->
 	% Calcolo dei miei costi
 	NearestColumnTarget = calculateNearestColumn(To),
 	Dijkstra_Results = calculateDijkstra(Current_Last_Target, From, To, NearestColumnTarget),
-	SelfCosts = calculateSelfCost(Dijkstra_Results, Battery_level, Cost_To_Last_Target, S),
+	{CC, CRDT, Can_Win} = calculateSelfCost(Dijkstra_Results, Battery_level, Cost_To_Last_Target, S),
 	%%------------------------------------------------
-	SelfCosts.
+	ElectionCosts = create_election_cost_data(Self_Pid, {CC, CRDT}),
+	My_Election_Cost = if Can_Win == i_can_win  -> [ElectionCosts];
+								true -> []
+				end,
+	My_Election_Cost.
 
 create_election_cost_data(Pid, {Cost_Client, Charge_After_Client}) ->
 	Results = #electionCostData{
@@ -359,10 +384,13 @@ manage_winner_data(Winner_Data, S) ->
 	ID_Winner = Winner_Data#election_result_to_car.id_winner,
 	My_Pid = S#electionState.pidCar,
 	if
+		ID_Winner == -1 -> ok;
 		My_Pid == ID_Winner ->
 			_ID_APP_User = Winner_Data#election_result_to_car.id_app_user;
-			% creo i record per la coda
-			% aggiorno la coda movement all'automa
+			% creo i record per la coda partendo dalle queue già calcolate in fase begin / partecipate
+
+			% li salvo nel mio stato
+			
 			%print_debug_message(S#electionState.pidCar, "I Won Election", none);
 		true ->
 			ok
@@ -378,18 +406,23 @@ manage_winner_data(Winner_Data, S) ->
 	end.
 
 findBestResult(Results) ->
-	SortFun = fun(A, B) -> 
-		CostClient_A = A#electionCostData.cost_client, 
-		Final_Charge_A = A#electionCostData.charge_after_transport,  
-		CostClient_B = B#electionCostData.cost_client, 
-		Final_Charge_B  = B#electionCostData.charge_after_transport, 
-		if CostClient_A == CostClient_B -> Final_Charge_A > Final_Charge_B;
-				true -> CostClient_A < CostClient_B
-		end
-	end,
-	Sorted_Data = lists:sort(SortFun, Results),
-% %print_debug_message(S#electionState.pidCar, "SortedData: ~w", [Sorted_Data]),
-	Best_Partecipant = hd(Sorted_Data),
+	Best_Partecipant = 
+		if Results =:= [] -> 
+				[];
+			true ->
+				SortFun = fun(A, B) -> 
+					CostClient_A = A#electionCostData.cost_client, 
+					Final_Charge_A = A#electionCostData.charge_after_transport,  
+					CostClient_B = B#electionCostData.cost_client, 
+					Final_Charge_B  = B#electionCostData.charge_after_transport, 
+					if CostClient_A == CostClient_B -> Final_Charge_A > Final_Charge_B;
+							true -> CostClient_A < CostClient_B
+					end
+				end,
+				Sorted_Data = lists:sort(SortFun, Results),
+			% %print_debug_message(S#electionState.pidCar, "SortedData: ~w", [Sorted_Data]),
+				[hd(Sorted_Data)]
+			end,
 	Best_Partecipant.
 
 sendInvitesPartecipation([], _Data, _S) -> sendedAll;
@@ -424,9 +457,13 @@ loopReceive() ->
 
 calculateSelfCost(_Data, _Battery_level, _Cost_To_Last_Target, _S) -> 
 	%print_debug_message(S#electionState.pidCar, "Battery Level: ~w", [Battery_level]),
-	CC = utilities:generate_random_number(100),
-	CRDT = utilities:generate_random_number(100),
-	Out = {CC, CRDT},
+	CC = utilities:generate_random_number(100) - 50,
+	CRDT = utilities:generate_random_number(100) - 50,
+	RandomNumber = utilities:generate_random_number(2),
+	Can_Win = if RandomNumber == 1 -> i_can_win;
+							true -> i_can_not_win
+			end,
+	Out = {CC, CRDT, Can_Win},
 	Out.
 
 calculateDijkstra(_CurrentPosition, _From, _To, _NearestColumnTarget) -> [].
