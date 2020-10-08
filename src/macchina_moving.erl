@@ -12,12 +12,13 @@ callback_mode() -> [state_functions,state_enter].
 
 %stato macchina in movimento:
 -record(movingCarState, {
+				tick_counter,
 				pidListener,
 				tappe, %lista di tappe da percorrere
+				pathCol, %lista di tappe verso la colonnina
 				currentUser = none,
 				currentPos,
 				batteryLevel, %decrementa a ogni tick
-				pathCol, %lista di tappe verso la colonnina
 				mustCharge, %flag che dice se devo o meno andare a caricare (seguire tappe colonnina)
 				lastDestination, %nodo dell'ultimo target
 				costToLastDestination}). %tempo per arrivare al target, decrementa a ogni tick
@@ -27,12 +28,13 @@ callback_mode() -> [state_functions,state_enter].
 %% ====================================================================
 start(InitialPos, PidListener) ->
 	State = #movingCarState {
+					tick_counter = 0,
 					pidListener = PidListener,
 					tappe = [],
+					pathCol = [],
 					currentUser = none,
 					currentPos = InitialPos,
 					batteryLevel = 100,
-					pathCol = [],
 					mustCharge = false},
 	{ok, Pid} = gen_statem:start_link(?MODULE,State, []),
 	Pid.
@@ -94,9 +96,11 @@ handle_common(cast, {updateQueue, Queue}, _OldState, State) ->
 	%estrappolo path colonnina dalle tappe
 	PathColonnina = ["test"],
 	LastDestination = calculateLastDestination(Tappe),
+	%sommi al costToLastDest attuale il valore del costo ottenuto
 	NewTappe = State#movingCarState.tappe ++ Tappe,
 	{next_state, moving, State#movingCarState{tappe=NewTappe, pathCol = PathColonnina, lastDestination = LastDestination, costToLastDestination = Costi}};
 
+%solo per V0
 handle_common({call,From}, {areYouBusy}, OldState, State) ->
 	Reply = if OldState == idle -> false;
 	   		  true -> true
@@ -105,18 +109,33 @@ handle_common({call,From}, {areYouBusy}, OldState, State) ->
 		
 handle_common({call,From}, {getBattery}, OldState, State) ->
 	Battery = State#movingCarState.batteryLevel,
-	{next_state, OldState, State, [{reply,From,Battery}]}.
+	{next_state, OldState, State, [{reply,From,Battery}]};
+
+handle_common(info, {_From, tick}, OldState, State) ->
+	if OldState == idle -> keep_state_and_data; %in idle ignora il tick
+	   OldState == charging ->					%per ora aumenta di una carica ogni tick
+		   NewBattery = State#movingCarState.batteryLevel + 1,
+		   {keep_state, State#movingCarState{batteryLevel = NewBattery}};
+	   true -> %se in moving o movingToCharge muoviti, consuma tappe
+		ActualTickCounter = State#movingCarState.tick_counter,
+		NewCounter = ActualTickCounter + 1,
+		if (NewCounter >= ?TICKS_TO_MOVING) -> {keep_state, State#movingCarState{tick_counter = 0}, [{next_event,internal,move}]};
+	   		true ->  {keep_state, State#movingCarState{tick_counter = NewCounter}}
+		end
+	 end.
+		   
 
 idle(enter, _OldState, _State) ->
 	print_debug_message(self(), "Sono in idle", []),
 	%printState(State),
 	keep_state_and_data;
 
-idle(cast, {getElectionData}, State) ->
+idle({call,From}, {getElectionData}, State) ->
 	Cost_To_last_Target = 0,
 	Current_Target = State#movingCarState.currentPos,
 	Battery_level = State#movingCarState.batteryLevel,
-	{Cost_To_last_Target, Current_Target, Battery_level};
+	Packet = {Cost_To_last_Target, Current_Target, Battery_level},
+	{keep_state, State, [{reply,From,Packet}]};
 
 %gestisco tick ricevuti in idle ignorandoli
 idle(info, {_From, tick}, _State) ->
@@ -142,8 +161,7 @@ moving(enter, _OldState, State) ->
 	printState(ActualState),
 	{keep_state, ActualState};
 	
-%gestione tick in movimento
-moving(info, {_From, tick}, State) ->
+moving(internal, move, State) ->
 	%calcolo subito il decremento batteria e costo al last target...visto che mi son spostato
 	NewBattery = State#movingCarState.batteryLevel - 1,
 	NewCostToLastDest = State#movingCarState.costToLastDestination - 1,
@@ -187,12 +205,13 @@ moving(info, {_From, tick}, State) ->
 			end
 	end;
 
-moving(cast, {getElectionData}, State) ->
+moving({call,From}, {getElectionData}, State) ->
 	Cost_To_last_Target = State#movingCarState.costToLastDestination,
 	Current_Target = State#movingCarState.lastDestination,
 	Battery_level = State#movingCarState.batteryLevel,
-	{Cost_To_last_Target, Current_Target, Battery_level};
-	
+	Packet = {Cost_To_last_Target, Current_Target, Battery_level},
+	{keep_state, State, [{reply,From,Packet}]};
+
 moving(cast, {crash}, State) ->
 	print_debug_message(self(), "Incidente!", []),
 	sendUserCrashEvent(State#movingCarState.currentUser, State),
@@ -213,15 +232,16 @@ movingToCharge(enter, _OldState, State) ->
 			keep_state_and_data
 	end;
 
-movingToCharge(cast, {getElectionData}, State) ->
+movingToCharge({call,From}, {getElectionData}, State) ->
 	Cost_To_last_Target = State#movingCarState.costToLastDestination,
 	Current_Target =  State#movingCarState.lastDestination,
 	Battery_level = State#movingCarState.batteryLevel,
-	{Cost_To_last_Target, Current_Target, Battery_level};
+	Packet = {Cost_To_last_Target, Current_Target, Battery_level},
+	{keep_state, State, [{reply,From,Packet}]};
 
 %similar to moving
 %di fatto consumi qua le tappe
-movingToCharge(info, {_From, tick}, State) ->
+movingToCharge(internal, move, State) ->
 	NewBattery = State#movingCarState.batteryLevel - 1,
 	TappeAttuali = State#movingCarState.pathCol,		 %cambia qua sostanzialmente
 	TappaAttuale = hd(TappeAttuali),
@@ -253,17 +273,18 @@ movingToCharge(info, {_From, tick}, State) ->
 			end
 	end;
 			
-			
 ?HANDLE_COMMON.
   
 charging(enter, _OldState, _State) ->
 	println("sto caricando"),
 	keep_state_and_data;
+
 ?HANDLE_COMMON.
   
 crash(enter, _OldState, _State) ->
 	exit(crash);
-	?HANDLE_COMMON.
+
+?HANDLE_COMMON.
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
@@ -295,6 +316,7 @@ calculateNewState(Stato, TappaAttuale, Tappe) ->
 			end
 	end.
 
+%calcolo target finale tra utenti accodati
 calculateLastDestination(Tappe) ->
 	LastTap = hd(lists:reverse(Tappe)),
 	LastTap#tappa.node_name.
@@ -324,7 +346,7 @@ arrivedInTargetPosition(UserPid, S) ->
 	macchina_ascoltatore:sendToEsternalAutomata(ListenerPid, UserPid, arrivedTargetPosition).
 
 printState(State) ->
-	println("Stato:", State).
+	utilities:print_debug_message(self(), State, none).
 	
 
 
