@@ -177,7 +177,7 @@ moving(internal, move, State) ->
 			NuovoStato =  State#movingCarState{tappe=NuoveTappe},
 			io:format("-"),
 			% print_debug_message(self(), "Sto raggiungendo: ~w", [TappaAttuale#tappa.node_name]),
-			%printState(NuovoStato),
+			printState(NuovoStato),
 			{keep_state, NuovoStato#movingCarState{batteryLevel = NewBattery, costToLastDestination = NewCostToLastDest}};
 		true -> %tempo = 0 , quindi ho raggiunto nodo nuovo
 			println("raggiunto nuovo nodo"),
@@ -346,10 +346,8 @@ arrivedInTargetPosition(UserPid, S) ->
 	macchina_ascoltatore:sendToEsternalAutomata(ListenerPid, UserPid, arrivedTargetPosition).
 
 printState(State) ->
-	utilities:print_debug_message(self(), State, none).
+	utilities:print_debug_message(self(), "Stato: " ++ [?TILDE_CHAR] ++ "p", State).
 	
-
-
 
 
 %make:all(),
