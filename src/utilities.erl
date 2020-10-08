@@ -27,14 +27,21 @@ println(String,Var) ->
 	io:format(String ++ " ~p~n" , [Var]).
 
 print_debug_message_raw(Text) -> io:format(Text).
-print_debug_message(Message) -> print_debug_message("", Message, []).
+print_debug_message(Message) -> print_debug_message("", Message, none).
 print_debug_message(Format, Data) -> print_debug_message("", Format, Data).
 print_debug_message(PID, Format, Data) ->
 	if PID == "" -> 
-		   if Data == [] -> io:format("[Debug] " ++"~p"++"~n", [Format]);
-				true ->	io:format("[Debug] "++Format++"~n", Data)
+		   if Data == none -> 
+				  		io:format("[Debug] ~p ~n", [Format]);
+					true ->	
+						io:format("[Debug] "++Format++"~n", Data)
 		   end;
-		true -> io:format("[Debug] {~w} - "++Format++"~n", [PID, Data])
+		true -> 
+			if Data == none -> 
+					io:format("[Debug] {~w} - ~p ~n", [PID, Format]);
+				true ->	
+					io:format("[Debug] {~w} - "++Format++"~n", [PID, Data])
+			end	   
 	end.
 	
 
