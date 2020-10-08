@@ -251,31 +251,9 @@ running_election(cast, {invite_result, Data}, S) ->
 				end,
 	S1 = S#electionState{carsInvited = NewInvited, 
 				childrenPartecipate = NewPartecipants},
-
-	FuncFilter = fun(Partecipant) -> Partecipant#carPartecipate.sentResults == not_sended_results end,
-	MissingAnswers = lists:filter(FuncFilter, NewPartecipants),
-	%print_debug_message(S1#electionState.pidCar, "Missing Answers: ~w", [MissingAnswers]),
-	if  (MissingAnswers =:= []) and (NewInvited =:= []) -> 
-			ChildrenCosts = packChildrenCosts(NewPartecipants),
-			{Cost_Client, Charge_After_Client} = S1#electionState.selfCost,
-			My_Results = #electionCostData{
-							pid_source = S1#electionState.pidCar, 
-							cost_client = Cost_Client, 
-							charge_after_transport = Charge_After_Client},
-			TotalCosts = [My_Results] ++ ChildrenCosts,
-			if S1#electionState.flag_initiator -> 
-					S2 = S1#electionState{totalCosts = TotalCosts},
-					{next_state, initiator_final_state, S2};
-				true -> 					
-					%print_debug_message(S1#electionState.pidCar, "Sending Costs To Parent", []),
-					Winner_Result = findBestResult(TotalCosts),
-					sendMessageElection(S1#electionState.parent, {costs_results, {S1#electionState.pidCar, [Winner_Result]}}, S1),
-				{next_state, waiting_final_results, S1} 
-			end;
-		true -> 
-			{next_state, running_election, S1}	
-	end;
-
+	
+	NextState = calculate_next_state_running_election(S1),
+	NextState;
 
 running_election(cast, {costs_results, Data}, S) -> 
 	%print_debug_message(S#electionState.pidCar, "Running Election - Costs Results", []),
@@ -284,10 +262,10 @@ running_election(cast, {costs_results, Data}, S) ->
 	%print_debug_message(S#electionState.pidCar, "CurrentCarsInvited: ~w", [S#electionState.carsInvited]),
 	%print_debug_message(S#electionState.pidCar, "CurrentPartecipants: ~w", [S#electionState.childrenPartecipate]),
 	CurrentPartecipants = S#electionState.childrenPartecipate,
-	UserAlreadyInInvited = lists:member(PID_Sender,  S#electionState.carsInvited),
+	UserInInvitedList = lists:member(PID_Sender,  S#electionState.carsInvited),
 	NewInvited = lists:delete(PID_Sender, S#electionState.carsInvited),
 	NewPartecipants = if
-		UserAlreadyInInvited ->
+		UserInInvitedList ->
 			NewPartecipant = #carPartecipate{
 				refCar = PID_Sender,
 				sentResults = ok, 
@@ -321,30 +299,36 @@ running_election(cast, {costs_results, Data}, S) ->
 
 	%print_debug_message(S1#electionState.pidCar, "NewCarsInvited: ~w", [S1#electionState.carsInvited]),
 	%print_debug_message(S1#electionState.pidCar, "NewPartecipants: ~w", [S1#electionState.childrenPartecipate]),
+
+	NextState = calculate_next_state_running_election(S1),
+	NextState.
+
+calculate_next_state_running_election(S) -> 
+	InvitedCars = S#electionState.carsInvited,
+	Partecipans = S#electionState.childrenPartecipate,
 	FuncFilter = fun(Partecipant) -> Partecipant#carPartecipate.sentResults == not_sended_results end,
-	MissingAnswers = lists:filter(FuncFilter, NewPartecipants),
+	MissingAnswers = lists:filter(FuncFilter, Partecipans),
 	%print_debug_message(S1#electionState.pidCar, "Missing Answers: ~w", [MissingAnswers]),
-	if  (MissingAnswers =:= []) and (NewInvited =:= []) -> 
-			ChildrenCosts = packChildrenCosts(NewPartecipants),
-			{Cost_Client, Charge_After_Client} = S1#electionState.selfCost,
+	if  (MissingAnswers =:= []) and (InvitedCars =:= []) -> 
+			ChildrenCosts = packChildrenCosts(Partecipans),
+			{Cost_Client, Charge_After_Client} = S#electionState.selfCost,
 			My_Results = #electionCostData{
-							pid_source = S1#electionState.pidCar, 
+							pid_source = S#electionState.pidCar, 
 							cost_client = Cost_Client, 
 							charge_after_transport = Charge_After_Client},
 			TotalCosts = [My_Results] ++ ChildrenCosts,
-			if S1#electionState.flag_initiator -> 
-					S2 = S1#electionState{totalCosts = TotalCosts},
-					{next_state, initiator_final_state, S2};
+			if S#electionState.flag_initiator -> 
+					S1 = S#electionState{totalCosts = TotalCosts},
+					{next_state, initiator_final_state, S1};
 				true -> 					
-					%print_debug_message(S1#electionState.pidCar, "Sending Costs To Parent", []),
-                    Winner_Result = findBestResult(TotalCosts),
-					sendMessageElection(S1#electionState.parent, {costs_results, {S1#electionState.pidCar, [Winner_Result]}}, S1),
-				{next_state, waiting_final_results, S1} 
+					%print_debug_message(S#electionState.pidCar, "Sending Costs To Parent", []),
+					Winner_Result = findBestResult(TotalCosts),
+					sendMessageElection(S#electionState.parent, {costs_results, {S#electionState.pidCar, [Winner_Result]}}, S),
+					{next_state, waiting_final_results, S} 
 			end;
 		true -> 
-			{next_state, running_election, S1}	
+			{next_state, running_election, S}	
 	end.
-
 %% ====================================================================
 %% Final States functions
 %% ====================================================================
@@ -352,24 +336,10 @@ initiator_final_state(enter, _OldState ,S) ->
 	%print_debug_message(S#electionState.pidCar, "Calculating Final Results", []),
 	TotalCosts = S#electionState.totalCosts,
 	Winner_Partecipant = findBestResult(TotalCosts),
-	Winner_Data = #election_result_to_car{id_winner = Winner_Partecipant#electionCostData.pid_source,
-										id_app_user = S#electionState.pidAppUser
-										},
-	ID_Winner = Winner_Data#election_result_to_car.id_winner,
-	My_Pid = S#electionState.pidCar,
-	if
-		My_Pid == ID_Winner ->
-			_ID_APP_User = Winner_Data#election_result_to_car.id_app_user,
-			% creo i record per la coda
-			% aggiorno la coda movement all'automa
-			print_debug_message(S#electionState.pidCar, "I Won Election", []);
-		true ->
-			ok
-	end,
-	FuncMap_2 = fun(Child) -> Child#carPartecipate.refCar end,
-	Pids_To_notify = lists:map(FuncMap_2, S#electionState.childrenPartecipate),
-
-	sendMessage(Pids_To_notify, {winning_results, Winner_Data}, S),
+	Winner_Data = #election_result_to_car  {id_winner = Winner_Partecipant#electionCostData.pid_source,
+											id_app_user = S#electionState.pidAppUser
+											},
+	manage_winner_data(Winner_Data, S),
 	sendToListener({election_results, [Winner_Data]}, S),
     keep_state_and_data;
 
@@ -385,21 +355,8 @@ waiting_final_results(info, {_From, tick}, _Stato) ->
 
 waiting_final_results(cast, {winning_results, Data}, S) -> 
 	%print_debug_message(S#electionState.pidCar, "Waiting For Election Results", []),
-	ID_Winner = Data#election_result_to_car.id_winner,
-	My_Pid = S#electionState.pidCar,
-	if
-		My_Pid == ID_Winner ->
-			_ID_APP_User = Data#election_result_to_car.id_app_user;
-			% creo i record per la coda
-			% aggiorno la coda movement all'automa
-			%print_debug_message(S#electionState.pidCar, "I Won Election", []);
-		true ->
-			ok
-	end,
-	FuncMap_2 = fun(Child) -> Child#carPartecipate.refCar end,
-	Pids_To_notify = lists:map(FuncMap_2, S#electionState.childrenPartecipate),
-	sendMessage(Pids_To_notify, {winning_results, Data}, S),
-	sendToListener({election_results, Data}, S),
+	manage_winner_data(Data, S),
+	sendToListener({election_results, Data}, S),	
 	S1 = resetState(S),
 	%print_debug_message(S1#electionState.pidCar, "Back to Idle", []),
 	{next_state, idle, S1};
@@ -410,6 +367,28 @@ waiting_final_results(cast, {invite_result, _Data}, S) ->
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
+manage_winner_data(Winner_Data, S) ->
+	ID_Winner = Winner_Data#election_result_to_car.id_winner,
+	My_Pid = S#electionState.pidCar,
+	if
+		My_Pid == ID_Winner ->
+			_ID_APP_User = Winner_Data#election_result_to_car.id_app_user;
+			% creo i record per la coda
+			% aggiorno la coda movement all'automa
+			%print_debug_message(S#electionState.pidCar, "I Won Election", []);
+		true ->
+			ok
+	end,
+
+	Childrens = S#electionState.childrenPartecipate,
+	if Childrens =:= [] -> ok;
+			true ->
+				%% Notify Children
+				FuncMap = fun(Child) -> Child#carPartecipate.refCar end,
+				Pids_To_notify = lists:map(FuncMap, Childrens),
+				sendMessage(Pids_To_notify, {winning_results, Winner_Data}, S)
+	end.
+
 findBestResult(Results) ->
 	SortFun = fun(A, B) -> 
 		CostClient_A = A#electionCostData.cost_client, 
