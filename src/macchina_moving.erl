@@ -34,7 +34,7 @@ start(InitialPos, PidListener) ->
 					pathCol = [],
 					currentUser = none,
 					currentPos = InitialPos,
-					batteryLevel = 100,
+					batteryLevel = ?BATTERY_LEVEL_MAX,
 					mustCharge = false},
 	{ok, Pid} = gen_statem:start_link(?MODULE,State, []),
 	Pid.
@@ -130,7 +130,7 @@ idle(enter, _OldState, _State) ->
 	%printState(State),
 	keep_state_and_data;
 
-idle({call,From}, {getElectionData}, State) ->
+idle({call,From}, {getDataElection}, State) ->
 	Cost_To_last_Target = 0,
 	Current_Target = State#movingCarState.currentPos,
 	Battery_level = State#movingCarState.batteryLevel,
@@ -205,7 +205,7 @@ moving(internal, move, State) ->
 			end
 	end;
 
-moving({call,From}, {getElectionData}, State) ->
+moving({call,From}, {getDataElection}, State) ->
 	Cost_To_last_Target = State#movingCarState.costToLastDestination,
 	Current_Target = State#movingCarState.lastDestination,
 	Battery_level = State#movingCarState.batteryLevel,
@@ -232,7 +232,7 @@ movingToCharge(enter, _OldState, State) ->
 			keep_state_and_data
 	end;
 
-movingToCharge({call,From}, {getElectionData}, State) ->
+movingToCharge({call,From}, {getDataElection}, State) ->
 	Cost_To_last_Target = State#movingCarState.costToLastDestination,
 	Current_Target =  State#movingCarState.lastDestination,
 	Battery_level = State#movingCarState.batteryLevel,

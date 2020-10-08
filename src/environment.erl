@@ -171,7 +171,7 @@ handle_event(S, N) ->
 generate_taxi(Stato) ->
 	StartingPos = getRandomNode(Stato),
 	PidGpsServer = Stato#environmentState.pid_gps_server,
-	City_Map = Stato#environmentState.pid_gps_server,
+	City_Map = Stato#environmentState.city,
 	PidTaxi = macchina_ascoltatore:start({StartingPos, PidGpsServer, City_Map}),
 	NewCars = [PidTaxi] ++ Stato#environmentState.cars,
 	Total_Cars = Stato#environmentState.total_cars + 1,

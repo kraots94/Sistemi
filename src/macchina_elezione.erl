@@ -12,7 +12,6 @@ callback_mode() -> [state_functions, state_enter].
 -record(electionCostData, {pid_source, cost_client, charge_after_transport}).
 
 -record(electionState, {
-				currentMovingQueue,
 				pidCar,
 				pidMovingCar,
 				pidGps,
@@ -21,16 +20,12 @@ callback_mode() -> [state_functions, state_enter].
 				carsInvited,
 				total_cars_invited,
 				childrenPartecipate,
-				total_children_partecipate = 0,
-				selfCost,
+				total_children_partecipate,
 				childrenCosts,
 				cityMap,
-				tick_counter,
+				queueToManage,
 				currentRequest,
 				flag_initiator,
-				dijkstra_results,
-				battery_level,
-				total_tree_costs,
 				my_election_cost,
 				dataToSendPartecipate,
 				totalCosts}).
@@ -42,7 +37,6 @@ callback_mode() -> [state_functions, state_enter].
 start(PidMacchina, PidMovingCar, Pid_Gps_Car, City_Map) ->
 	State = #electionState {
 							pidAppUser = none,
-							currentMovingQueue = [],
 							pidCar = PidMacchina,
 							pidMovingCar = PidMovingCar,
 							pidGps = Pid_Gps_Car,
@@ -51,15 +45,11 @@ start(PidMacchina, PidMovingCar, Pid_Gps_Car, City_Map) ->
 							total_cars_invited = 0,
 							childrenPartecipate = [],
 							total_children_partecipate = 0,
-							selfCost = {-1 , -1},
 							childrenCosts = [],
 							cityMap = City_Map,
-						   	tick_counter = 0,
+							queueToManage = [],
 							currentRequest = {},
 							flag_initiator = false,
-							dijkstra_results = [],
-							battery_level = 0,
-							total_tree_costs = [],
 							my_election_cost = [],
 							dataToSendPartecipate = none,
 							totalCosts = []},
@@ -70,20 +60,14 @@ start(PidMacchina, PidMovingCar, Pid_Gps_Car, City_Map) ->
 resetState(S) ->
 	S#electionState {
 					pidAppUser = none,
-					currentMovingQueue = [],
 					parent = none,
 					carsInvited = [],
 					total_cars_invited = 0,
 					childrenPartecipate = [],
 					total_children_partecipate = 0,
-					selfCost = {-1 , -1},
 					childrenCosts = [],
-					tick_counter = 0,
 					currentRequest = {},
 					flag_initiator = false,
-					dijkstra_results = [],
-					battery_level = 0,
-					total_tree_costs = [],
 					my_election_cost = [],
 					dataToSendPartecipate = none,
 					totalCosts = []}.
@@ -114,10 +98,9 @@ idle(cast, {beginElection, Data}, S) ->
 	CloserCars = getDataFromAutomata(PID_GPS, {self(), getNearCars}),
 
 	%print_debug_message(Self_Pid, "Close Cars: ~w", [CloserCars]),
+	{My_Election_Cost, S1} = manage_self_cost(S, CurrentRequest),
 
-	My_Election_Cost= manage_self_cost(S, CurrentRequest),
-
-	S1 = S#electionState { 
+	S2 = S1#electionState { 
 		flag_initiator = true,
 		carsInvited = CloserCars,
 		pidAppUser = Pid_App_User,
@@ -127,16 +110,16 @@ idle(cast, {beginElection, Data}, S) ->
 	if CloserCars =:= [] -> 
 			%print_debug_message(Self_Pid, "No people to invite", none),
 
-			S2 = S1#electionState{totalCosts = My_Election_Cost},
-			{next_state, initiator_final_state, S2};
+			S3 = S2#electionState{totalCosts = My_Election_Cost},
+			{next_state, initiator_final_state, S3};
 		true ->  
 			%print_debug_message(Self_Pid, "All cars invited", none),
 			%print_debug_message(Self_Pid, "Waiting For: ~w", [CloserCars]),
 			
 			DataPartecipate = create_data_partecipate(Self_Pid, CurrentRequest, ?MAX_HOPES_ELECTION),
 			%invio partecipateElection ai vicini
-			S2 = S1#electionState{dataToSendPartecipate = DataPartecipate},
-			{next_state, running_election, S2} 
+			S3 = S2#electionState{dataToSendPartecipate = DataPartecipate},
+			{next_state, running_election, S3} 
 	end;
 
 idle(cast, {partecipateElection, Data}, S) ->
@@ -157,8 +140,8 @@ idle(cast, {partecipateElection, Data}, S) ->
 	CloserCars = lists:delete(Parent_Pid, CloserCars_All),
 	%print_debug_message(Self_Pid, "Close Cars: ~w", [CloserCars]),
 
-	My_Election_Cost = manage_self_cost(S, CurrentRequest),
-	S1 = S#electionState{currentRequest = CurrentRequest,
+	{My_Election_Cost, S1} = manage_self_cost(S, CurrentRequest),
+	S2 = S1#electionState{currentRequest = CurrentRequest,
 		parent = Parent_Pid,
 		carsInvited = CloserCars,
 		my_election_cost = My_Election_Cost
@@ -168,14 +151,14 @@ idle(cast, {partecipateElection, Data}, S) ->
 	%print_debug_message(Self_Pid, "Invited Cars: ~w", [CloserCars]),
 	if CloserCars =:= [] -> 
 			%mando i dati a mio padre
-			sendMessageElection(Parent_Pid, {costs_results, {Self_Pid, My_Election_Cost}}, S1),
+			sendMessageElection(Parent_Pid, {costs_results, {Self_Pid, My_Election_Cost}}, S2),
 			%aspetto i risultati
-			{next_state, waiting_final_results, S1};
+			{next_state, waiting_final_results, S2};
 		true ->  
 			%invio partecipateElection ai vicini
 			DataPartecipate = create_data_partecipate(Self_Pid, CurrentRequest, CurrentTTL - 1),
-			S2 = S1#electionState{dataToSendPartecipate = DataPartecipate},
-			{next_state, running_election, S2} 
+			S3 = S2#electionState{dataToSendPartecipate = DataPartecipate},
+			{next_state, running_election, S3} 
 	end.
 	
 %% ====================================================================
@@ -272,6 +255,8 @@ calculate_next_state_running_election(S) ->
 	if  (MissingAnswers =:= []) and (InvitedCars =:= []) -> 
 			ChildrenCosts = packChildrenCosts(Partecipans),
 			My_Election_Cost = S#electionState.my_election_cost,
+			print_debug_message(S#electionState.pidCar, "My_Election_Cost: ~w", My_Election_Cost),
+			print_debug_message(S#electionState.pidCar, "ChildrenCosts: ~w", ChildrenCosts),
 			TotalCosts = My_Election_Cost ++ ChildrenCosts,
 
 			if S#electionState.flag_initiator -> 
@@ -344,27 +329,30 @@ manage_self_cost(S, CurrentRequest) ->
 	Self_Pid = S#electionState.pidCar,
 	From = CurrentRequest#user_request.from,
 	To = CurrentRequest#user_request.to,
-	%Current_Last_Target
-	%Current_Cost_To_Last_Target
-	%NearestColumnNode
-	%Current_Battery_Level
-	%City_Graph
+	{Current_Cost_To_Last_Target, Current_Last_Target, Current_Battery_Level} = macchina_moving:getDataElection(S#electionState.pidMovingCar),
+	NearestCol = calculateNearestColumn(To),
 
-	%{Cost_To_Last_Target, Current_Last_Target, Battery_Level} = getDataFromAutomata(PID_MOV, {getDataElection}),
-	Battery_level = 200000,
-	Cost_To_Last_Target = 0,
-	Current_Last_Target = "hmmsii",
-	%%------------------------------------------------	
-	% Calcolo dei miei costi
-	NearestColumnTarget = calculateNearestColumn(To),
-	Dijkstra_Results = calculateDijkstra(Current_Last_Target, From, To, NearestColumnTarget),
-	{CC, CRDT, Can_Win} = calculateSelfCost(Dijkstra_Results, Battery_level, Cost_To_Last_Target, S),
-	%%------------------------------------------------
-	ElectionCosts = create_election_cost_data(Self_Pid, {CC, CRDT}),
-	My_Election_Cost = if Can_Win == i_can_win  -> [ElectionCosts];
-								true -> []
+	City_Graph = S#electionState.cityMap#city.city_graph,
+	City_Nodes = S#electionState.cityMap#city.nodes,
+	
+%	print_debug_message(Self_Pid, "My Graph Is: ~w", [City_Graph]),
+%	print_debug_message(Self_Pid, "My Nodes Are: ~w", [City_Nodes]),
+	
+	Points = {Current_Last_Target, From, To, NearestCol},
+	Battery_Avaiable = Current_Battery_Level - Current_Cost_To_Last_Target,
+	CityData = {City_Graph, City_Nodes},
+
+	{CC, CRDT, Can_Win, QueueCar} = calculateSelfCost(Points, Battery_Avaiable, CityData, Self_Pid),
+	Final_CC = CC + Current_Cost_To_Last_Target,
+	My_Election_Cost = if Can_Win == i_can_win  -> 
+										S1 = S#electionState{queueToManage = QueueCar},
+										ElectionCosts = create_election_cost_data(Self_Pid, {Final_CC, CRDT}),
+										%print_debug_message(Self_Pid, "My Costs Are: ~w", [ElectionCosts]),
+										[ElectionCosts];
+								true -> S1 = S,
+										[]
 				end,
-	My_Election_Cost.
+	{My_Election_Cost, S1}.
 
 create_election_cost_data(Pid, {Cost_Client, Charge_After_Client}) ->
 	Results = #electionCostData{
@@ -386,12 +374,12 @@ manage_winner_data(Winner_Data, S) ->
 	if
 		ID_Winner == -1 -> ok;
 		My_Pid == ID_Winner ->
-			_ID_APP_User = Winner_Data#election_result_to_car.id_app_user;
+			print_debug_message(My_Pid, "I Won", none),
+			_ID_APP_User = Winner_Data#election_result_to_car.id_app_user,
 			% creo i record per la coda partendo dalle queue già calcolate in fase begin / partecipate
-
 			% li salvo nel mio stato
 			
-			%print_debug_message(S#electionState.pidCar, "I Won Election", none);
+			print_debug_message(My_Pid, "Current Queues: ~w", S#electionState.queueToManage);
 		true ->
 			ok
 	end,
@@ -455,25 +443,47 @@ loopReceive() ->
 %% Cost functions
 %% ====================================================================
 
-calculateSelfCost(_Data, _Battery_level, _Cost_To_Last_Target, _S) -> 
-	%print_debug_message(S#electionState.pidCar, "Battery Level: ~w", [Battery_level]),
-	CC = utilities:generate_random_number(100) - 50,
-	CRDT = utilities:generate_random_number(100) - 50,
-	RandomNumber = utilities:generate_random_number(2),
-	Can_Win = if RandomNumber == 1 -> i_can_win;
-							true -> i_can_not_win
-			end,
-	Out = {CC, CRDT, Can_Win},
-	Out.
+calculateSelfCost(Points, Battery_Avaiable, CityData, Self_Pid) -> 
+	print_debug_message(Self_Pid, "Calculating Self Cost", none),
+	print_debug_message(Self_Pid, "Points: ~w", Points),
+	print_debug_message(Self_Pid, "Battery: ~w", Battery_Avaiable),
 
-calculateDijkstra(_CurrentPosition, _From, _To, _NearestColumnTarget) -> [].
-
+	{P1, P2, P3, P4} = Points,
+	{Cost_P1_P2, Queue_P1_P2} = city_map:calculate_path(CityData, {P1, P2}),
+	RemainingCharge_P2 = Battery_Avaiable - Cost_P1_P2,
+	Out_Results = 
+		if  RemainingCharge_P2 < 0 -> 	
+				print_debug_message(Self_Pid, "I can not go To User Position", none),
+				{-1, -1, i_can_not_win, []};		
+			true -> 					
+				{Cost_P2_P3, Queue_P2_P3} = city_map:calculate_path(CityData, {P2, P3}),
+				RemainingCharge_P3 =  RemainingCharge_P2 -Cost_P2_P3,
+				if  RemainingCharge_P3 < 0 -> 	
+						print_debug_message(Self_Pid, "I can not go To Target Position", none),
+						{-1, -1, i_can_not_win, []};
+					true -> 					
+						{Cost_P3_P4, Queue_P3_P4} = city_map:calculate_path(CityData, {P3, P4}),
+						RemainingCharge_P4 = RemainingCharge_P3 -Cost_P3_P4,
+						if  RemainingCharge_P4 < 0 -> 
+								print_debug_message(Self_Pid, "I can not go To Column Position", none),
+								{-1, -1, i_can_not_win, []};
+							true ->	
+								CC = Cost_P1_P2,
+								CRDT = Battery_Avaiable - Cost_P1_P2 - Cost_P2_P3,
+								QueueCar = [Queue_P1_P2, Queue_P2_P3, Queue_P3_P4],
+								{CC, CRDT, i_can_win, QueueCar}
+						end
+				end
+		end,
+		
+	print_debug_message(Self_Pid, "Out Resutlts: ~w", [Out_Results]),
+	Out_Results.
 
 %% ====================================================================
 %% Utilities functions
 %% ====================================================================
 
-calculateNearestColumn(_Node) -> "".
+calculateNearestColumn(_Node) -> "au".
 
 searchPartecipantInList(Partecipans, ToSearch) ->
 	Out = lists:filter(fun(X) -> (X#carPartecipate.refCar == ToSearch) end, Partecipans),

@@ -13,7 +13,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([init_city/0, delete_map/1, calculate_path/4]).
+-export([init_city/0, delete_map/1, calculate_path/2]).
 
 init_city() -> 
 	Map = load_map(),
@@ -24,35 +24,18 @@ init_city() ->
 	City.
 
 
-delete_map(_Map) -> ok.
+delete_map(_Map) -> %del_graph(City_Graph),.
+		ok.
 
 %% ====================================================================
-%% User -> Reference to user
-%% All three points are names in name format, not refs.
-%% P1 -> Position Car after served last user in queue
-%% P2 -> Position new user start
-%% P3 -> Position new user target
-%% P4 -> Position nearest column
-%% City -> City refs
-%% ====================================================================
-calculate_path(User, P1, P2, P3) -> 
-	City_Graph = get_map(),
-	Nodes = load_nodes(),
-	ID_P1 = getNodeID(P1, Nodes),
-	ID_P2 = getNodeID(P2, Nodes),
-	ID_P3 = getNodeID(P3, Nodes),
-%	ID_P4 = getClosestRecharchingCol(ID_P3),
-	Out_Djsktra_P1 = dijkstra:run(City_Graph, ID_P1),
-	Out_Djsktra_P2 = dijkstra:run(City_Graph, ID_P2),
-%	Out_Djsktra_P3 = dijkstra:run(City_Graph, ID_P3),
+calculate_path(CityData, {P, Q}) -> 
+	{City_Graph, Nodes} = CityData,
+	ID_P = getNodeID(P, Nodes),
+	ID_Q = getNodeID(Q, Nodes),
+	Out_Djsktra_P = dijkstra:run(City_Graph, ID_P),
 	EdgesWeights = edges_with_weights(City_Graph),
-	Queue_Car_User = calculate_path_costs(EdgesWeights, Out_Djsktra_P1,ID_P1, ID_P2),
-	Queue_User_Target = calculate_path_costs(EdgesWeights, Out_Djsktra_P2,ID_P2, ID_P3),
-%	Queue_Target_Column = calculate_path_costs(EdgesWeights, Out_Djsktra_P2,ID_P3, ID_P4),
-	Queue_Target_Column = {0, []},
-	Out_Records = create_records(User, Nodes, Queue_Car_User, Queue_User_Target, Queue_Target_Column),
-	del_graph(City_Graph),
-	Out_Records.
+	Queue_Car_P_Q = calculate_path_costs(EdgesWeights, Out_Djsktra_P,ID_P, ID_Q),
+	Queue_Car_P_Q.
 
 %% ====================================================================
 %% Internal functions
