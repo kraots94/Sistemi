@@ -2,7 +2,7 @@
 -compile(export_all).
 -behaviour(gen_statem).
 -import('send', [send_message/2, send_message/3]).
--import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3]).
+-import('utilities', [println/1, println/2, prinprint_debug_message/1, print_debug_message/2, print_debug_message/3]).
 -include("globals.hrl").
 -include("records.hrl").
 
@@ -79,7 +79,7 @@ idle(cast, {send_requestNoElection, Request}, State) ->
 	keep_state_and_data;
 
 idle(cast, taxiServingYou, State) ->
-	print_debug_message(self(), "Taxi ~w is serving me", [State#userState.picCarServing]),
+	println("taxi serving me"),
 	{next_state, waiting_car, State}.
 
 waiting_election(enter, _OldState, _Stato) -> 
@@ -106,7 +106,7 @@ waiting_election(cast, {winner, Data}, Stato) ->
 waiting_car(enter, _OldState, _Stato) -> keep_state_and_data;
 
 waiting_car(cast, arrivedUserPosition, State) ->
-	print_debug_message(self(), "Taxi ~w is arrived to my node", [State#userState.picCarServing]),
+	println("taxi arrived to me"),
 	{next_state, moving, State};
 	
 ?HANDLE_COMMON.
@@ -118,7 +118,7 @@ waiting_car(cast, arrivedUserPosition, State) ->
 moving(enter, _OldState, _Stato) -> keep_state_and_data;
 
 moving(cast, arrivedTargetPosition, State) ->
-	print_debug_message(self(), "I'm in Target Position", []),
+	println("target position reached"),
 	{next_state, ending, State};
 
 %moving(cast, {changeDest, _NewDest}, _State) ->
@@ -130,7 +130,7 @@ moving(cast, arrivedTargetPosition, State) ->
   
 ending(enter, _OldState, State) ->
 	deletePosGps(State),
-	print_debug_message(self(), "I'm dying", []),
+	println("I'm dying..."),
 	%codice per la morte qua
 	keep_state_and_data.
 

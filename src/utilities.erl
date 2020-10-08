@@ -9,6 +9,7 @@
 %% ====================================================================
 -export([println/1, 
 		 println/2, 
+		 printList/2,
 		 print_debug_message_raw/1,
 		 print_debug_message/1,
 		 print_debug_message/2,
@@ -19,12 +20,17 @@
 		 createPairsFromList/1]).
 
 %print normal text
+%print normal text
 println(String) ->
 	io:format(String ++ "~n", []).
 
 %print text e variabile
 println(String,Var) ->
 	io:format(String ++ " ~p~n" , [Var]).
+
+%print list
+printList(String,List) -> 
+	io:format(String ++ " ~w~n" , [List]).
 
 print_debug_message_raw(Text) -> io:format(Text).
 print_debug_message(Message) -> print_debug_message("", Message, none).
