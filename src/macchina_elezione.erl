@@ -98,127 +98,78 @@ idle(enter, _OldState, _State) ->
 idle(info, {_From, tick}, _Stato) ->
 	keep_state_and_data; %per ora non fare nulla
 
-idle(cast, {beginElection, Data}, S) ->
-	%print_debug_message(S#electionState.pidCar, "Begin Election", []),
-	% Update State
-	S1 = S#electionState { currentRequest = Data#dataElectionBegin.request,
-							pidAppUser =  Data#dataElectionBegin.pidAppUser},
+idle(cast, {beginElection, Data}, S) ->   
+	CurrentRequest =  Data#dataElectionBegin.request,
+	Pid_App_User = Data#dataElectionBegin.pidAppUser,
 
-%%% Recupero dati da altri automi della macchina
-	PID_GPS = S1#electionState.pidGps,
+	%%% Recupero dati da altri automi della macchina
+	Self_Pid = S#electionState.pidCar,
+	PID_GPS = S#electionState.pidGps,
 	CloserCars = getDataFromAutomata(PID_GPS, {self(), getNearCars}),
 
 	%print_debug_message(S#electionState.pidCar, "Close Cars: ~w", [CloserCars]),
 	
-	%{Cost_To_Last_Target, Current_Last_Target, Battery_Level} = getDataFromAutomata(PID_MOV, {getDataElection}),
-	Battery_level = 200000,
-	Cost_To_Last_Target = 0,
-	Current_Last_Target = "hmmsii",
-%%------------------------------------------------
-										
-	From = S1#electionState.currentRequest#user_request.from,
-	To = S1#electionState.currentRequest#user_request.to,
-
-	% Calcolo dei miei costi
-	From = S1#electionState.currentRequest#user_request.from,
-	To = S1#electionState.currentRequest#user_request.to,
-	NearestColumnTarget = calculateNearestColumn(To),
-	Dijkstra_Results = calculateDijkstra(Current_Last_Target, From, To, NearestColumnTarget),
-	{CC, CRDT} = calculateSelfCost(Dijkstra_Results, Battery_level, Cost_To_Last_Target, S),
-	%%------------------------------------------------
-
-	S2 = S1#electionState { 
+    SelfCost =  manage_self_cost(S, CurrentRequest),
+	S1 = S#electionState { 
 		flag_initiator = true,
 		carsInvited = CloserCars,
-		selfCost = {CC, CRDT}
+        selfCost = SelfCost,
+        pidAppUser = Pid_App_User
 	},
 
-	if S2#electionState.carsInvited =:= [] -> 
-		%print_debug_message(S2#electionState.pidCar, "No people to invite", []),
-		{Cost_Client, Charge_After_Client} = S2#electionState.selfCost,
-		Results = #electionCostData{
-						pid_source = S2#electionState.pidCar, 
-						cost_client = Cost_Client, 
-						charge_after_transport = Charge_After_Client},
-		%aspetto i risultati
-		S3 = S2#electionState{totalCosts = [Results]},
-		{next_state, initiator_final_state, S3};
-	true ->  
-		%print_debug_message(S2#electionState.pidCar, "All cars invited", []),
-		%print_debug_message(S2#electionState.pidCar, "Waiting For: ~w", [S2#electionState.carsInvited]),
-		
-		%invio partecipateElection ai vicini
-		DataPartecipate = #dataElectionPartecipate{
-				pidParent = S2#electionState.pidCar,
-				request = S2#electionState.currentRequest,
-				ttl =  ?MAX_HOPES_ELECTION},
-		S3 = S2#electionState{dataToSendPartecipate = DataPartecipate},
-		{next_state, running_election, S3} 
+	if CloserCars =:= [] -> 
+			%print_debug_message(S2#electionState.pidCar, "No people to invite", []),
+			ElectionCosts = create_election_cost_data(Self_Pid, SelfCost),
+			S2 = S1#electionState{totalCosts = [ElectionCosts]},
+			{next_state, initiator_final_state, S2};
+		true ->  
+			%print_debug_message(S2#electionState.pidCar, "All cars invited", []),
+			%print_debug_message(S2#electionState.pidCar, "Waiting For: ~w", [S2#electionState.carsInvited]),
+			
+			DataPartecipate = create_data_partecipate(Self_Pid, CurrentRequest, ?MAX_HOPES_ELECTION),
+			%invio partecipateElection ai vicini
+			S2 = S1#electionState{dataToSendPartecipate = DataPartecipate},
+			{next_state, running_election, S2} 
 	end;
 
 idle(cast, {partecipateElection, Data}, S) ->
-	%print_debug_message(S#electionState.pidCar, "Partecipate Election", []),
-	% Update State
-	S1 = S#electionState{currentRequest = Data#dataElectionPartecipate.request,
-						parent = Data#dataElectionPartecipate.pidParent},
+	CurrentRequest = Data#dataElectionPartecipate.request,
+	Parent_Pid = Data#dataElectionPartecipate.pidParent,	CurrentTTL = Data#dataElectionPartecipate.ttl,
 
-	Parent_Pid = S1#electionState.parent,
-	sendMessageElection(Parent_Pid, {invite_result, {S1#electionState.pidCar, i_can_join}}, S1),
-
-	CurrentTTL = Data#dataElectionPartecipate.ttl,
-
+	Self_Pid = S#electionState.pidCar,
+	sendMessageElection(Parent_Pid, {invite_result, {Self_Pid, i_can_join}}, S),
+	
 	%%% Recupero dati da altri automi della macchina
-	PID_GPS = S1#electionState.pidGps,
-	_PID_MOV = -1,
+	PID_GPS = S#electionState.pidGps,
 	CloserCars_All = if CurrentTTL > 0 -> 
 							getDataFromAutomata(PID_GPS, {self(), getNearCars}); 
 						true -> 
 							[] 
 					end,
 
-	%{Cost_To_Last_Target, Current_Last_Target, Battery_Level} = getDataFromAutomata(PID_MOV, {getDataElection}),
-	Battery_level = 200000,
-	Cost_To_Last_Target = 0,
-	Current_Last_Target = "hmmsii",
-	%%------------------------------------------------	
-
-	CloserCars = lists:delete(S1#electionState.parent, CloserCars_All),
+	CloserCars = lists:delete(Parent_Pid, CloserCars_All),
 	%print_debug_message(S#electionState.pidCar, "Close Cars: ~w", [CloserCars]),
 
-% Calcolo dei miei costi
-	From = S1#electionState.currentRequest#user_request.from,
-	To = S1#electionState.currentRequest#user_request.to,
-	NearestColumnTarget = calculateNearestColumn(To),
-	Dijkstra_Results = calculateDijkstra(Current_Last_Target, From, To, NearestColumnTarget),
-	{CC, CRDT} = calculateSelfCost(Dijkstra_Results, Battery_level, Cost_To_Last_Target, S),
-%%------------------------------------------------
-
-	S2 = S1#electionState { 
+	SelfCost =  manage_self_cost(S, CurrentRequest),
+	S1 = S#electionState{currentRequest = CurrentRequest,
+		parent = Parent_Pid,
 		carsInvited = CloserCars,
-		selfCost = {CC, CRDT}
+		selfCost = SelfCost
 	},
 
 	%print_debug_message(S2#electionState.pidCar, "Current Parent Election: ~w", [S2#electionState.parent]),
 	%print_debug_message(S2#electionState.pidCar, "Invited Cars: ~w", [S2#electionState.carsInvited]),
-	if S2#electionState.carsInvited =:= [] -> 
+	if CloserCars =:= [] -> 
 			%mando i dati a mio padre
-			{Cost_Client, Charge_After_Client} = S2#electionState.selfCost,
-			Results = #electionCostData{
-							pid_source = S2#electionState.pidCar, 
-							cost_client = Cost_Client, 
-							charge_after_transport = Charge_After_Client},
-
-			sendMessageElection(S2#electionState.parent, {costs_results, {S2#electionState.pidCar, [Results]}}, S2),
+			ElectionCosts = create_election_cost_data(Self_Pid, SelfCost),
+			sendMessageElection(Parent_Pid, {costs_results, {Self_Pid, [ElectionCosts]}}, S1),
 			%aspetto i risultati
-			{next_state, waiting_final_results, S2};
+			{next_state, waiting_final_results, S1};
 		true ->  
 			%invio partecipateElection ai vicini
-			DataPartecipate = #dataElectionPartecipate{
-					pidParent = S2#electionState.pidCar,
-					request = S2#electionState.currentRequest,
-					ttl = CurrentTTL - 1},
-			S3 = S2#electionState{dataToSendPartecipate = DataPartecipate},
-			{next_state, running_election, S3} 
+			DataPartecipate = create_data_partecipate(Self_Pid, CurrentRequest, CurrentTTL - 1),
+			S2 = S1#electionState{dataToSendPartecipate = DataPartecipate},
+			{next_state, running_election, S2} 
 	end.
 	
 %% ====================================================================
@@ -367,6 +318,37 @@ waiting_final_results(cast, {invite_result, _Data}, S) ->
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
+
+manage_self_cost(S, CurrentRequest) ->
+	From = CurrentRequest#user_request.from,
+	To = CurrentRequest#user_request.to,
+
+	%{Cost_To_Last_Target, Current_Last_Target, Battery_Level} = getDataFromAutomata(PID_MOV, {getDataElection}),
+	Battery_level = 200000,
+	Cost_To_Last_Target = 0,
+	Current_Last_Target = "hmmsii",
+	%%------------------------------------------------	
+	% Calcolo dei miei costi
+	NearestColumnTarget = calculateNearestColumn(To),
+	Dijkstra_Results = calculateDijkstra(Current_Last_Target, From, To, NearestColumnTarget),
+	SelfCosts = calculateSelfCost(Dijkstra_Results, Battery_level, Cost_To_Last_Target, S),
+	%%------------------------------------------------
+	SelfCosts.
+
+create_election_cost_data(Pid, {Cost_Client, Charge_After_Client}) ->
+	Results = #electionCostData{
+		pid_source = Pid, 
+		cost_client = Cost_Client, 
+		charge_after_transport = Charge_After_Client},
+	Results.
+
+create_data_partecipate(PidParent, Request, TTL) ->
+	DataPartecipate = #dataElectionPartecipate{
+		pidParent = PidParent,
+		request = Request,
+		ttl = TTL},
+	DataPartecipate.
+
 manage_winner_data(Winner_Data, S) ->
 	ID_Winner = Winner_Data#election_result_to_car.id_winner,
 	My_Pid = S#electionState.pidCar,
@@ -436,7 +418,10 @@ loopReceive() ->
 
 calculateSelfCost(_Data, _Battery_level, _Cost_To_Last_Target, _S) -> 
 	%print_debug_message(S#electionState.pidCar, "Battery Level: ~w", [Battery_level]),
-	{utilities:generate_random_number(100), utilities:generate_random_number(100)}.
+	CC = utilities:generate_random_number(100),
+	CRDT = utilities:generate_random_number(100),
+	Out = {CC, CRDT},
+	Out.
 
 calculateDijkstra(_CurrentPosition, _From, _To, _NearestColumnTarget) -> [].
 

@@ -108,7 +108,7 @@ handle_common({call,From}, {getBattery}, OldState, State) ->
 	Battery = State#movingCarState.batteryLevel,
 	{next_state, OldState, State, [{reply,From,Battery}]}.
 
-idle(enter, _OldState, State) ->
+idle(enter, _OldState, _State) ->
 	print_debug_message(self(), "Sono in idle", []),
 	%printState(State),
 	keep_state_and_data;
