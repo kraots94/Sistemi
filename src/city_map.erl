@@ -1,7 +1,6 @@
 %% @author Alessandro
 %% @doc @todo Add description to city_map.
 
-
 -module(city_map).
 -include("records.hrl").
 -include("globals.hrl").

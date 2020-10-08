@@ -30,19 +30,20 @@ callback_mode() -> [state_functions, state_enter].
 				dijkstra_results,
 				battery_level,
 				total_tree_costs,
-				dataToSendPartecipate}).
+				dataToSendPartecipate,
+				totalCosts}).
 
 %% ====================================================================
 %% API functions
 %% ====================================================================
 
-start(PidMacchina,PidMovingCar, PidWifi,City_Map) ->
+start(PidMacchina, PidMovingCar, Pid_Gps_Car, City_Map) ->
 	State = #electionState {
 							pidAppUser = none,
 							currentMovingQueue = [],
 							pidCar = PidMacchina,
 							pidMovingCar = PidMovingCar,
-							pidGps = PidWifi,
+							pidGps = Pid_Gps_Car,
 							parent = none,
 							carsInvited = [],
 							childrenPartecipate = [],
@@ -56,7 +57,8 @@ start(PidMacchina,PidMovingCar, PidWifi,City_Map) ->
 							dijkstra_results = [],
 							battery_level = 0,
 							total_tree_costs = [],
-							dataToSendPartecipate = none},
+							dataToSendPartecipate = none,
+							totalCosts = []},
 
 	{ok, Pid} = gen_statem:start_link(?MODULE,State, []),
 	Pid.
@@ -77,13 +79,18 @@ resetState(S) ->
 					dijkstra_results = [],
 					battery_level = 0,
 					total_tree_costs = [],
-					dataToSendPartecipate = none}.
+					dataToSendPartecipate = none,
+					totalCosts = []}.
 %% ====================================================================
 %% Automata Functions
 %% ====================================================================
 
 init(State) ->
 	{ok, idle, State}.
+	
+%% ====================================================================
+%% Idle States functions
+%% ====================================================================
 
 idle(enter, _OldState, _State) ->
 	keep_state_and_data;
@@ -134,8 +141,8 @@ idle(cast, {beginElection, Data}, S) ->
 						cost_client = Cost_Client, 
 						charge_after_transport = Charge_After_Client},
 		%aspetto i risultati
-		calculate_final_results([Results], S2),
-		{next_state, idle, S2};
+		S3 = S2#electionState{totalCosts = Results},
+		{next_state, initiator_final_state, S3};
 	true ->  
 		%print_debug_message(S2#electionState.pidCar, "All cars invited", []),
 		%print_debug_message(S2#electionState.pidCar, "Waiting For: ~w", [S2#electionState.carsInvited]),
@@ -214,6 +221,10 @@ idle(cast, {partecipateElection, Data}, S) ->
 			{next_state, running_election, S3} 
 	end.
 	
+%% ====================================================================
+%% Running Election States functions
+%% ====================================================================
+
 running_election (enter, _OldState, S) ->
 	%print_debug_message(S#electionState.pidCar, "Sending Invites to other cars", []),
 	sendInvitesPartecipation(S#electionState.carsInvited, S#electionState.dataToSendPartecipate, S),
@@ -245,7 +256,7 @@ running_election(cast, {invite_result, Data}, S) ->
 	MissingAnswers = lists:filter(FuncFilter, NewPartecipants),
 	%print_debug_message(S1#electionState.pidCar, "Missing Answers: ~w", [MissingAnswers]),
 	if  (MissingAnswers =:= []) and (NewInvited =:= []) -> 
-			ChildrenCosts = packChildrenCosts(NewPartecipants, []),
+			ChildrenCosts = packChildrenCosts(NewPartecipants),
 			{Cost_Client, Charge_After_Client} = S1#electionState.selfCost,
 			My_Results = #electionCostData{
 							pid_source = S1#electionState.pidCar, 
@@ -253,10 +264,8 @@ running_election(cast, {invite_result, Data}, S) ->
 							charge_after_transport = Charge_After_Client},
 			TotalCosts = [My_Results] ++ ChildrenCosts,
 			if S1#electionState.flag_initiator -> 
-					calculate_final_results(TotalCosts, S1),
-					S2 = resetState(S1),
-					%print_debug_message(S2#electionState.pidCar, "Back to Idle", []),
-					{next_state, idle, S2};
+					S2 = S1#electionState{totalCosts = TotalCosts},
+					{next_state, initiator_final_state, S2};
 				true -> 					
 					%print_debug_message(S1#electionState.pidCar, "Sending Costs To Parent", []),
 					sendMessageElection(S1#electionState.parent, {costs_results, {S1#electionState.pidCar, TotalCosts}}, S1),
@@ -315,7 +324,7 @@ running_election(cast, {costs_results, Data}, S) ->
 	MissingAnswers = lists:filter(FuncFilter, NewPartecipants),
 	%print_debug_message(S1#electionState.pidCar, "Missing Answers: ~w", [MissingAnswers]),
 	if  (MissingAnswers =:= []) and (NewInvited =:= []) -> 
-			ChildrenCosts = packChildrenCosts(NewPartecipants, []),
+			ChildrenCosts = packChildrenCosts(NewPartecipants),
 			{Cost_Client, Charge_After_Client} = S1#electionState.selfCost,
 			My_Results = #electionCostData{
 							pid_source = S1#electionState.pidCar, 
@@ -323,10 +332,8 @@ running_election(cast, {costs_results, Data}, S) ->
 							charge_after_transport = Charge_After_Client},
 			TotalCosts = [My_Results] ++ ChildrenCosts,
 			if S1#electionState.flag_initiator -> 
-					calculate_final_results(TotalCosts, S1),
-					S2 = resetState(S1),
-					%print_debug_message(S2#electionState.pidCar, "Back to Idle", []),
-					{next_state, idle, S2};
+					S2 = S1#electionState{totalCosts = TotalCosts},
+					{next_state, initiator_final_state, S2};
 				true -> 					
 					%print_debug_message(S1#electionState.pidCar, "Sending Costs To Parent", []),
 					sendMessageElection(S1#electionState.parent, {costs_results, {S1#electionState.pidCar, TotalCosts}}, S1),
@@ -336,8 +343,12 @@ running_election(cast, {costs_results, Data}, S) ->
 			{next_state, running_election, S1}	
 	end.
 
-calculate_final_results(DataTree, S) -> 
+%% ====================================================================
+%% Final States functions
+%% ====================================================================
+initiator_final_state(enter, _OldState ,S) ->
 	%print_debug_message(S#electionState.pidCar, "Calculating Final Results", []),
+	TotalCosts = S#electionState.totalCosts,
 	SortFun = fun(A, B) -> 
 		CostClient_A = A#electionCostData.cost_client, 
 		Final_Charge_A = A#electionCostData.charge_after_transport,  
@@ -347,7 +358,7 @@ calculate_final_results(DataTree, S) ->
 				true -> CostClient_A < CostClient_B
 		end
 	end,
-	Sorted_Data = lists:sort(SortFun, DataTree),
+	Sorted_Data = lists:sort(SortFun, TotalCosts),
 	
 % %print_debug_message(S#electionState.pidCar, "SortedData: ~w", [Sorted_Data]),
 	Winner_Partecipant = hd(Sorted_Data),
@@ -369,7 +380,11 @@ calculate_final_results(DataTree, S) ->
 	Pids_To_notify = lists:map(FuncMap_2, S#electionState.childrenPartecipate),
 
 	sendMessage(Pids_To_notify, {winning_results, Winner_Data}, S),
-	sendToListener({election_results, Winner_Data}, S).
+	sendToListener({election_results, Winner_Data}, S),
+	S2 = resetState(S),
+	{next_state, idle, S2};
+
+initiator_final_state(cast, _Data, S) -> {next_state, idle, S}.
 
 waiting_final_results (enter, _OldState, _State) ->
 	keep_state_and_data;
@@ -400,26 +415,10 @@ waiting_final_results(cast, {winning_results, Data}, S) ->
 
 waiting_final_results(cast, {invite_result, _Data}, S) -> 
 	{next_state, waiting_final_results, S}.
- 
-%running
-%-> wait_results
-%-> calculate_results
-%{election_data, Data}
-%Data = {election_results, {id_winner}} id_winner è da confrontare con IDCar
-%Data = {invite_result, {pidCar, i_can_join}}
-%Data = {invite_result, {pidCar, i_can_not_join}}
-%Data = {costs_results, [{pid_source, cost_client, charge_after_transport}]}
 
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
-calculateSelfCost(_Data, Battery_level, _Cost_To_Last_Target, S) -> 
-	%print_debug_message(S#electionState.pidCar, "Battery Level: ~w", [Battery_level]),
-	{utilities:generate_random_number(100), utilities:generate_random_number(100)}.
-
-calculateNearestColumn(_Node) -> "".
-
-calculateDijkstra(_CurrentPosition, _From, _To, _NearestColumnTarget) -> [].
 
 sendInvitesPartecipation([], _Data, _S) -> sendedAll;
 sendInvitesPartecipation([H | T], Data, S) -> 
@@ -447,6 +446,23 @@ loopReceive() ->
 		Data -> Data
 	end.
 
+%% ====================================================================
+%% Cost functions
+%% ====================================================================
+
+calculateSelfCost(_Data, _Battery_level, _Cost_To_Last_Target, _S) -> 
+	%print_debug_message(S#electionState.pidCar, "Battery Level: ~w", [Battery_level]),
+	{utilities:generate_random_number(100), utilities:generate_random_number(100)}.
+
+calculateDijkstra(_CurrentPosition, _From, _To, _NearestColumnTarget) -> [].
+
+
+%% ====================================================================
+%% Utilities functions
+%% ====================================================================
+
+calculateNearestColumn(_Node) -> "".
+
 searchPartecipantInList(Partecipans, ToSearch) ->
 	Out = lists:filter(fun(X) -> (X#carPartecipate.refCar == ToSearch) end, Partecipans),
 	if Out =:= [] -> {[], none};
@@ -455,8 +471,9 @@ searchPartecipantInList(Partecipans, ToSearch) ->
 			{El, ok}
 	end.
 
+packChildrenCosts(List) -> packCosts(List, []).	
 
-packChildrenCosts([], ACC) -> ACC;	
-packChildrenCosts([H | T ], ACC) -> 
+packCosts([], ACC) -> ACC;	
+packCosts([H | T ], ACC) -> 
 	NewACC = ACC ++ H#carPartecipate.costsCar,
-	packChildrenCosts(T, NewACC).
+	packCosts(T, NewACC).
