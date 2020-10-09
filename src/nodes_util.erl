@@ -19,7 +19,7 @@ load_nodes() ->
 	Nodes.
 
 load_charging_cols() -> 
-	{ok, IO} = file:open(?FILE_NODES, [read]),
+	{ok, IO} = file:open(?FILE_CHARGING_COLS, [read]),
 	{ok, [Total_Nodes]} = io:fread(IO, ">", "~d"),
 	Nodes = read_node([], Total_Nodes, IO),
 	Nodes.
