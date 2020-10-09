@@ -254,7 +254,7 @@ moving(cast, {crash}, State) ->
 	?HANDLE_COMMON.
 	  
 movingToCharge(enter, _OldState, _State) ->
-	keep_state_and_charge;
+	keep_state_and_data;
 
 movingToCharge({call,From}, {getDataElection}, State) ->
 	Cost_To_last_Target = State#movingCarState.costToLastDestination,
