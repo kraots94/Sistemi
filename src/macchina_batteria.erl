@@ -61,7 +61,7 @@ check_battery(internal, checkThresholds, Stato) ->
 		   			Stato#batteryState{columnPathEnabled = true};
 				  (BatteryLevel > ?BATTERY_LEVEL_LOW) and AlreadyEnabledColPath ->
 					Stato#batteryState{columnPathEnabled = false, notifiedChargedBat = false};
-				  (BatteryLevel >= ?BATTERY_LEVEL_MAX) and not(Notified)-> 
+				  (BatteryLevel > ?BATTERY_LEVEL_MAX) and not(Notified)-> 
 					macchina_moving:fullBattery(PidAttachedCar), %...e questo lo fa tornare in idle
 					Stato#batteryState{notifiedChargedBat = true};
 				  true -> Stato

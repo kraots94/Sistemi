@@ -97,8 +97,6 @@ handle_common({call,From}, {areYouBusy}, OldState, State) ->
 			end,
 	{next_state, OldState, State, [{reply,From,Reply}]};
 
-handle_common(cast, {charged}, _OldState, _State) ->
-	keep_state_and_data;
 		
 handle_common({call,From}, {getBattery}, OldState, State) ->
 	Battery = State#movingCarState.batteryLevel,
@@ -330,7 +328,6 @@ charging(enter, _OldState, State) ->
 charging(internal,charge, State) ->
 	ActualBat = State#movingCarState.batteryLevel,
 	NewStateCharged = State#movingCarState{batteryLevel = ActualBat + ?TICKS_TO_CHARGE},
-	printState(NewStateCharged),
 	{keep_state, NewStateCharged};
 
 charging(cast, {charged}, State) ->
