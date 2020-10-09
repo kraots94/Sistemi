@@ -15,8 +15,7 @@
 		 print_debug_message/2,
 		 print_debug_message/3, 
 		 calculateSquaredDistance/2, 
-		 generate_random_number/1,
-		 createRandomEntities/2, 
+		 generate_random_number/1, 
 		 createPairsFromList/1]).
 
 %print normal text
@@ -62,11 +61,6 @@ calculateSquaredDistance({Px, Py}, {Qx, Qy}) ->
 	SquaredDistance = Diff_1 * Diff_1 + Diff_2 * Diff_2,
 	SquaredDistance.
 
-createRandomEntities(PID_GPS_Server, N) ->
-	Nodes = nodes_util:load_nodes(),
-	City = city_map:init_city(),
-	createRandomEntity(PID_GPS_Server, Nodes, City, N, []).
-
 createPairsFromList(List) -> createPairs(List, []).
 
 % Generates a number 1 <= x <= MAX
@@ -78,13 +72,6 @@ generate_random_number(MAX) ->
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
-
-createRandomEntity(_PID_GPS_Server, _Nodes, _City, 0, ACC) -> ACC;
-createRandomEntity(PID_GPS_Server, Nodes, City, N, ACC) -> 
-	Pos = nodes_util:getRandomPositionName(Nodes),
-	PID_CAR = macchina_ascoltatore:start({Pos, PID_GPS_Server, City}),
-	NewACC = [PID_CAR] ++ ACC,
-	createRandomEntity(PID_GPS_Server, Nodes, City, N-1, NewACC).
 
 createPairs([], ACC) -> ACC;
 

@@ -20,8 +20,7 @@ callback_mode() -> [state_functions, state_enter].
 %% API functions
 %% ====================================================================
 
-start(InitialPos, PID_GPS_Server) ->
-	InitData = {InitialPos, PID_GPS_Server},
+start(InitData) ->
 	{ok, Pid} = gen_statem:start_link(?MODULE,InitData, []),
 	Pid.
 

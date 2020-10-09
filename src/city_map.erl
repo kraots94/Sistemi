@@ -15,7 +15,7 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([init_city/0, delete_map/1, calculate_path/2, get_nearest_col/3, create_records/5]).
+-export([init_city/0, calculate_path/2, get_nearest_col/3, create_records/5]).
 
 init_city() -> 
 	Map = load_map(),
@@ -25,9 +25,6 @@ init_city() ->
 				 nodes = load_nodes(),
 				 column_positions = load_charging_cols()},
 	City.
-
-delete_map(_Map) -> %del_graph(City_Graph),.
-		ok.
 
 calculate_path(CityData, {P, Q}) -> 
 	{City_Graph, Nodes} = CityData,

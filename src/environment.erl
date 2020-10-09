@@ -2,7 +2,7 @@
 
 -export([start_link/0, end_environment/1]).
 
--import('tick_server',[start_clock/2, end_clock/1]).
+-import('tick_server',[start_clock/1, end_clock/1]).
 -import('gps_server', [start_gps_server/1, end_gps_server/1]).
 -import('send', [send_message/2, send_message/3]).
 -import('city_map', [init_city/0]).
@@ -11,7 +11,7 @@
 
 -include("records.hrl").
 -include("globals.hrl").
-% stato environment:
+% State environment:
 
 -record(environmentState,  {cars,
 							total_cars,
@@ -50,7 +50,7 @@ end_environment(Pid) ->
 init() -> 
 	print_debug_message("Start Environment"),
 	City = init_city(),
-	Pid_Tick = start_clock(?TICKTIME, [self()]),
+	Pid_Tick = start_clock([self()]),
 	PID_server_gps = start_gps_server(City#city.nodes),
 	S = #environmentState{cars = [], 
 						  users = [], 
@@ -60,8 +60,7 @@ init() ->
 						  tick_s_pid = Pid_Tick, 
 						  pid_gps_server = PID_server_gps, 
 						  tick_counter = 0},
-	print_debug_message(self(), "Environment Created, state: ~w", [S]),
-
+	print_debug_message(self(), "Environment Created", none),
 	loop(S).
 
 loop(State) ->
@@ -69,29 +68,39 @@ loop(State) ->
 		{Pid, tot_nodes} -> 
 			Pid ! State#environmentState.city#city.total_nodes,
 			loop(State);
-		{_Pid, tick} -> CurrentTickCounter = State#environmentState.tick_counter,
-						NextTick = CurrentTickCounter + 1,
-						NewState =
-							if NextTick >= ?TICKS_EVENT -> 
-								  HandledState = handle_event(State, utilities:generate_random_number(100)),
-								  HandledState#environmentState{tick_counter = 0};
-							true -> 
-								State#environmentState{tick_counter = NextTick}
-							end,
-					    loop(NewState);
-		{_Pid, {event, N}} -> loop(handle_event(State, N));
+		{_Pid, tick} -> 
+			CurrentTickCounter = State#environmentState.tick_counter,
+			NextTick = CurrentTickCounter + 1,
+			NewState =
+				if NextTick >= ?TICKS_EVENT -> 
+						HandledState = handle_event(State, utilities:generate_random_number(100)),
+						HandledState#environmentState{tick_counter = 0};
+				true -> 
+					State#environmentState{tick_counter = NextTick}
+				end,
+			loop(NewState);
+		{_Pid, {event, N}} -> 
+			loop(handle_event(State, N));
 		{_Pid, {print, wireless_card}} -> 
-								State#environmentState.pid_gps_server ! {self(), {printState}},
-								loop(State);
+			State#environmentState.pid_gps_server ! {self(), {printState}},
+			loop(State);
 		{_Pid, {print, self}} -> 
-								print_debug_message(self(), "Environment State: ~w", [State]),
-								loop(State);
+			print_debug_message(self(), "Environment State: ~w", State),
+			loop(State);
+		{spawn, cars, N} -> 	
+			print_debug_message(self(), "Have to spawn ~w cars", [N]),
+			NewState = generate_multiple_cars(N, State),
+			loop(NewState);
+		{spawn, users, N} -> 
+			print_debug_message(self(), "Have to spawn ~w users", State),
+			NewState = generate_multiple_users(State, N),
+			loop(NewState);
         {Pid, Ref, terminate} ->
 			send_message(Pid, {Ref, ok}),
 			terminate(State),
 			print_debug_message(self(), "Exiting enviroment loop", []);
         Unknown ->
-			print_debug_message(self(), "Environment Received Unknown: ~p", [Unknown]),
+			print_debug_message(self(), "Environment Received Unknown: ~p", Unknown),
             loop(State)
     end.
 
@@ -102,64 +111,64 @@ loop(State) ->
 handle_event(S, N) ->
 	NewState = if 	
 	    % Nothing
-	    N < 0 ->  print_debug_message(self(), "Event: ~w", ["nothing happened"]),
+	    N < 0 ->  print_debug_message(self(), "Event: ~p", "nothing happened"),
 				  S;
 		% Spawn Car
-		N < 10 -> print_debug_message(self(), "Event: ~w", ["spawn car"]),
-				  generate_taxi(S);
+		N < 10 -> print_debug_message(self(), "Event: ~p", "spawn car"),
+				  generate_single_car(S);
 					
-	   	N < 15 -> print_debug_message(self(), "Event: ~w", ["nothing happened"]),
+	   	N < 15 -> print_debug_message(self(), "Event: ~p", "nothing happened"),
 				  S;
 
-		N < 25 -> print_debug_message(self(), "Event: ~w", ["spawn client"]),
-				  generate_user(S);
+		N < 25 -> print_debug_message(self(), "Event: ~p", "spawn client"),
+				  generate_single_user(S);
 	   	
-		N < 35 -> print_debug_message(self(), "Event: ~w", ["nothing happened"]),
-				  S;
-	   	
-		N < 45 -> print_debug_message(self(), "Event: ~w", ["client change target"]),
+		N < 35 -> print_debug_message(self(), "Event: ~p", "nothing happened"),
 				  S;
 	   	
-		N < 50 -> print_debug_message(self(), "Event: ~w", ["nothing happened"]),
+		N < 45 -> print_debug_message(self(), "Event: ~p", "client change target"),
 				  S;
 	   	
-		N < 60 -> print_debug_message(self(), "Event: ~w", ["car crash"]),
+		N < 50 -> print_debug_message(self(), "Event: ~p", "nothing happened"),
 				  S;
 	   	
-		N < 70 -> print_debug_message(self(), "Event: ~w", ["fix car"]),
+		N < 60 -> print_debug_message(self(), "Event: ~p", "car crash"),
+				  S;
+	   	
+		N < 70 -> print_debug_message(self(), "Event: ~p", "fix car"),
 				  S;
 		
-		N < 75 -> print_debug_message(self(), "Event: ~w", ["nothing happened"]),
+		N < 75 -> print_debug_message(self(), "Event: ~p", "nothing happened"),
 				  S;
 		
-		N < 77 -> print_debug_message(self(), "Event: ~w", ["add node to map"]),
+		N < 77 -> print_debug_message(self(), "Event: ~p", "add node to map"),
 				  S;
 		
-		N == 77 -> print_debug_message(self(), "Event: ~w", ["nothing happened"]),
+		N == 77 -> print_debug_message(self(), "Event: ~p", "nothing happened"),
 				  S;
 		
-		N < 80 -> print_debug_message(self(), "Event: ~w", ["add street to map"]),
+		N < 80 -> print_debug_message(self(), "Event: ~p", "add street to map"),
 				  S;
 		
-		N == 80 -> print_debug_message(self(), "Event: ~w", ["nothing happened"]),
+		N == 80 -> print_debug_message(self(), "Event: ~p", "nothing happened"),
 				  S;
 		
-		N < 83 -> print_debug_message(self(), "Event: ~w", ["remove node from map"]),
+		N < 83 -> print_debug_message(self(), "Event: ~p", "remove node from map"),
 				  S;
 		
-		N == 83 -> print_debug_message(self(), "Event: ~w", ["nothing happened"]),
+		N == 83 -> print_debug_message(self(), "Event: ~p", "nothing happened"),
 				  S;
 		
-		N < 86 -> print_debug_message(self(), "Event: ~w", ["remove street from map"]),
+		N < 86 -> print_debug_message(self(), "Event: ~p", "remove street from map"),
 				  S;
 		
-		N < 95 -> print_debug_message(self(), "Event: ~w", ["nothing happened"]),
+		N < 95 -> print_debug_message(self(), "Event: ~p", "nothing happened"),
 				  S;
 		
-		N < 100 -> print_debug_message(self(), "Event: ~w", ["remove car"]),
+		N < 100 -> print_debug_message(self(), "Event: ~p", "remove car"),
 				  S;
 		
-		true -> print_debug_message(self(), "Event: ~w", ["nothing happened"]),
+		true -> print_debug_message(self(), "Event: ~p", "nothing happened"),
 				  S
 	end,
 	NewState.
@@ -168,24 +177,44 @@ handle_event(S, N) ->
 %% Internal functions
 %% ====================================================================
 
-generate_taxi(Stato) ->
-	StartingPos = getRandomNode(Stato),
-	PidGpsServer = Stato#environmentState.pid_gps_server,
-	City_Map = Stato#environmentState.city,
-	PidTaxi = macchina_ascoltatore:start({StartingPos, PidGpsServer, City_Map}),
-	NewCars = [PidTaxi] ++ Stato#environmentState.cars,
-	Total_Cars = Stato#environmentState.total_cars + 1,
-	Stato#environmentState{cars = NewCars, total_cars = Total_Cars}.
+generate_multiple_cars(N, State) ->
+	Cars_Generated = generate_entities(State, N, fun generate_taxi/1, []),
+	NewCars = Cars_Generated ++ State#environmentState.cars,
+	Total_Cars = State#environmentState.total_cars + 1,
+	State#environmentState{cars = NewCars, total_cars = Total_Cars}.
 
-generate_user(Stato) ->
-	NodeStart = getRandomNode(Stato),
-	Request = generateUserRequest(Stato, NodeStart),
-	PidGpsServer = Stato#environmentState.pid_gps_server,
-	PidUtente = appUtente_flusso:start(NodeStart, PidGpsServer),
+generate_multiple_users(N, State) -> 
+	Users = generate_entities(State, N, fun generate_user/1, []),
+	NewUsers = Users ++ State#environmentState.users,
+	Total_Users = State#environmentState.total_users + 1,
+	State#environmentState{users = NewUsers, total_users = Total_Users}.
+	
+generate_single_car(State) ->
+	PidTaxi = generate_taxi(State),
+	NewCars = [PidTaxi] ++ State#environmentState.cars,
+	Total_Cars = State#environmentState.total_cars + 1,
+	State#environmentState{cars = NewCars, total_cars = Total_Cars}.
+
+generate_single_user(State) ->
+	PidUtente = generate_user(State),
+	NewUsers = [PidUtente] ++ State#environmentState.users,
+	Total_Users = State#environmentState.total_users + 1,
+	State#environmentState{users = NewUsers, total_users = Total_Users}.
+
+generate_taxi(State) ->
+	StartingPos = getRandomNode(State),
+	PidGpsServer = State#environmentState.pid_gps_server,
+	City_Map = State#environmentState.city,
+	PidTaxi = macchina_ascoltatore:start({StartingPos, PidGpsServer, City_Map}),
+	PidTaxi.
+
+generate_user(State) ->
+	NodeStart = getRandomNode(State),
+	Request = generateUserRequest(State, NodeStart),
+	PidGpsServer = State#environmentState.pid_gps_server,
+	PidUtente = appUtente_flusso:start({NodeStart, PidGpsServer}),
 	appUtente_flusso:sendRequest(PidUtente, Request),
-	NewUsers = [PidUtente] ++ Stato#environmentState.users,
-	Total_Users = Stato#environmentState.total_users + 1,
-	Stato#environmentState{users = NewUsers, total_users = Total_Users}.
+	PidUtente.
 
 % uccide l'orologio e gli automi delle macchine / utenti
 terminate(State) ->
@@ -193,12 +222,17 @@ terminate(State) ->
 	PID_server_gps = State#environmentState.pid_gps_server,
 	end_clock(PID_clock),
 	end_gps_server(PID_server_gps),
-%delete map
     ok.
 
 %% ====================================================================
 %% Utilities functions
 %% ====================================================================
+
+generate_entities(_State, 0, _GenerateFunc, PIDS) -> PIDS;
+generate_entities(State, N, GenerateFunc, PIDS) -> 
+	NewPid = GenerateFunc(State),	
+	New_Pids = [NewPid]	++ PIDS,
+	generate_entities(State, N-1, GenerateFunc, New_Pids).
 
 getRandomNode(S) -> 
 	Nodes = S#environmentState.city#city.nodes,
@@ -219,5 +253,5 @@ getRandomCar(S) ->
 	RandomCar = lists:nth(RandomN, Cars),
 	RandomCar.
 
-generateUserRequest(Stato, User_Position) ->
-	{User_Position, getRandomNode(Stato)}.
+generateUserRequest(State, User_Position) ->
+	{User_Position, getRandomNode(State)}.
