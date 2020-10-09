@@ -3,12 +3,13 @@
 
 
 -module(utilities).
-
+-include("globals.hrl").
 %% ====================================================================
 %% API functions
 %% ====================================================================
 -export([println/1, 
 		 println/2, 
+		 printList/2,
 		 print_debug_message_raw/1,
 		 print_debug_message/1,
 		 print_debug_message/2,
@@ -19,6 +20,7 @@
 		 createPairsFromList/1]).
 
 %print normal text
+%print normal text
 println(String) ->
 	io:format(String ++ "~n", []).
 
@@ -26,15 +28,26 @@ println(String) ->
 println(String,Var) ->
 	io:format(String ++ " ~p~n" , [Var]).
 
+%print list
+printList(String,List) -> 
+	io:format(String ++ " ~w~n" , [List]).
+
 print_debug_message_raw(Text) -> io:format(Text).
-print_debug_message(Message) -> print_debug_message("", Message, []).
+print_debug_message(Message) -> print_debug_message("", Message, none).
 print_debug_message(Format, Data) -> print_debug_message("", Format, Data).
 print_debug_message(PID, Format, Data) ->
 	if PID == "" -> 
-		   if Data == [] -> io:format("[Debug] " ++"~p"++"~n", [Format]);
-				true ->	io:format("[Debug] "++Format++"~n", Data)
+		   if Data == none -> 
+				  		io:format("[Debug] ~p ~n", [Format]);
+					true ->	
+						io:format("[Debug] "++Format++"~n", Data)
 		   end;
-		true -> io:format("[Debug] {~w} - "++Format++"~n", [PID, Data])
+		true -> 
+			if Data == none -> 
+					io:format("[Debug] {~w} - ~p ~n", [PID, Format]);
+				true ->	
+					io:format("[Debug] {~w} - "++Format++"~n", [PID, Data])
+			end	   
 	end.
 	
 
@@ -46,7 +59,8 @@ calculateSquaredDistance({Px, Py}, {Qx, Qy}) ->
 
 createRandomEntities(PID_GPS_Server, N) ->
 	Nodes = nodes_util:load_nodes(),
-	createRandomEntity(PID_GPS_Server, Nodes, N, []).
+	City = city_map:init_city(),
+	createRandomEntity(PID_GPS_Server, Nodes, City, N, []).
 
 createPairsFromList(List) -> createPairs(List, []).
 
@@ -60,12 +74,12 @@ generate_random_number(MAX) ->
 %% Internal functions
 %% ====================================================================
 
-createRandomEntity(_PID_GPS_Server,_Nodes, 0, ACC) -> ACC;
-createRandomEntity(PID_GPS_Server, Nodes, N, ACC) -> 
+createRandomEntity(_PID_GPS_Server, _Nodes, _City, 0, ACC) -> ACC;
+createRandomEntity(PID_GPS_Server, Nodes, City, N, ACC) -> 
 	Pos = nodes_util:getRandomPositionName(Nodes),
-	PID_CAR = macchina_ascoltatore:start({Pos, PID_GPS_Server, 0}),
+	PID_CAR = macchina_ascoltatore:start({Pos, PID_GPS_Server, City}),
 	NewACC = [PID_CAR] ++ ACC,
-	createRandomEntity(PID_GPS_Server, Nodes, N-1, NewACC).
+	createRandomEntity(PID_GPS_Server, Nodes, City, N-1, NewACC).
 
 createPairs([], ACC) -> ACC;
 

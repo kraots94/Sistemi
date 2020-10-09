@@ -1,6 +1,6 @@
 -module(environment).
 
--export([start_link/0, end_environment/1, getRandomCar/1]).
+-export([start_link/0, end_environment/1]).
 
 -import('tick_server',[start_clock/2, end_clock/1]).
 -import('gps_server', [start_gps_server/1, end_gps_server/1]).
@@ -13,30 +13,20 @@
 -include("globals.hrl").
 % stato environment:
 
--record(environmentState, {cars, 
+-record(environmentState,  {cars,
+							total_cars,
 							users, 
+							total_users,
 							city, 
 							tick_s_pid, 
 							pid_gps_server, 
 							tick_counter}).
+						
+%% ====================================================================
+%% API functions
+%% ====================================================================
 %%% Client API
 start_link() -> spawn_link(fun init/0).
-
-%%% Server functions
-init() -> 
-	print_debug_message("Start Environment"),
-	City = init_city(),
-	Pid_Tick = start_clock(?TICKTIME, [self()]),
-	PID_server_gps = start_gps_server(City#city.nodes),
-	S = #environmentState{cars = [], 
-						  users = [], 
-						  city = City, 
-						  tick_s_pid = Pid_Tick, 
-						  pid_gps_server = PID_server_gps, 
-						  tick_counter = 0},
-	print_debug_message(self(), "Environment Created, state: ~w", [S]),
-
-	loop(S).
 
 end_environment(Pid) ->
 	print_debug_message("Killing Environment"),
@@ -52,6 +42,27 @@ end_environment(Pid) ->
 	after 5000 ->
 		erlang:error(timeout)
 	end.
+
+%% ====================================================================
+%% Server functions
+%% ====================================================================
+
+init() -> 
+	print_debug_message("Start Environment"),
+	City = init_city(),
+	Pid_Tick = start_clock(?TICKTIME, [self()]),
+	PID_server_gps = start_gps_server(City#city.nodes),
+	S = #environmentState{cars = [], 
+						  users = [], 
+						  total_cars = 0,
+						  total_users = 0,
+						  city = City, 
+						  tick_s_pid = Pid_Tick, 
+						  pid_gps_server = PID_server_gps, 
+						  tick_counter = 0},
+	print_debug_message(self(), "Environment Created, state: ~w", [S]),
+
+	loop(S).
 
 loop(State) ->
     receive
@@ -84,7 +95,10 @@ loop(State) ->
             loop(State)
     end.
 
-%%% Private functions
+%% ====================================================================
+%% Handle Events functions
+%% ====================================================================
+
 handle_event(S, N) ->
 	NewState = if 	
 	    % Nothing
@@ -150,37 +164,28 @@ handle_event(S, N) ->
 	end,
 	NewState.
 
-getRandomNode(S) -> 
-	Nodes = S#environmentState.city#city.nodes,
-	NodeName = getRandomPositionName(Nodes),
-	NodeName.
+%% ====================================================================
+%% Internal functions
+%% ====================================================================
 
 generate_taxi(Stato) ->
 	StartingPos = getRandomNode(Stato),
-	PidWireless = Stato#environmentState.pid_gps_server,
-	PidTaxi = macchina_moving:start(StartingPos, PidWireless),
+	PidGpsServer = Stato#environmentState.pid_gps_server,
+	City_Map = Stato#environmentState.city,
+	PidTaxi = macchina_ascoltatore:start({StartingPos, PidGpsServer, City_Map}),
 	NewCars = [PidTaxi] ++ Stato#environmentState.cars,
-	Stato#environmentState{cars = NewCars}.
-
-generateUserRequest(Stato, User_Position) ->
-	{User_Position, getRandomNode(Stato)}.
-
-getRandomCar(S) ->
-	Cars = S#environmentState.cars,
-	Total_Cars = length(Cars),
-	RandomN = utilities:generate_random_number(Total_Cars),
-	RandomCar = lists:nth(RandomN, Cars),
-	RandomCar.
+	Total_Cars = Stato#environmentState.total_cars + 1,
+	Stato#environmentState{cars = NewCars, total_cars = Total_Cars}.
 
 generate_user(Stato) ->
 	NodeStart = getRandomNode(Stato),
 	Request = generateUserRequest(Stato, NodeStart),
-	PidEnv = self(),
-	PidWireless = Stato#environmentState.pid_gps_server,
-	PidUtente = appUtente_flusso:start(NodeStart, PidEnv, PidWireless),
+	PidGpsServer = Stato#environmentState.pid_gps_server,
+	PidUtente = appUtente_flusso:start(NodeStart, PidGpsServer),
 	appUtente_flusso:sendRequest(PidUtente, Request),
 	NewUsers = [PidUtente] ++ Stato#environmentState.users,
-	Stato#environmentState{users = NewUsers}.
+	Total_Users = Stato#environmentState.total_users + 1,
+	Stato#environmentState{users = NewUsers, total_users = Total_Users}.
 
 % uccide l'orologio e gli automi delle macchine / utenti
 terminate(State) ->
@@ -190,3 +195,29 @@ terminate(State) ->
 	end_gps_server(PID_server_gps),
 %delete map
     ok.
+
+%% ====================================================================
+%% Utilities functions
+%% ====================================================================
+
+getRandomNode(S) -> 
+	Nodes = S#environmentState.city#city.nodes,
+	NodeName = getRandomPositionName(Nodes),
+	NodeName.
+
+getRandomUser(S) -> 
+	Users = S#environmentState.cars,
+	TotalUsers = S#environmentState.total_users,
+	RandomN = utilities:generate_random_number(TotalUsers),
+	RandomUser = lists:nth(RandomN, Users),
+	RandomUser.
+
+getRandomCar(S) ->
+	Cars = S#environmentState.cars,
+	Total_Cars = S#environmentState.total_cars,
+	RandomN = utilities:generate_random_number(Total_Cars),
+	RandomCar = lists:nth(RandomN, Cars),
+	RandomCar.
+
+generateUserRequest(Stato, User_Position) ->
+	{User_Position, getRandomNode(Stato)}.

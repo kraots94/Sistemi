@@ -122,27 +122,44 @@ L'immagine \ref{fig:automi_macchina_various} rappresenta alcuni eventi globali p
 In questa sezione vengono discusse le comunicazioni tra le diverse componenti e gli algoritmi utilizzati all'interno del sistema.
 
 \subsection{Funzioni di costo delle macchine} \label{funzioni_di_costo_macchine}
-Per la scelta della macchina più adatta, vengono considerati i seguenti parametri.
+La scelta progettuale effettuata in questo aspetto è la seguente: un'unità di distanza viene percorsa con un'unità di batteria. Per questo motivo è possibile effettuare confronti e operazioni tra le misure delle distanze e delle cariche rimanenti. 
+Poiché si assume che una macchina possa avere zero o più utenti in coda, i costi ne tengono conto.
 
 \begin{itemize}
-	\item Crdt = Carica Rimanente Dopo Trasporto dell'utente.
-	\item Cc = Costo Cliente, esprime dopo quanto tempo la macchina raggiungerebbe il cliente.
-	\item Cr = Carica Rimanente espressa in unità di misura della distanza percorribile.
-	\item Prc = Percorso Rimanente Cliente espresso in unità di misura della distanza assumendo che il taxi sia occupato.
-	\item Pvcn = Percorso Verso Cliente Nuovo a partire dalla posizione dopo lo scorso cliente espresso in unità di misura della distanza.
-	\item Pvdc = Percorso Verso Destinazione Cliente a partire dalla posizione attuale del cliente espresso in unità di misura della distanza.
-	\item Pvcr = Percorso Verso Colonnina Ricarica per permettere alla macchina di ricaricarsi dopo il trasporto se necessario.
+	\item Crdt = Carica Rimanente Dopo Trasporto → carica della macchina restante dopo il trasporto dell'utente richiedente escludendo il successivo percorso verso la colonnina di ricarica.
+	
+	\item Cc = Costo Cliente → esprime dopo quanto tempo la macchina raggiungerebbe la posizione iniziale del cliente.
+	
+	\item Cr = Carica Rimanente → espressa in unità di misura della distanza percorribile, è la carica rimanente dopo i trasporti degli eventuali utenti in coda. Nel caso non siano presenti, essa è pari al valore attuale della batteria.
+	
+	\item Clt = Costo Last Target → Costo del percorso verso l'ultimo cliente presente nella coda della macchina. Se non ne è presente alcuno, esso vale zero.
+	
+	\item Pvcn = Percorso Verso Cliente Nuovo → percorso dalla posizione di arrivo dell'ultimo cliente in coda fino alla posizione di partenza del nuovo cliente. Nel caso non siano presenti utenti in coda, il punto di partenza è la posizione attuale della macchina.
+	
+	\item Pvdc = Percorso Verso Destinazione Cliente → percorso che parte dalla posizione attuale del cliente fino alla posizione di arrivo del cliente. 
+	
+	\item Pvcr = Percorso Verso Colonnina Ricarica → percorso che parte dalla posizione finale del cliente richiedente fino alla posizione della colonnina più vicina ad essa. 
+	
+	\item CTT = Costo Totale Trasporto → Il costo totale del trasporto compreso il nuovo cliente. Affiché una macchina possa gareggiare come vincitrice all'elezione, è necessario esso sia sempre inferiore alla batteria rimanente.
 \end{itemize}
 
-\begin{equation} \label{funzione_costo_raggiungimento_cliente}
-Cc = Prc + Pvcn
-\end{equation}
+Le relazioni che intercorrono tra le variabili appena definite sono le seguenti: 
+\begin{itemize}
+	\item  Carica rimanente dopo il trasporto. Essa viene calcolata seguendo questa formula.
+		\begin{equation} \label{carica_rimanente_trasporto}
+			Crdt = Cr - (Cc + Pvdc)
+		\end{equation}
+	\item Costo Cliente. Esso è il tempo necessario per raggiungere la posizione del cliente partendo dalla posizione attuale del taxi.
+		\begin{equation} \label{funzione_costo_raggiungimento_cliente}
+			Cc = CLT + Pvcn
+		\end{equation}
+	\item  Costo Totale Trasporto. Esso rappresenta quanto costa a una certa macchina il trasporto del cliente.
+		\begin{equation} \label{funzione_costo_totale_macchina}
+			CTT = CLT + Pvcn + Pvdc + Pvcr
+		\end{equation}
+\end{itemize}
 
-\begin{equation} \label{carica_rimanente_trasporto}
-Crdt = Cr - (Cc + Pvdc + Pvcr)
-\end{equation}
-
-La scelta della macchina, verrà effettuata minimizzando il tempo del cliente \ref{funzione_costo_raggiungimento_cliente} e, in caso di parità, massimizzando la carica rimanente dopo il trasporto \ref{carica_rimanente_trasporto}. Nel caso in cui non sia univoco il vincitore, la selezione diventa casuale tra i contendenti.
+La scelta della macchina, verrà effettuata minimizzando il tempo di arrivo nella posizione del cliente \ref{funzione_costo_raggiungimento_cliente} e, in caso di parità, massimizzando la carica rimanente dopo il trasporto \ref{carica_rimanente_trasporto}. Nel caso in cui non sia univoco il vincitore, la selezione diventa casuale tra i contendenti.
 
 \subsection{Pacchetti scambiati per l'elezione}\label{descrizione_pacchetto}
 Vengono utilizzati tre tipi di pacchetti per l'algoritmo di elezione:

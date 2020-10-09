@@ -14,7 +14,8 @@ callback_mode() -> [state_functions].
 							pidBattery,
 							pidElection,
 							pidGps,
-							pidClock}).
+							pidClock,
+							pidAppUser}).
 
 %% ====================================================================
 %% API functions
@@ -52,7 +53,8 @@ init(InitData) ->
 					pidBattery  = PidBattery,
 					pidElection = PidElection,
 					pidGps = PidGpsModule,
-					pidClock = PidClock
+					pidClock = PidClock,
+					pidAppUser = -1
 			},
 	%print_debug_message(self(), "Pids Created: ~w", [PidMoving, PidBattery, PidElection]),
 	{ok, idle, State}.
@@ -86,7 +88,8 @@ idle(cast, {beginElection, Data}, Stato) ->
 	NewData = #dataElectionBegin{request = Request, pidAppUser = PidAppUser},
 	PidElezione = Stato#taxiListenerState.pidElection,
 	gen_statem:cast(PidElezione, {beginElection,NewData}),
-	{next_state, listen_election, Stato};
+	S1 = Stato#taxiListenerState{pidAppUser = PidAppUser},
+	{next_state, listen_election, S1};
 
 %partecipate election ricevuto da altra macchina
 idle(cast, {partecipateElection, Data}, Stato) ->
@@ -125,18 +128,31 @@ listen_election(cast, {partecipateElection, Data}, _Stato) ->
 	keep_state_and_data;
 
 listen_election(cast, {election_results, Data}, Stato) ->
-	% notifico l'utente - to do
 %[Debug] {<0.10850.0>} - Listener - Winning Results: [{election_result_to_car,<0.10838.0>,<0.10856.0>}]
-	Pid_Car = Data#election_result_to_car.id_winner,
+	PidElezione = Stato#taxiListenerState.pidElection,
+	{DataToUse, Is_Initiator} = if is_list(Data) -> 
+													% Tolgo l'elezione dallo stato di calcolo
+													gen_statem:cast(PidElezione, {exit_final_state_initator}),
+													{hd(Data), true};
+											true -> {Data, false}
+								end,
 
-	if Pid_Car == self() -> 
-			Pid_User = Data#election_result_to_car.id_app_user,
-			DataToUser = #election_result_to_user{
-					id_car_winner = Pid_Car, 
-					time_to_wait = utilities:generate_random_number(100)
-				},
-			gen_statem:cast(Pid_User, {winner, DataToUser});
-		true -> ok
+	Pid_Car = DataToUse#election_result_to_car.id_winner,
+
+	if (Pid_Car == -1) and (Is_Initiator)-> % Avviso l'utente se non c'è un vincitore
+								notify_user_no_taxi(Stato#taxiListenerState.pidAppUser);
+					Pid_Car == self() -> 
+								gen_statem:cast(PidElezione, {sendMovingQueue}),
+								%% Update coda moving
+								PidMoving = Stato#taxiListenerState.pidMoving,
+								Pid_User = DataToUse#election_result_to_car.id_app_user,
+								TimeToUser = macchina_moving:getTimeToUser(PidMoving),
+								DataToUser = #election_result_to_user{
+										id_car_winner = Pid_Car, 
+										time_to_wait = TimeToUser
+									},
+								gen_statem:cast(Pid_User, {winner, DataToUser});
+					true -> ok
 	end,
 	%print_debug_message(self(), "Listener - Winning Results: ~w", [Data]),
 	{next_state, idle, Stato}.
@@ -159,3 +175,10 @@ initDataGpsModule(PidGpsServer,InitialPosition) ->
 							signal_power = ?GPS_MODULE_POWER, 
 							map_side = ?MAP_SIDE}.
 
+notify_user_no_taxi(PID) ->
+	Pid_User = PID,
+	DataToUser = #election_result_to_user{
+			id_car_winner = -1, 
+			time_to_wait = -1
+		},
+	gen_statem:cast(Pid_User, {winner, DataToUser}).

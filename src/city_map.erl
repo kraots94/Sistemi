@@ -1,7 +1,6 @@
 %% @author Alessandro
 %% @doc @todo Add description to city_map.
 
-
 -module(city_map).
 -include("records.hrl").
 -include("globals.hrl").
@@ -14,53 +13,34 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([init_city/0, delete_map/1, calculate_path/4]).
+-export([init_city/0, delete_map/1, calculate_path/2, get_nearest_col/2, create_records/5]).
 
 init_city() -> 
 	Map = load_map(),
 	City = #city{total_nodes = num_of_vertices(Map),
 				 total_edges = num_of_edges(Map),
 				 city_graph = Map,
-				 nodes = load_nodes()},
+				 nodes = load_nodes(),
+				 column_positions = load_cols()},
 	City.
 
+delete_map(_Map) -> %del_graph(City_Graph),.
+		ok.
 
-delete_map(_Map) -> ok.
-
-%% ====================================================================
-%% User -> Reference to user
-%% All three points are names in name format, not refs.
-%% P1 -> Position Car after served last user in queue
-%% P2 -> Position new user start
-%% P3 -> Position new user target
-%% P4 -> Position nearest column
-%% City -> City refs
-%% ====================================================================
-calculate_path(User, P1, P2, P3) -> 
-	City_Graph = get_map(),
-	Nodes = load_nodes(),
-	ID_P1 = getNodeID(P1, Nodes),
-	ID_P2 = getNodeID(P2, Nodes),
-	ID_P3 = getNodeID(P3, Nodes),
-%	ID_P4 = getClosestRecharchingCol(ID_P3),
-	Out_Djsktra_P1 = dijkstra:run(City_Graph, ID_P1),
-	Out_Djsktra_P2 = dijkstra:run(City_Graph, ID_P2),
-%	Out_Djsktra_P3 = dijkstra:run(City_Graph, ID_P3),
+calculate_path(CityData, {P, Q}) -> 
+	{City_Graph, Nodes} = CityData,
+	ID_P = getNodeID(P, Nodes),
+	ID_Q = getNodeID(Q, Nodes),
+	Out_Djsktra_P = dijkstra:run(City_Graph, ID_P),
 	EdgesWeights = edges_with_weights(City_Graph),
-	Queue_Car_User = calculate_path_costs(EdgesWeights, Out_Djsktra_P1,ID_P1, ID_P2),
-	Queue_User_Target = calculate_path_costs(EdgesWeights, Out_Djsktra_P2,ID_P2, ID_P3),
-%	Queue_Target_Column = calculate_path_costs(EdgesWeights, Out_Djsktra_P2,ID_P3, ID_P4),
-	Queue_Target_Column = {0, []},
-	Out_Records = create_records(User, Nodes, Queue_Car_User, Queue_User_Target, Queue_Target_Column),
-	del_graph(City_Graph),
-	Out_Records.
+	Queue_Car_P_Q = calculate_path_costs(EdgesWeights, Out_Djsktra_P,ID_P, ID_Q),
+	Queue_Car_P_Q.
+
+get_nearest_col(_P, _Columns_Positions) -> "aa".
 
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
-get_map() ->
-	load_map().
-	
 load_map() ->
 	City_Map = graph:from_file(?FILE_MAP),
 	City_Map.
@@ -83,15 +63,17 @@ createCosts([{A,B} | T], ACC, EdgesWeights) ->
 % {TOTAL_COST, [{0,4}, {9, 6}, {6, 5}, {5, 2}]}
 % {TOTAL_COST, [{0,4}, {9, 6}, {6, 5}, {5, 2}]}
 % {TOTAL_COST, [{0,4}, {9, 6}, {6, 5}, {5, 2}]}
-% user_start, user_target, intermediate, column_path, column_end
-% {[Costo P1-P2, P2-P3, P3-Colonnina], [tappe]}
-%{[20,1,1],[{user, 0,"aabb", "partenza_taxi"}, {9, 6}, {6, 5}, {5, 2}]}
+% user_start, user_target, intermediate, column (nodo posizione colonnina)
+% {{Cost_To_Target, [Tappe]}, {Cost_To_Column, [Tappe]}}
 create_records(User, Nodes, Queue_Car_User, Queue_User_Target, Queue_Target_Column) ->
 	{Cost_1, Queue_1} = Queue_Car_User,
 	{Cost_2, Queue_2} = Queue_User_Target,
-	{Cost_3, _Queue_3} = Queue_Target_Column,
-	Total_Costs = [Cost_1, Cost_2, Cost_3],
-	{Total_Costs, createRecordToUser(Queue_1, User, Nodes, []) ++ createRecordToTarget(Queue_2, User, Nodes, [])}.
+	{Cost_3, Queue_3} = Queue_Target_Column,
+	Cost_To_Target = Cost_1 + Cost_2,
+	Cost_To_Column = Cost_3,
+	Queue_To_User_Dest = createRecordToUser(Queue_1, User, Nodes, []) ++ createRecordToTarget(Queue_2, User, Nodes, []),
+	Queue_To_Column =  createRecordToColumn(Queue_3, Nodes, []),
+	{{Cost_1, Cost_2, Cost_3}, Queue_To_User_Dest, Queue_To_Column}.
 
 % user_start, user_target, intermediate, column_path, column_end, none
 %-record(tappa, {user, type, t, node_name}).
@@ -132,3 +114,23 @@ createRecordToTarget([H | T], Username, Nodes, ACC) ->
 
    NewACC = ACC ++ [NewTappa],
 	createRecordToTarget(T, Username, Nodes, NewACC).
+
+createRecordToColumn([], _Nodes, ACC) -> ACC;
+createRecordToColumn([H | T], Nodes, ACC) ->
+   {Cost, NextHop} = H,
+   	NextHopName = getNodeName(NextHop, Nodes),
+	Temp = #tappa
+			{
+				user = none,
+				type = none,
+				t = Cost,
+				node_name = NextHopName
+			},
+	NewTappa =  if T =:= [] ->  Temp#tappa{type = column};
+					true -> 	Temp#tappa{type = intermediate}
+			 	end,
+
+   NewACC = ACC ++ [NewTappa],
+	createRecordToColumn(T, Nodes, NewACC).
+
+load_cols() -> [].
