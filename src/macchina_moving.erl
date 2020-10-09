@@ -4,7 +4,7 @@
 -include("records.hrl").
 -include("globals.hrl").
 -import('utilities', [println/1, println/2, print_debug_message/1, print_debug_message/2, print_debug_message/3, print_debug_message_raw/1]).
--define(DEBUGPRINT_MOVING, false).
+-define(DEBUGPRINT_MOVING, true).
 -define(TICKS_TO_CHARGE, 3).
 
 
@@ -230,7 +230,7 @@ moving(internal, move, State) ->
 				tl(TappeAttuali) =:= [] -> %ho finito il servizio
 					if (State#movingCarState.mustCharge) -> %devo andare a caricare
 							printDebug(State, "Moving to charging"),
-							checkColumnHere(State, NewBattery);
+							checkColumnHere(NewState, NewBattery); %check se la colonnina è qui e in tal caso vai subito in charging
 					    true -> 
 						   	{next_state, idle, NewState#movingCarState{batteryLevel = NewBattery, costToLastDestination = 0}}
 					end;
@@ -253,7 +253,7 @@ moving(cast, {crash}, State) ->
 	{next_state, crash, State#movingCarState{tappe = [],currentUser = none}};
 	?HANDLE_COMMON.
 	  
-movingToCharge(enter, _OldState, State) ->
+movingToCharge(enter, _OldState, _State) ->
 	keep_state_and_charge;
 
 movingToCharge({call,From}, {getDataElection}, State) ->
