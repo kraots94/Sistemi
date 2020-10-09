@@ -168,10 +168,8 @@ idle(cast, {partecipateElection, Data}, S) ->
 idle(cast, {sendMovingQueue}, S) ->   
 	QueueData = S#electionState.car_moving_queue_data,
 	PidMovingCar = S#electionState.pidMovingCar,
+	print_debug_message(S#electionState.pidCar, "Sending data to moving automata: ~w", [QueueData]),
 	macchina_moving:updateQueue(PidMovingCar, QueueData),
-
-	%dare il dato
-
 	%resest stat
 	S1 =  S#electionState{car_moving_queue_data = none},
 	{keep_state, S1}.	
@@ -309,7 +307,7 @@ initiator_final_state(enter, _OldState ,S) ->
 				end,
 	S1 = manage_winner_data(Winner_Data, S),
 	sendToListener({election_results, [Winner_Data]}, S1),
-    keep_state_and_data;
+	{next_state, initiator_final_state, S1};
 
 initiator_final_state(info, {_From, tick}, _Stato) ->
 	keep_state_and_data; %per ora non fare nulla
@@ -388,7 +386,7 @@ manage_winner_data(Winner_Data, S) ->
 	ID_Winner = Winner_Data#election_result_to_car.id_winner,
 	My_Pid = S#electionState.pidCar,
 	S1 = if
-		ID_Winner == -1 -> ok;
+		ID_Winner == -1 -> S;
 		My_Pid == ID_Winner ->
 			print_debug_message(My_Pid, "I Won", none),
 			ID_APP_User = Winner_Data#election_result_to_car.id_app_user,
@@ -398,18 +396,19 @@ manage_winner_data(Winner_Data, S) ->
 			{Queue_P1_P2, Queue_P2_P3, Queue_P3_P4} = Queues,
 			OutRecords = create_records(ID_APP_User, City_Nodes, Queue_P1_P2, Queue_P2_P3, Queue_P3_P4),
 			% li salvo nel mio stato
+			print_debug_message(My_Pid, "Records created: ~w", [OutRecords]),
 			S#electionState{car_moving_queue_data = OutRecords};
 		true ->
 			S
 	end,
 
-	Childrens = S#electionState.childrenPartecipate,
+	Childrens = S1#electionState.childrenPartecipate,
 	if Childrens =:= [] -> ok;
 			true ->
 				%% Notify Children
 				FuncMap = fun(Child) -> Child#carPartecipate.refCar end,
 				Pids_To_notify = lists:map(FuncMap, Childrens),
-				sendMessage(Pids_To_notify, {winning_results, Winner_Data}, S)
+				sendMessage(Pids_To_notify, {winning_results, Winner_Data}, S1)
 	end,
 	S1.
 
