@@ -5,15 +5,17 @@
 -include("records.hrl").
 -include("globals.hrl").
 
+-record(column_entity_data,{dist, node_name}).
+
 -import('graph', [from_file/1, num_of_edges/1, num_of_vertices/1, del_graph/1, pprint/1, edges_with_weights/1]).
 -import('graph_utils', [getDataPath/2, getWeight/3]).
 -import('dijkstra', [run/2]).
--import('nodes_util', [load_nodes/0, getNodeID/2, getNodeName/2]).
--import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3, createPairsFromList/1]).
+-import('nodes_util', [load_nodes/0, load_charging_cols/0, getNodeID/2, getNodeName/2, getPositionFromNodeName/2]).
+-import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3, createPairsFromList/1, calculateSquaredDistance/2]).
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([init_city/0, delete_map/1, calculate_path/2, get_nearest_col/2, create_records/5]).
+-export([init_city/0, delete_map/1, calculate_path/2, get_nearest_col/3, create_records/5]).
 
 init_city() -> 
 	Map = load_map(),
@@ -21,7 +23,7 @@ init_city() ->
 				 total_edges = num_of_edges(Map),
 				 city_graph = Map,
 				 nodes = load_nodes(),
-				 column_positions = load_cols()},
+				 column_positions = load_charging_cols()},
 	City.
 
 delete_map(_Map) -> %del_graph(City_Graph),.
@@ -36,7 +38,8 @@ calculate_path(CityData, {P, Q}) ->
 	Queue_Car_P_Q = calculate_path_costs(EdgesWeights, Out_Djsktra_P,ID_P, ID_Q),
 	Queue_Car_P_Q.
 
-get_nearest_col(_P, _Columns_Positions) -> "aa".
+get_nearest_col(CurrentPosName, Nodes, Cols_Nodes) -> 
+	getNearestColumnNodeName(CurrentPosName, Nodes, Cols_Nodes).
 
 %% ====================================================================
 %% Internal functions
@@ -69,8 +72,6 @@ create_records(User, Nodes, Queue_Car_User, Queue_User_Target, Queue_Target_Colu
 	{Cost_1, Queue_1} = Queue_Car_User,
 	{Cost_2, Queue_2} = Queue_User_Target,
 	{Cost_3, Queue_3} = Queue_Target_Column,
-	Cost_To_Target = Cost_1 + Cost_2,
-	Cost_To_Column = Cost_3,
 	Queue_To_User_Dest = createRecordToUser(Queue_1, User, Nodes, []) ++ createRecordToTarget(Queue_2, User, Nodes, []),
 	Queue_To_Column =  createRecordToColumn(Queue_3, Nodes, []),
 	{{Cost_1, Cost_2, Cost_3}, Queue_To_User_Dest, Queue_To_Column}.
@@ -133,4 +134,25 @@ createRecordToColumn([H | T], Nodes, ACC) ->
    NewACC = ACC ++ [NewTappa],
 	createRecordToColumn(T, Nodes, NewACC).
 
-load_cols() -> [].
+calculateColsDistances(CurrentPosName, Nodes, Cols_Nodes) ->
+	{StartNode_X, StartNode_Y} = getPositionFromNodeName(CurrentPosName, Nodes),
+	
+	MapFunc = fun(Node) ->	  
+				Curr_X = Node#node.pos_x,
+				Curr_Y = Node#node.pos_y,
+				SquaredDistanceNodes = calculateSquaredDistance({StartNode_X, StartNode_Y}, {Curr_X, Curr_Y}),
+				#column_entity_data{
+					dist = SquaredDistanceNodes, 
+					node_name = Node#node.name
+					}
+			end,
+
+	ColumnNodesDistances = lists:map(MapFunc, Cols_Nodes),	
+	ColumnNodesDistances.
+
+getNearestColumnNodeName(CurrentPosName, Nodes, Cols_Nodes) ->
+	NodesDistances = calculateColsDistances(CurrentPosName, Nodes, Cols_Nodes),
+	SortFun = fun(A, B) ->  A#column_entity_data.dist < B#column_entity_data.dist end,
+	Sorted_Nodes = lists:sort(SortFun, NodesDistances),
+	NearestColumn = hd(Sorted_Nodes),
+	NearestColumn#column_entity_data.node_name.

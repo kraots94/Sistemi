@@ -11,9 +11,10 @@ PATH_GRAPH = sys.path[0]+PATH_SEPARATOR
 
 WEIGHT_MIN = 3
 WEIGHT_MAX = 10
-TOTAL_NODES = 100
-TOTAL_EDGES = 300
-CARTESIAN_SIDE = 100
+TOTAL_NODES = 20
+TOTAL_EDGES = 40
+TOTAL_CHARGING_COLS = 4
+CARTESIAN_SIDE = 20
 
 """convert positive decimal integer n to equivalent in another base (2-26)"""
 def baseconvert(n, base):
@@ -177,6 +178,63 @@ def add_edges(graph_edges, graph_vertices, total_nodes, total_to_add):
         graph_edges.append([random.randint(WEIGHT_MIN,WEIGHT_MAX), graph_vertices[current_combination[0]][0], graph_vertices[current_combination[1]][0]])
         visited_combo.append(index)
 
+def createColumns(Nodes, N):
+    tmp = 1
+    while True:
+        if tmp * tmp >= N:
+            break
+        tmp = tmp+1
+    square_side = math.floor(CARTESIAN_SIDE / tmp)
+
+    matrix = []
+    for i in range(tmp):
+        matrix.append([])
+        for _ in range(tmp):
+            matrix[i].append({"points": [],
+                            "col_inside": False})
+
+    def mapFunc1(vertex):
+        new_x = math.floor((vertex[1]-1)/square_side)
+        new_y = math.floor((vertex[2]-1)/square_side)
+        new_x = tmp-1 if new_x >= tmp else new_x
+        new_y = tmp-1 if new_y >= tmp else new_y
+        return [new_x, new_y, vertex]
+
+    points_mapped = list(map(mapFunc1, Nodes))
+
+    for point in points_mapped:
+        new_x = point[0]
+        new_y = point[1]
+        matrix[new_y][new_x]["points"].append(point[2])
+
+    avaiableChunks = []
+    for i in range(tmp):
+        for j in range(tmp):
+            if len(matrix[i][j]["points"]) > 0:
+                avaiableChunks.append([i, j])
+
+    Chargin_Cols_Positions = []
+    total_avaiable_chunks = len(avaiableChunks)
+    total_cols_to_insert = min(total_avaiable_chunks, TOTAL_CHARGING_COLS)
+    for _ in range(total_cols_to_insert):
+
+        while True:
+            randomPos = random.randint(0, total_avaiable_chunks -1)
+            random_i = avaiableChunks[randomPos][0]
+            random_j = avaiableChunks[randomPos][1]
+            if matrix[random_i][random_j]["col_inside"] == False:
+                break
+        
+        matrix[random_i][random_j]["col_inside"]  = True
+        points_in_pos = len(matrix[random_i][random_j]["points"])
+        randomPos = random.randint(0, points_in_pos -1)
+        Point = matrix[random_i][random_j]["points"][randomPos]
+
+        Chargin_Cols_Positions.append(Point)
+
+    
+    return Chargin_Cols_Positions
+
 def create_file_graph(V, E):
     fo = open(PATH_MAP+"city_map_graph.dat", "w")
     total_nodes = len(V)
@@ -206,7 +264,14 @@ def create_file_dot(V, E):
 
     dot.render(filename="map", directory=PATH_GRAPH, cleanup=True)
 
-def create_image(V):    
+def create_file_columns(Cols):
+    fo = open(PATH_MAP+"city_map_charging_cols.dat", "w")
+    fo.write(str(len(cols)) + "\n")
+    for col in Cols:
+        fo.write(col[0] + " "+ str(base26to10(col[0])) +" "+str(col[1]) + " " +str(col[2]) + "\n")
+    fo.close()
+
+def create_image(V, Cols):    
     tot_letters_name = len(V[0][0])
     letter_width = 14
     letter_height = 14
@@ -217,10 +282,19 @@ def create_image(V):
     d = ImageDraw.Draw(img)
     for vertex in V:
         name = vertex[0].upper()
-        x = vertex[1] * letter_width * tot_letters_name + 1
+        x = (vertex[1]-1) * letter_width * tot_letters_name + 1
         increment = (letter_height*tot_letters_name - letter_height) /2
-        y = img_height - vertex[2] * letter_height*tot_letters_name + increment
-        d.text((x,y), name, font=fnt, fill=(0,0,0))
+        y = img_height - (vertex[2]) * letter_height*tot_letters_name - increment
+        isChargingCol = False
+        for col in Cols:
+            if name == col[0].upper():
+                isChargingCol = True
+                break
+
+        if isChargingCol:
+            d.text((x,y), name, font=fnt, fill=(255,0,0))
+        else:
+            d.text((x,y), name, font=fnt, fill=(0,0,0))
 
     img.save(PATH_GRAPH+'map.png')
 
@@ -230,8 +304,10 @@ V = createNodes(TOTAL_NODES)
 E = []
 createPath(V, E)
 add_edges(E, V, TOTAL_NODES, edges_to_add)
+cols = createColumns(V, TOTAL_CHARGING_COLS)
 
 create_file_graph(V, E)
 create_file_nodes_positions(V)
+create_file_columns(cols)
 create_file_dot(V, E)
-create_image(V)
+create_image(V, cols)

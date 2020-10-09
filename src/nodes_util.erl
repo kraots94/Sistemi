@@ -10,9 +10,15 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([load_nodes/0, print_nodes/1, getNodeID/2, getNodeName/2, getPositionFromNodeName/2, getRandomPositionName/1]).
+-export([load_nodes/0, load_charging_cols/0, print_nodes/1, getNodeID/2, getNodeName/2, getPositionFromNodeName/2, getRandomPositionName/1]).
 
 load_nodes() -> 
+	{ok, IO} = file:open(?FILE_NODES, [read]),
+	{ok, [Total_Nodes]} = io:fread(IO, ">", "~d"),
+	Nodes = read_node([], Total_Nodes, IO),
+	Nodes.
+
+load_charging_cols() -> 
 	{ok, IO} = file:open(?FILE_NODES, [read]),
 	{ok, [Total_Nodes]} = io:fread(IO, ">", "~d"),
 	Nodes = read_node([], Total_Nodes, IO),

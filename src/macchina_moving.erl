@@ -4,7 +4,7 @@
 -include("records.hrl").
 -include("globals.hrl").
 -import('utilities', [println/1, println/2, print_debug_message/1, print_debug_message/2, print_debug_message/3, print_debug_message_raw/1]).
--define(DEBUGPRINT_MOVING, true).
+-define(DEBUGPRINT_MOVING, false).
 -define(TICKS_TO_CHARGE, 3).
 
 
@@ -130,6 +130,7 @@ handle_common(cast, {requestRcv, Request}, _OldState, State) ->
 %Queue = {costi,Tappe}
 handle_common(cast, {updateQueue, Queue}, _OldState, State) ->
 	printDebug(State,"Data Received:"),
+	print_debug_message(State#movingCarState.pidListener, "Data received: ~w", [Queue]),
 	printDebug(State, Queue),
 	{{Cost_1, Cost_2, _Cost_3}, TappeTarget, TappeColumn} = Queue,
 	Time_To_User_Pos = State#movingCarState.costToLastDestination + Cost_1,
@@ -161,7 +162,7 @@ handle_common(info, {_From, tick}, OldState, State) ->
 
 idle(enter, _OldState, State) ->
 	printDebug(State, "Sono in idle"),
-	%printState(State),
+	printState(State),
 	keep_state_and_data;
 
 idle({call,From}, {getDataElection}, State) ->
@@ -229,7 +230,7 @@ moving(internal, move, State) ->
 				tl(TappeAttuali) =:= [] -> %ho finito il servizio
 					if (State#movingCarState.mustCharge) -> %devo andare a caricare
 							printDebug(State, "Moving to charging"),
-						   	{next_state, movingToCharge, NewState#movingCarState{batteryLevel = NewBattery, costToLastDestination = 0, mustCharge = false}};
+							checkColumnHere(State, NewBattery);
 					    true -> 
 						   	{next_state, idle, NewState#movingCarState{batteryLevel = NewBattery, costToLastDestination = 0}}
 					end;
@@ -252,19 +253,8 @@ moving(cast, {crash}, State) ->
 	{next_state, crash, State#movingCarState{tappe = [],currentUser = none}};
 	?HANDLE_COMMON.
 	  
-%qua consumo le tappe verso colonnina settate nell'apposito attributo
 movingToCharge(enter, _OldState, State) ->
-	printDebug(State, "Sono in moving verso la colonnina"),
-	%controllo se la colonnina è qua dove sono
-	PrimaTappa = hd(State#movingCarState.pathCol),
-	TipoTappa = PrimaTappa#tappa.type,
-	TempoTappa = PrimaTappa#tappa.t,
-	if 
-		(TipoTappa =:= column) and (TempoTappa == 0) -> %caso speciale in cui colonnina è dove sono
-			{next_state, charging, State#movingCarState{pathCol = [], costToLastDestination = 0}};
-		true ->
-			keep_state_and_data
-	end;
+	keep_state_and_charge;
 
 movingToCharge({call,From}, {getDataElection}, State) ->
 	Cost_To_last_Target = State#movingCarState.costToLastDestination,
@@ -408,6 +398,20 @@ arrivedInUserPosition(UserPid, S) ->
 arrivedInTargetPosition(UserPid, S) ->
 	ListenerPid = S#movingCarState.pidListener,
 	macchina_ascoltatore:sendToEsternalAutomata(ListenerPid, UserPid, arrivedTargetPosition).
+
+checkColumnHere(State, Battery) ->
+	%controllo se la colonnina è qua dove sono
+	PrimaTappa = hd(State#movingCarState.pathCol),
+	TipoTappa = PrimaTappa#tappa.type,
+	TempoTappa = PrimaTappa#tappa.t,
+	if 
+		(TipoTappa =:= column) and (TempoTappa == 0) -> %caso speciale in cui colonnina è dove sono
+			{next_state, charging, State#movingCarState{pathCol = [], costToLastDestination = 0,
+														batteryLevel = Battery, mustCharge = false}};
+		true ->
+			printDebug(State, "Sono in moving verso la colonnina"),
+			{next_state, movingToCharge, State#movingCarState{batteryLevel = Battery, costToLastDestination = 0, mustCharge = false}}
+	end.
 
 printDebug(S, ToPrint) ->
 	if ?DEBUGPRINT_MOVING -> utilities:print_debug_message(S#movingCarState.pidListener, [?TILDE_CHAR] ++ "p", ToPrint);

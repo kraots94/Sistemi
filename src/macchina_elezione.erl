@@ -2,7 +2,7 @@
 -compile(export_all).
 -import('send', [send_message/2, send_message/3]).
 -import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3]).
--import('city_map', [get_nearest_col/2, calculate_path/2, create_records/5]).
+-import('city_map', [get_nearest_col/3, calculate_path/2, create_records/5]).
 -behaviour(gen_statem).
 -include("records.hrl").
 -include("globals.hrl").
@@ -347,7 +347,7 @@ manage_self_cost(S, CurrentRequest) ->
 	City_Graph = S#electionState.cityMap#city.city_graph,
 	City_Nodes = S#electionState.cityMap#city.nodes,
 	City_Cols = S#electionState.cityMap#city.column_positions,
-	NearestCol = get_nearest_col(To, City_Cols),
+	NearestCol = get_nearest_col(To, City_Nodes, City_Cols),
 
 %	print_debug_message(Self_Pid, "My Graph Is: ~w", [City_Graph]),
 %	print_debug_message(Self_Pid, "My Nodes Are: ~w", [City_Nodes]),
