@@ -122,7 +122,8 @@ handle_common(cast, {requestRcv, Request}, _OldState, State) ->
 %la ricezione della queue con elezione fatta
 %Queue = {costi,Tappe}
 handle_common(cast, {updateQueue, Queue}, _OldState, State) ->
-	print_debug_message(State#movingCarState.pidListener, "Data Received: ~w", Queue),
+	print_debug_message(State#movingCarState.pidListener, "W8 M8", none),
+	print_debug_message(State#movingCarState.pidListener, "Data Received: ~w", [Queue]),
 	{{Cost_1, Cost_2, _Cost_3}, TappeTarget, TappeColumn} = Queue,
 	Time_To_User_Pos = State#movingCarState.costToLastDestination + Cost_1,
 	CostToLastDest = State#movingCarState.costToLastDestination + Cost_1 + Cost_2,
