@@ -129,8 +129,8 @@ listen_election(cast, {partecipateElection, Data}, _Stato) ->
 
 listen_election(cast, {election_results, Data}, Stato) ->
 %[Debug] {<0.10850.0>} - Listener - Winning Results: [{election_result_to_car,<0.10838.0>,<0.10856.0>}]
+	PidElezione = Stato#taxiListenerState.pidElection,
 	{DataToUse, Is_Initiator} = if is_list(Data) -> 
-													PidElezione = Stato#taxiListenerState.pidElection,
 													% Tolgo l'elezione dallo stato di calcolo
 													gen_statem:cast(PidElezione, {exit_final_state_initator}),
 													{hd(Data), true};
@@ -140,15 +140,16 @@ listen_election(cast, {election_results, Data}, Stato) ->
 	Pid_Car = DataToUse#election_result_to_car.id_winner,
 
 	if (Pid_Car == -1) and (Is_Initiator)-> % Avviso l'utente se non c'è un vincitore
-											notify_user_no_taxi(Stato#taxiListenerState.pidAppUser);
+								notify_user_no_taxi(Stato#taxiListenerState.pidAppUser);
 					Pid_Car == self() -> 
-
+								gen_statem:cast(PidElezione, {sendMovingQueue}),
 								%% Update coda moving
-								Cost_To_Client = 1,
+								PidMoving = Stato#taxiListenerState.pidMoving,
 								Pid_User = DataToUse#election_result_to_car.id_app_user,
+								TimeToUser = macchina_moving:getTimeToUser(PidMoving),
 								DataToUser = #election_result_to_user{
 										id_car_winner = Pid_Car, 
-										time_to_wait = Cost_To_Client
+										time_to_wait = TimeToUser
 									},
 								gen_statem:cast(Pid_User, {winner, DataToUser});
 					true -> ok

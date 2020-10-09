@@ -21,7 +21,8 @@ callback_mode() -> [state_functions,state_enter].
 				batteryLevel, %decrementa a ogni tick
 				mustCharge, %flag che dice se devo o meno andare a caricare (seguire tappe colonnina)
 				lastDestination, %nodo dell'ultimo target
-				costToLastDestination}). %tempo per arrivare al target, decrementa a ogni tick
+				costToLastDestination, %tempo per arrivare al target, decrementa a ogni tick
+				timeToUser}). 
 
 %% ====================================================================
 %% API functions
@@ -35,7 +36,10 @@ start(InitialPos, PidListener) ->
 					currentUser = none,
 					currentPos = InitialPos,
 					batteryLevel = ?BATTERY_LEVEL_MAX,
-					mustCharge = false},
+					mustCharge = false,
+					lastDestination = InitialPos,
+					costToLastDestination = 0,
+					timeToUser = 0},
 	{ok, Pid} = gen_statem:start_link(?MODULE,State, []),
 	Pid.
 
@@ -52,8 +56,17 @@ getBatteryLevel(Pid) ->
 getDataElection(Pid) ->
 	gen_statem:call(Pid, {getDataElection}).
 
+getTimeToUser(Pid) ->
+	gen_statem:call(Pid, {getTimeToUser}).
+
 enablePathCharge(Pid) ->
 	gen_statem:cast(Pid, {goToCharge}).
+
+updateQueue(Pid, Queue) ->
+	gen_statem:cast(Pid, {updateQueue, Queue}).
+
+fullBattery(Pid) ->
+	gen_statem:cast(Pid, {charged}).
 
 %% ====================================================================
 %% Automata Functions
@@ -71,6 +84,21 @@ handle_common(cast, {goToCharge}, OldState, State) ->
 			{keep_state, State#movingCarState{mustCharge = true}}
 	end;
 
+%solo per V0
+handle_common({call,From}, {areYouBusy}, OldState, State) ->
+	Reply = if OldState == idle -> false;
+	   		  true -> true
+			end,
+	{next_state, OldState, State, [{reply,From,Reply}]};
+		
+handle_common({call,From}, {getBattery}, OldState, State) ->
+	Battery = State#movingCarState.batteryLevel,
+	{next_state, OldState, State, [{reply,From,Battery}]};
+
+handle_common({call,From}, {getTimeToUser}, OldState, State) ->
+	TimeToUser = State#movingCarState.timeToUser,
+	{next_state, OldState, State, [{reply,From,TimeToUser}]};
+
 %ricezione richiesta senza elezione
 handle_common(cast, {requestRcv, Request}, _OldState, State) ->
 	{From, To, UserPid} = Request,
@@ -86,34 +114,30 @@ handle_common(cast, {requestRcv, Request}, _OldState, State) ->
 	LastDestination = calculateLastDestination(Tappe),
 	NewTappe = State#movingCarState.tappe ++ Tappe,
 	%NuovaBatteria = State#movingCarState.batteryLevel - (CostoAlCliente + CostoAlTarget),
-	{next_state, moving, State#movingCarState{tappe=NewTappe, pathCol = PathColonnina, lastDestination = LastDestination, costToLastDestination = CostoAlCliente + CostoAlTarget}};
+	{next_state, moving, State#movingCarState{tappe=NewTappe, 
+											pathCol = PathColonnina, 
+											lastDestination = LastDestination, 
+											costToLastDestination = CostoAlCliente + CostoAlTarget}};
 
 %la ricezione della queue con elezione fatta
 %Queue = {costi,Tappe}
 handle_common(cast, {updateQueue, Queue}, _OldState, State) ->
-	{Costi, Tappe} = Queue,
-	%calcoli da Costi costToLastDestination...in sostanza sommi al valore attuale
-	%estrappolo path colonnina dalle tappe
-	PathColonnina = ["test"],
-	LastDestination = calculateLastDestination(Tappe),
-	%sommi al costToLastDest attuale il valore del costo ottenuto
-	NewTappe = State#movingCarState.tappe ++ Tappe,
-	{next_state, moving, State#movingCarState{tappe=NewTappe, pathCol = PathColonnina, lastDestination = LastDestination, costToLastDestination = Costi}};
-
-%solo per V0
-handle_common({call,From}, {areYouBusy}, OldState, State) ->
-	Reply = if OldState == idle -> false;
-	   		  true -> true
-			end,
-	{next_state, OldState, State, [{reply,From,Reply}]};
-		
-handle_common({call,From}, {getBattery}, OldState, State) ->
-	Battery = State#movingCarState.batteryLevel,
-	{next_state, OldState, State, [{reply,From,Battery}]};
+	print_debug_message(State#movingCarState.pidListener, "Data Received: ~w", Queue),
+	{{Cost_1, Cost_2, _Cost_3}, TappeTarget, TappeColumn} = Queue,
+	Time_To_User_Pos = State#movingCarState.costToLastDestination + Cost_1,
+	CostToLastDest = State#movingCarState.costToLastDestination + Cost_1 + Cost_2,
+	LastDestination = calculateLastDestination(TappeTarget),
+	NewTappe = State#movingCarState.tappe ++ TappeTarget,
+	{next_state, moving, State#movingCarState{tappe=NewTappe, 
+											pathCol = TappeColumn, 
+											lastDestination = LastDestination, 
+											costToLastDestination = CostToLastDest, 
+											timeToUser = Time_To_User_Pos}};
 
 handle_common(info, {_From, tick}, OldState, State) ->
 	if OldState == idle -> keep_state_and_data; %in idle ignora il tick
 	   OldState == charging ->					%per ora aumenta di una carica ogni tick
+		   printState(State),
 		   NewBattery = State#movingCarState.batteryLevel + 1,
 		   {keep_state, State#movingCarState{batteryLevel = NewBattery}};
 	   true -> %se in moving o movingToCharge muoviti, consuma tappe
@@ -177,7 +201,7 @@ moving(internal, move, State) ->
 			NuovoStato =  State#movingCarState{tappe=NuoveTappe},
 			io:format("-"),
 			% print_debug_message(self(), "Sto raggiungendo: ~w", [TappaAttuale#tappa.node_name]),
-			printState(NuovoStato),
+			%printState(NuovoStato),
 			{keep_state, NuovoStato#movingCarState{batteryLevel = NewBattery, costToLastDestination = NewCostToLastDest}};
 		true -> %tempo = 0 , quindi ho raggiunto nodo nuovo
 			println("raggiunto nuovo nodo"),
@@ -254,7 +278,11 @@ movingToCharge(internal, move, State) ->
 			TappaConSpostamento = TappaAttuale#tappa{t = NewTime},
 			NuoveTappeCol = [TappaConSpostamento] ++ tl(TappeAttuali),
 			io:format("-"),
-			{keep_state, State#movingCarState{pathCol = NuoveTappeCol, batteryLevel = NewBattery, costToLastDestination = NewTime, lastDestination = NextHop}}; %il costToLastDest nel caso di spostamento verso col è il costo nexthop
+			%il costToLastDest nel caso di spostamento verso col è il costo nexthop
+			{keep_state, State#movingCarState{pathCol = NuoveTappeCol, 
+											batteryLevel = NewBattery, 
+											costToLastDestination = NewTime, 
+											lastDestination = NextHop}}; 
 	true -> %tempo = 0 , quindi ho raggiunto nodo nuovo
 			println("raggiunto nuovo nodo"),
 			NewPos = TappaAttuale#tappa.node_name,
@@ -263,13 +291,21 @@ movingToCharge(internal, move, State) ->
 			if  %controllo in che tipo di nodo sono arrivato (intermedio o colonnina)
 				TipoNodoAttuale =:= column -> %arrivato alla colonnina
 					println("colonnina raggiunta!"),
-					{next_state, charging, State#movingCarState{pathCol = [], batteryLevel = NewBattery, costToLastDestination = 0, lastDestination = NewPos, currentPos = NewPos}};
+					{next_state, charging, State#movingCarState{pathCol = [], 
+																batteryLevel = NewBattery, 
+																costToLastDestination = 0, 
+																lastDestination = NewPos, 
+																currentPos = NewPos}};
 				true -> %arrivato in nodo intermedio
 					 NuoveTappe = tl(TappeAttuali),
 					 ProssimaTappa = hd(NuoveTappe),
 					 NodoProssimaTappa = ProssimaTappa#tappa.node_name,
 					 CostoProssimaTappa = ProssimaTappa#tappa.t,
-					 {keep_state, State#movingCarState{pathCol = NuoveTappe, batteryLevel = NewBattery, lastDestination = NodoProssimaTappa, costToLastDestination = CostoProssimaTappa, currentPos = NewPos}}
+					 {keep_state, State#movingCarState{pathCol = NuoveTappe, 
+														batteryLevel = NewBattery, 
+														lastDestination = NodoProssimaTappa, 
+														costToLastDestination = CostoProssimaTappa, 
+														currentPos = NewPos}}
 			end
 	end;
 			
@@ -278,6 +314,10 @@ movingToCharge(internal, move, State) ->
 charging(enter, _OldState, _State) ->
 	println("sto caricando"),
 	keep_state_and_data;
+
+charging(cast, {charged}, State) ->
+	println("finito di caricare, sono al massimo"),
+	{next_state, idle, State};
 
 ?HANDLE_COMMON.
   
@@ -298,21 +338,30 @@ calculateNewState(Stato, TappaAttuale, Tappe) ->
 	if 
 		NuoveTappe =:= [] -> Stato#movingCarState{tappe = [], currentUser = none, currentPos = Pos, lastDestination = Pos};
 		true ->
+			TipoNodoAttuale = TappaAttuale#tappa.type,
+			NewState =
+				if TipoNodoAttuale =:= user_start -> Stato#movingCarState{timeToUser = 0};
+				   true -> Stato 
+				end,
 			ProssimaTappa = hd(NuoveTappe),
 			ProssimoUtente = ProssimaTappa#tappa.user,
 			ProssimoTipo = ProssimaTappa#tappa.type,
 			if 
 				ProssimoUtente /= TappaAttuale#tappa.user ->
-					taxiServingAppId(ProssimoUtente, Stato),
+					taxiServingAppId(ProssimoUtente, NewState),
 					if (ProssimoTipo =:= user_start) -> %caso in cui il prossimo utente è nel nodo attuale
-						   arrivedInUserPosition(ProssimoUtente, Stato),
+						   arrivedInUserPosition(ProssimoUtente, NewState),
 						   NuoveNuoveTappe = tl(NuoveTappe),
-						   Stato#movingCarState{tappe = NuoveNuoveTappe, currentUser = ProssimoUtente, currentPos = Pos};
+						   NewState#movingCarState{tappe = NuoveNuoveTappe, 
+												currentUser = ProssimoUtente, 
+												currentPos = Pos};
 					   true ->
-						   Stato#movingCarState{tappe = NuoveTappe, currentUser = ProssimoUtente, currentPos = Pos}
+						   NewState#movingCarState{tappe = NuoveTappe, 
+												currentUser = ProssimoUtente, 
+												currentPos = Pos}
 					end;
 				true ->
-					Stato#movingCarState{tappe = NuoveTappe, currentPos = Pos}
+					NewState#movingCarState{tappe = NuoveTappe, currentPos = Pos}
 			end
 	end.
 

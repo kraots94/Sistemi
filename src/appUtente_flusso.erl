@@ -76,11 +76,7 @@ idle(cast, {send_requestNoElection, Request}, State) ->
 	NearestCar = findTaxi(State),
 	{From, To} = Request,
 	gen_statem:cast(NearestCar, {send_requestNoElection, {From,To, self()}}),
-	keep_state_and_data;
-
-idle(cast, taxiServingYou, State) ->
-	println("taxi serving me"),
-	{next_state, waiting_car, State}.
+	keep_state_and_data.
 
 waiting_election(enter, _OldState, _Stato) -> 
 	%richiesta inviata, aspetto risultati
@@ -104,6 +100,10 @@ waiting_election(cast, {winner, Data}, Stato) ->
 %	keep_state_and_data.
 
 waiting_car(enter, _OldState, _Stato) -> keep_state_and_data;
+
+waiting_car(cast, taxiServingYou, State) ->
+	println("taxi serving me"),
+	{keep_state, State};
 
 waiting_car(cast, arrivedUserPosition, State) ->
 	println("taxi arrived to me"),

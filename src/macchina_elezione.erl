@@ -2,6 +2,7 @@
 -compile(export_all).
 -import('send', [send_message/2, send_message/3]).
 -import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3]).
+-import('city_map', [get_nearest_col/2, calculate_path/2, create_records/5]).
 -behaviour(gen_statem).
 -include("records.hrl").
 -include("globals.hrl").
@@ -24,6 +25,7 @@ callback_mode() -> [state_functions, state_enter].
 				childrenCosts,
 				cityMap,
 				queueToManage,
+				car_moving_queue_data,
 				currentRequest,
 				flag_initiator,
 				my_election_cost,
@@ -48,6 +50,7 @@ start(PidMacchina, PidMovingCar, Pid_Gps_Car, City_Map) ->
 							childrenCosts = [],
 							cityMap = City_Map,
 							queueToManage = [],
+							car_moving_queue_data = none,
 							currentRequest = {},
 							flag_initiator = false,
 							my_election_cost = [],
@@ -69,6 +72,7 @@ resetState(S) ->
 					currentRequest = {},
 					flag_initiator = false,
 					my_election_cost = [],
+					queueToManage = [],
 					dataToSendPartecipate = none,
 					totalCosts = []}.
 %% ====================================================================
@@ -159,8 +163,19 @@ idle(cast, {partecipateElection, Data}, S) ->
 			DataPartecipate = create_data_partecipate(Self_Pid, CurrentRequest, CurrentTTL - 1),
 			S3 = S2#electionState{dataToSendPartecipate = DataPartecipate},
 			{next_state, running_election, S3} 
-	end.
+	end;
 	
+idle(cast, {sendMovingQueue}, S) ->   
+	QueueData = S#electionState.car_moving_queue_data,
+	PidMovingCar = S#electionState.pidMovingCar,
+	macchina_moving:updateQueue(PidMovingCar, QueueData),
+
+	%dare il dato
+
+	%resest stat
+	S1 =  S#electionState{car_moving_queue_data = none},
+	{keep_state, S1}.	
+
 %% ====================================================================
 %% Running Election States functions
 %% ====================================================================
@@ -292,8 +307,8 @@ initiator_final_state(enter, _OldState ,S) ->
 												id_app_user = S#electionState.pidAppUser
 											}
 				end,
-	manage_winner_data(Winner_Data, S),
-	sendToListener({election_results, [Winner_Data]}, S),
+	S1 = manage_winner_data(Winner_Data, S),
+	sendToListener({election_results, [Winner_Data]}, S1),
     keep_state_and_data;
 
 initiator_final_state(info, {_From, tick}, _Stato) ->
@@ -311,11 +326,11 @@ waiting_final_results(info, {_From, tick}, _Stato) ->
 
 waiting_final_results(cast, {winning_results, Data}, S) -> 
 	%print_debug_message(S#electionState.pidCar, "Waiting For Election Results", none),
-	manage_winner_data(Data, S),
-	sendToListener({election_results, Data}, S),	
-	S1 = resetState(S),
+	S1 = manage_winner_data(Data, S),
+	sendToListener({election_results, Data}, S1),	
+	S2 = resetState(S1),
 	%print_debug_message(S1#electionState.pidCar, "Back to Idle", none),
-	{next_state, idle, S1};
+	{next_state, idle, S2};
 
 waiting_final_results(cast, {invite_result, _Data}, S) -> 
 	{next_state, waiting_final_results, S}.
@@ -330,11 +345,12 @@ manage_self_cost(S, CurrentRequest) ->
 	From = CurrentRequest#user_request.from,
 	To = CurrentRequest#user_request.to,
 	{Current_Cost_To_Last_Target, Current_Last_Target, Current_Battery_Level} = macchina_moving:getDataElection(S#electionState.pidMovingCar),
-	NearestCol = calculateNearestColumn(To),
-
+	
 	City_Graph = S#electionState.cityMap#city.city_graph,
 	City_Nodes = S#electionState.cityMap#city.nodes,
-	
+	City_Cols = S#electionState.cityMap#city.column_positions,
+	NearestCol = get_nearest_col(To, City_Cols),
+
 %	print_debug_message(Self_Pid, "My Graph Is: ~w", [City_Graph]),
 %	print_debug_message(Self_Pid, "My Nodes Are: ~w", [City_Nodes]),
 	
@@ -371,17 +387,20 @@ create_data_partecipate(PidParent, Request, TTL) ->
 manage_winner_data(Winner_Data, S) ->
 	ID_Winner = Winner_Data#election_result_to_car.id_winner,
 	My_Pid = S#electionState.pidCar,
-	if
+	S1 = if
 		ID_Winner == -1 -> ok;
 		My_Pid == ID_Winner ->
 			print_debug_message(My_Pid, "I Won", none),
-			_ID_APP_User = Winner_Data#election_result_to_car.id_app_user,
+			ID_APP_User = Winner_Data#election_result_to_car.id_app_user,
 			% creo i record per la coda partendo dalle queue già calcolate in fase begin / partecipate
+			Queues = S#electionState.queueToManage,
+			City_Nodes = S#electionState.cityMap#city.nodes,
+			{Queue_P1_P2, Queue_P2_P3, Queue_P3_P4} = Queues,
+			OutRecords = create_records(ID_APP_User, City_Nodes, Queue_P1_P2, Queue_P2_P3, Queue_P3_P4),
 			% li salvo nel mio stato
-			
-			print_debug_message(My_Pid, "Current Queues: ~w", S#electionState.queueToManage);
+			S#electionState{car_moving_queue_data = OutRecords};
 		true ->
-			ok
+			S
 	end,
 
 	Childrens = S#electionState.childrenPartecipate,
@@ -391,7 +410,8 @@ manage_winner_data(Winner_Data, S) ->
 				FuncMap = fun(Child) -> Child#carPartecipate.refCar end,
 				Pids_To_notify = lists:map(FuncMap, Childrens),
 				sendMessage(Pids_To_notify, {winning_results, Winner_Data}, S)
-	end.
+	end,
+	S1.
 
 findBestResult(Results) ->
 	Best_Partecipant = 
@@ -449,20 +469,20 @@ calculateSelfCost(Points, Battery_Avaiable, CityData, Self_Pid) ->
 	print_debug_message(Self_Pid, "Battery: ~w", Battery_Avaiable),
 
 	{P1, P2, P3, P4} = Points,
-	{Cost_P1_P2, Queue_P1_P2} = city_map:calculate_path(CityData, {P1, P2}),
+	{Cost_P1_P2, Queue_P1_P2} = calculate_path(CityData, {P1, P2}),
 	RemainingCharge_P2 = Battery_Avaiable - Cost_P1_P2,
 	Out_Results = 
 		if  RemainingCharge_P2 < 0 -> 	
 				print_debug_message(Self_Pid, "I can not go To User Position", none),
 				{-1, -1, i_can_not_win, []};		
 			true -> 					
-				{Cost_P2_P3, Queue_P2_P3} = city_map:calculate_path(CityData, {P2, P3}),
+				{Cost_P2_P3, Queue_P2_P3} = calculate_path(CityData, {P2, P3}),
 				RemainingCharge_P3 =  RemainingCharge_P2 -Cost_P2_P3,
 				if  RemainingCharge_P3 < 0 -> 	
 						print_debug_message(Self_Pid, "I can not go To Target Position", none),
 						{-1, -1, i_can_not_win, []};
 					true -> 					
-						{Cost_P3_P4, Queue_P3_P4} = city_map:calculate_path(CityData, {P3, P4}),
+						{Cost_P3_P4, Queue_P3_P4} = calculate_path(CityData, {P3, P4}),
 						RemainingCharge_P4 = RemainingCharge_P3 -Cost_P3_P4,
 						if  RemainingCharge_P4 < 0 -> 
 								print_debug_message(Self_Pid, "I can not go To Column Position", none),
@@ -470,7 +490,7 @@ calculateSelfCost(Points, Battery_Avaiable, CityData, Self_Pid) ->
 							true ->	
 								CC = Cost_P1_P2,
 								CRDT = Battery_Avaiable - Cost_P1_P2 - Cost_P2_P3,
-								QueueCar = [Queue_P1_P2, Queue_P2_P3, Queue_P3_P4],
+								QueueCar = {{Cost_P1_P2, Queue_P1_P2}, {Cost_P2_P3, Queue_P2_P3}, {Cost_P3_P4, Queue_P3_P4}},
 								{CC, CRDT, i_can_win, QueueCar}
 						end
 				end
@@ -482,8 +502,6 @@ calculateSelfCost(Points, Battery_Avaiable, CityData, Self_Pid) ->
 %% ====================================================================
 %% Utilities functions
 %% ====================================================================
-
-calculateNearestColumn(_Node) -> "au".
 
 searchPartecipantInList(Partecipans, ToSearch) ->
 	Out = lists:filter(fun(X) -> (X#carPartecipate.refCar == ToSearch) end, Partecipans),

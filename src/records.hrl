@@ -3,7 +3,7 @@
 % user_start, user_target, intermediate, column_path, column_end, none
 -record(tappa, {user, type, t, node_name}).
 
--record(city, {total_nodes, total_edges, city_graph, nodes}).
+-record(city, {total_nodes, total_edges, city_graph, nodes, column_positions}).
 
 -record(user_request,{from, to}).
 -record(election_result_to_car,{id_winner, id_app_user}).
@@ -20,7 +20,8 @@
 -record(batteryState, {pidCar,
 					  sameBatteryCounter,
 					  tick_counter,
-					  columnPathEnabled}).
+					  columnPathEnabled,
+					  notifiedChargedBat}).
 
 -record(dataElectionBegin,{
 	request,
