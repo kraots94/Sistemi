@@ -143,31 +143,24 @@ def mapValues(value, istart, istop, ostart, ostop):
 def getNodeFromID(node_id, Nodes):
     outNode = None
     for node in Nodes:
-        if(type(node_id) == int):
-            val = str(base26to10(node[0]))
-
-            if node_id == val:
-                outNode = node
-                break
-        else:
-            if node_id == node[0]:
-                outNode = node
-                break
+        if node_id == base26to10(node[0]):
+            outNode = node
+            break
     return outNode
 
-def calculateWeight(V, W, Nodes):
-    if type(V) is list:
-        Node_From = V
-        Node_To = W
-    else:
-        Node_From = getNodeFromID(V, Nodes)
-        Node_To = getNodeFromID(W, Nodes)
+def getNodeFromName(node_name, Nodes):
+    outNode = None
+    for node in Nodes:
+        if node_name == node[0]:
+            outNode = node
+            break
+    return outNode
 
-    P = {"x": Node_From[1], "y": Node_From[2]}
-    Q = {"x": Node_To[1], "y": Node_To[2]}
+def calculateWeight(U, V):
+    P = {"x": U[1], "y": U[2]}
+    Q = {"x": V[1], "y": V[2]}
     squaredDistance = calculateSquaredDistance(P, Q)
     return math.floor(mapValues(squaredDistance, 0, MAX_DISTANCE_SQUARED, WEIGHT_MIN, WEIGHT_MAX))
-
 
 def createPath(V, E):
     visitedList = []
@@ -184,7 +177,9 @@ def createPath(V, E):
     while len(initialList) > 0:
         index = randint(0, len(initialList)-1)
         adjVertex = initialList[index]
-        weight = calculateWeight(currentVertex, adjVertex, V)
+        node_u = getNodeFromName(currentVertex, V)
+        node_v = getNodeFromName(adjVertex, V)
+        weight = calculateWeight(node_u, node_v)
         edge = [weight, currentVertex, adjVertex]
         E.append(edge)
         initialList.remove(adjVertex)
@@ -228,10 +223,10 @@ def add_edges(graph_edges, graph_vertices, total_nodes, total_to_add):
         while index in visited_combo:
             index = randint(0, len(combinations) - 1)
         current_combination = combinations[index]
-        V = graph_vertices[current_combination[0]]
-        W = graph_vertices[current_combination[1]]
-        weight = calculateWeight(V, W, graph_vertices)
-        graph_edges.append([weight, V[0], W[0]])
+        node_u = graph_vertices[current_combination[0]]
+        node_v = graph_vertices[current_combination[1]]
+        weight = calculateWeight(node_u, node_v)
+        graph_edges.append([weight, node_u[0], node_v[0]])
         visited_combo.append(index)
 
 
