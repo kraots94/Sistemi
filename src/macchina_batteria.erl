@@ -39,7 +39,7 @@ init(State) ->
 check_battery(info, {_From, tick}, Stato) ->
 	TickCount = Stato#batteryState.tick_counter,
 	%for testi porp vedo a ogni tick
-	if TickCount < 3 -> {keep_state, Stato#batteryState{tick_counter = TickCount + 1}}; 
+	if TickCount < 2 -> {keep_state, Stato#batteryState{tick_counter = TickCount + 1}}; 
 		true ->
 			PidAttachedCar = Stato#batteryState.pidCar,
 			Battery = macchina_moving:getBatteryLevel(PidAttachedCar),

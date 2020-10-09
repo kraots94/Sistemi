@@ -5,6 +5,8 @@
 -import('utilities', [println/1, println/2, prinprint_debug_message/1, print_debug_message/2, print_debug_message/3]).
 -include("globals.hrl").
 -include("records.hrl").
+-define(DEBUGPRINT_APP, false).
+
 
 callback_mode() -> [state_functions, state_enter].
 -record(userState, {
@@ -90,7 +92,8 @@ waiting_election(cast, {winner, Data}, Stato) ->
 		   io:format("riprovo!"),
 		   {next_state, idle, Stato, [{next_event,internal,{send_request,Request}}]};
 	true -> %hooray vincitore trovato
-			print_debug_message(self(), "Winner Taxi_Data: ~w", Data),
+			printDebug("Winner Taxi_Data: "),
+			printDebugList(Data),
 			{next_state, waiting_car, Stato#userState{picCarServing = IdCarWinner}}
 	end.
 
@@ -102,11 +105,11 @@ waiting_election(cast, {winner, Data}, Stato) ->
 waiting_car(enter, _OldState, _Stato) -> keep_state_and_data;
 
 waiting_car(cast, taxiServingYou, State) ->
-	println("taxi serving me"),
+	printDebug("taxi serving me"),
 	{keep_state, State};
 
 waiting_car(cast, arrivedUserPosition, State) ->
-	println("taxi arrived to me"),
+	printDebug("taxi arrived to me"),
 	{next_state, moving, State};
 	
 ?HANDLE_COMMON.
@@ -118,7 +121,7 @@ waiting_car(cast, arrivedUserPosition, State) ->
 moving(enter, _OldState, _Stato) -> keep_state_and_data;
 
 moving(cast, arrivedTargetPosition, State) ->
-	println("target position reached"),
+	printDebug("target position reached"),
 	{next_state, ending, State};
 
 %moving(cast, {changeDest, _NewDest}, _State) ->
@@ -130,8 +133,8 @@ moving(cast, arrivedTargetPosition, State) ->
   
 ending(enter, _OldState, State) ->
 	deletePosGps(State),
-	println("I'm dying..."),
-	%codice per la morte qua
+	printDebug("I'm dying..."),
+	gen_statem:stop(self()),
 	keep_state_and_data.
 
 %% ====================================================================
@@ -181,6 +184,18 @@ initDataGpsModule(PidGpsServer,InitialPosition) ->
 							starting_pos = InitialPosition, 
 							signal_power = ?GPS_MODULE_POWER, 
 							map_side = ?MAP_SIDE}.
+
+printDebug(ToPrint) ->
+	if ?DEBUGPRINT_APP -> io:format("<user>"),
+		  				  utilities:print_debug_message(self(), [?TILDE_CHAR] ++ "p", ToPrint);
+	   true -> foo
+	end.
+
+printDebugList(ToPrint) ->
+	if ?DEBUGPRINT_APP -> io:format("<user>"),
+		   				  utilities:print_debug_message(self(), [?TILDE_CHAR] ++ "w", ToPrint);
+	   true -> foo
+	end.
 
 
 %PID_Wireless_Server = wireless_card_server:start_wireless_server(nodes_util:load_nodes()).

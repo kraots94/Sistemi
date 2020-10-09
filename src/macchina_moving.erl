@@ -4,6 +4,9 @@
 -include("records.hrl").
 -include("globals.hrl").
 -import('utilities', [println/1, println/2, print_debug_message/1, print_debug_message/2, print_debug_message/3, print_debug_message_raw/1]).
+-define(DEBUGPRINT_MOVING, true).
+-define(TICKS_TO_CHARGE, 3).
+
 
 callback_mode() -> [state_functions,state_enter].
 %getDataElection, deve tornare {Cost_To_last_Target, Current_Target, Battery_Level} , Current_Target = pos attuale se fermo, dest se moving, next node se vai verso colonnina (stringa)
@@ -13,6 +16,7 @@ callback_mode() -> [state_functions,state_enter].
 %stato macchina in movimento:
 -record(movingCarState, {
 				tick_counter,
+				tick_counterBat,
 				pidListener,
 				tappe, %lista di tappe da percorrere
 				pathCol, %lista di tappe verso la colonnina
@@ -30,6 +34,7 @@ callback_mode() -> [state_functions,state_enter].
 start(InitialPos, PidListener) ->
 	State = #movingCarState {
 					tick_counter = 0,
+					tick_counterBat = 0,
 					pidListener = PidListener,
 					tappe = [],
 					pathCol = [],
@@ -68,6 +73,7 @@ updateQueue(Pid, Queue) ->
 fullBattery(Pid) ->
 	gen_statem:cast(Pid, {charged}).
 
+
 %% ====================================================================
 %% Automata Functions
 %% ====================================================================
@@ -78,9 +84,9 @@ init(State) ->
 %automa batt mi dice di andare a caricare, accodo percorso colonnina
 handle_common(cast, {goToCharge}, OldState, State) ->
 	if OldState /= moving -> 
-		    println("qualcosa sbagliato");
+		    printDebug(State, "qualcosa sbagliato");
 	   true ->
-			println("aggiorno tappe aggiungendom patch carica"), %nb: l'aggiunta del path è implicito settando il flag
+			printDebug(State, "aggiorno tappe aggiungendo patch carica"), %nb: l'aggiunta del path è implicito settando il flag
 			{keep_state, State#movingCarState{mustCharge = true}}
 	end;
 
@@ -122,7 +128,8 @@ handle_common(cast, {requestRcv, Request}, _OldState, State) ->
 %la ricezione della queue con elezione fatta
 %Queue = {costi,Tappe}
 handle_common(cast, {updateQueue, Queue}, _OldState, State) ->
-	print_debug_message(State#movingCarState.pidListener, "Data Received: ~w", Queue),
+	printDebug(State,"Data Received:"),
+	printDebug(State, Queue),
 	{{Cost_1, Cost_2, _Cost_3}, TappeTarget, TappeColumn} = Queue,
 	Time_To_User_Pos = State#movingCarState.costToLastDestination + Cost_1,
 	CostToLastDest = State#movingCarState.costToLastDestination + Cost_1 + Cost_2,
@@ -137,9 +144,11 @@ handle_common(cast, {updateQueue, Queue}, _OldState, State) ->
 handle_common(info, {_From, tick}, OldState, State) ->
 	if OldState == idle -> keep_state_and_data; %in idle ignora il tick
 	   OldState == charging ->					%per ora aumenta di una carica ogni tick
-		   printState(State),
-		   NewBattery = State#movingCarState.batteryLevel + 1,
-		   {keep_state, State#movingCarState{batteryLevel = NewBattery}};
+			ActualTickCounter = State#movingCarState.tick_counterBat,
+			NewCounter = ActualTickCounter + 1,
+			if (NewCounter >= ?TICKS_TO_CHARGE) -> {keep_state, State#movingCarState{tick_counterBat = 0}, [{next_event,internal,charge}]};
+	   			true ->  {keep_state, State#movingCarState{tick_counterBat = NewCounter}}
+			end;
 	   true -> %se in moving o movingToCharge muoviti, consuma tappe
 		ActualTickCounter = State#movingCarState.tick_counter,
 		NewCounter = ActualTickCounter + 1,
@@ -149,8 +158,8 @@ handle_common(info, {_From, tick}, OldState, State) ->
 	 end.
 		   
 
-idle(enter, _OldState, _State) ->
-	print_debug_message(self(), "Sono in idle", []),
+idle(enter, _OldState, State) ->
+	printDebug(State, "Sono in idle"),
 	%printState(State),
 	keep_state_and_data;
 
@@ -168,7 +177,7 @@ idle(info, {_From, tick}, _State) ->
 ?HANDLE_COMMON.
 	  
 moving(enter, _OldState, State) ->
-	print_debug_message(self(), "Sono in moving", []),
+	printDebug(State,"Sono in moving"),
 	PrimaTappa = hd(State#movingCarState.tappe),
 	FirstUser = PrimaTappa#tappa.user,
 	TipoTappa = PrimaTappa#tappa.type,
@@ -199,12 +208,12 @@ moving(internal, move, State) ->
 			TappaConSpostamento = TappaAttuale#tappa{t = NewTime},
 			NuoveTappe = [TappaConSpostamento] ++ tl(TappeAttuali),
 			NuovoStato =  State#movingCarState{tappe=NuoveTappe},
-			io:format("-"),
+			%io:format("-"),
 			% print_debug_message(self(), "Sto raggiungendo: ~w", [TappaAttuale#tappa.node_name]),
 			%printState(NuovoStato),
 			{keep_state, NuovoStato#movingCarState{batteryLevel = NewBattery, costToLastDestination = NewCostToLastDest}};
 		true -> %tempo = 0 , quindi ho raggiunto nodo nuovo
-			println("raggiunto nuovo nodo"),
+			printDebug(State, "raggiunto nuovo nodo"),
 			TipoNodoAttuale = TappaAttuale#tappa.type,
 			PersonaAttuale = TappaAttuale#tappa.user,
 			NewState = calculateNewState(State, TappaAttuale, TappeAttuali),
@@ -218,8 +227,8 @@ moving(internal, move, State) ->
 			if 
 				tl(TappeAttuali) =:= [] -> %ho finito il servizio
 					if (State#movingCarState.mustCharge) -> %devo andare a caricare
-							print_debug_message(self(), "Moving to charging", []),
-						   	{next_state, movingToCharge, NewState#movingCarState{batteryLevel = NewBattery, costToLastDestination = 0}};
+							printDebug(State, "Moving to charging"),
+						   	{next_state, movingToCharge, NewState#movingCarState{batteryLevel = NewBattery, costToLastDestination = 0, mustCharge = false}};
 					    true -> 
 						   	{next_state, idle, NewState#movingCarState{batteryLevel = NewBattery, costToLastDestination = 0}}
 					end;
@@ -237,14 +246,14 @@ moving({call,From}, {getDataElection}, State) ->
 	{keep_state, State, [{reply,From,Packet}]};
 
 moving(cast, {crash}, State) ->
-	print_debug_message(self(), "Incidente!", []),
+	printDebug(State, "Incidente!"),
 	sendUserCrashEvent(State#movingCarState.currentUser, State),
 	{next_state, crash, State#movingCarState{tappe = [],currentUser = none}};
 	?HANDLE_COMMON.
 	  
 %qua consumo le tappe verso colonnina settate nell'apposito attributo
 movingToCharge(enter, _OldState, State) ->
-	println("Sono in moving verso la colonnina"),
+	printDebug(State, "Sono in moving verso la colonnina"),
 	%controllo se la colonnina è qua dove sono
 	PrimaTappa = hd(State#movingCarState.pathCol),
 	TipoTappa = PrimaTappa#tappa.type,
@@ -277,20 +286,20 @@ movingToCharge(internal, move, State) ->
 		NewTime > 0 -> %sono nello spostamento fra due nodi, decremento il tempo
 			TappaConSpostamento = TappaAttuale#tappa{t = NewTime},
 			NuoveTappeCol = [TappaConSpostamento] ++ tl(TappeAttuali),
-			io:format("-"),
+			%io:format("-"),
 			%il costToLastDest nel caso di spostamento verso col è il costo nexthop
 			{keep_state, State#movingCarState{pathCol = NuoveTappeCol, 
 											batteryLevel = NewBattery, 
 											costToLastDestination = NewTime, 
 											lastDestination = NextHop}}; 
 	true -> %tempo = 0 , quindi ho raggiunto nodo nuovo
-			println("raggiunto nuovo nodo"),
+			printDebug(State, "raggiunto nuovo nodo"),
 			NewPos = TappaAttuale#tappa.node_name,
 			sendPosToGps(NewPos, State),
 			TipoNodoAttuale = TappaAttuale#tappa.type,
 			if  %controllo in che tipo di nodo sono arrivato (intermedio o colonnina)
 				TipoNodoAttuale =:= column -> %arrivato alla colonnina
-					println("colonnina raggiunta!"),
+					printDebug(State, "colonnina raggiunta!"),
 					{next_state, charging, State#movingCarState{pathCol = [], 
 																batteryLevel = NewBattery, 
 																costToLastDestination = 0, 
@@ -311,13 +320,19 @@ movingToCharge(internal, move, State) ->
 			
 ?HANDLE_COMMON.
   
-charging(enter, _OldState, _State) ->
-	println("sto caricando"),
+charging(enter, _OldState, State) ->
+	printDebug(State, "sto caricando"),
 	keep_state_and_data;
 
+charging(internal,charge, State) ->
+	ActualBat = State#movingCarState.batteryLevel,
+	NewStateCharged = State#movingCarState{batteryLevel = ActualBat + ?TICKS_TO_CHARGE},
+	printState(NewStateCharged),
+	{keep_state, NewStateCharged};
+
 charging(cast, {charged}, State) ->
-	println("finito di caricare, sono al massimo"),
-	{next_state, idle, State};
+	printDebug(State, "finito di caricare, sono al massimo"),
+	{next_state, idle, State#movingCarState{batteryLevel = ?BATTERY_LEVEL_MAX}};
 
 ?HANDLE_COMMON.
   
@@ -339,7 +354,7 @@ calculateNewState(Stato, TappaAttuale, Tappe) ->
 		NuoveTappe =:= [] -> Stato#movingCarState{tappe = [], currentUser = none, currentPos = Pos, lastDestination = Pos};
 		true ->
 			TipoNodoAttuale = TappaAttuale#tappa.type,
-			NewState =
+			NewState = %controllo se sono arrivato da utente
 				if TipoNodoAttuale =:= user_start -> Stato#movingCarState{timeToUser = 0};
 				   true -> Stato 
 				end,
@@ -394,8 +409,13 @@ arrivedInTargetPosition(UserPid, S) ->
 	ListenerPid = S#movingCarState.pidListener,
 	macchina_ascoltatore:sendToEsternalAutomata(ListenerPid, UserPid, arrivedTargetPosition).
 
+printDebug(S, ToPrint) ->
+	if ?DEBUGPRINT_MOVING -> utilities:print_debug_message(S#movingCarState.pidListener, [?TILDE_CHAR] ++ "p", ToPrint);
+	   true -> foo
+	end.
+
 printState(State) ->
-	utilities:print_debug_message(self(), "Stato: " ++ [?TILDE_CHAR] ++ "p", State).
+	printDebug(State,State).
 	
 
 

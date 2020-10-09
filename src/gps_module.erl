@@ -39,6 +39,8 @@ setPosition(GpsPid, Position) ->
 deleteLocationTracks(GpsPid) ->
 	send_message(GpsPid, {removeEntity}).
 
+
+
 %% ====================================================================
 %% Init functions
 %% ====================================================================

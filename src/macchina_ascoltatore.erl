@@ -36,6 +36,9 @@ updatePosition(ListenerPid, Position) ->
 sendToEsternalAutomata(ListenerdPid, Target, Data) ->
 	gen_statem:cast(ListenerdPid, {to_outside, {Target, Data}}).
 
+die(ListenerdPid) ->
+	gen_statem:cast(ListenerdPid, {die}).
+
 %% ====================================================================
 %% Automata functions
 %% ====================================================================
@@ -58,6 +61,17 @@ init(InitData) ->
 			},
 	%print_debug_message(self(), "Pids Created: ~w", [PidMoving, PidBattery, PidElection]),
 	{ok, idle, State}.
+
+handle_common(cast, {die}, _OldState, State) ->
+	PidMov = State#taxiListenerState.pidMoving,
+	PidBattery =  State#taxiListenerState.pidBattery,
+	PidElection = State#taxiListenerState.pidElection,
+	PidGps = State#taxiListenerState.pidGps,
+	PidClock = State#taxiListenerState.pidClock,
+	gen_statem:stop(PidMov),gen_statem:stop(PidBattery),gen_statem:stop(PidElection), %ammazzo automi
+	gps_module:end_gps_module(PidGps), tick_server:end_clock(PidClock), %ammazzo server
+	print_debug_message("ho eliminato tutti"),
+	gen_statem:stop(self()).
 	
 %roba che deve uscire
 idle(cast, {to_outside, {Target, Data}}, _Stato) ->
@@ -96,7 +110,9 @@ idle(cast, {partecipateElection, Data}, Stato) ->
 	%print_debug_message(self(), "Listener - partecipateElection - ~w", [Data]),
 	PidElezione = Stato#taxiListenerState.pidElection,
 	gen_statem:cast(PidElezione, {partecipateElection, Data}),
-	{next_state, listen_election, Stato}.
+	{next_state, listen_election, Stato};
+
+?HANDLE_COMMON.
 
 %% ====================================================================
 %% ELECTION functions
@@ -155,7 +171,9 @@ listen_election(cast, {election_results, Data}, Stato) ->
 					true -> ok
 	end,
 	%print_debug_message(self(), "Listener - Winning Results: ~w", [Data]),
-	{next_state, idle, Stato}.
+	{next_state, idle, Stato};
+
+?HANDLE_COMMON.
 
 
 %listen_election(cast, OtherEvents, Stato) ->
