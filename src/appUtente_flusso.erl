@@ -2,10 +2,10 @@
 -compile(export_all).
 -behaviour(gen_statem).
 -import('send', [send_message/2, send_message/3]).
--import('utilities', [println/1, println/2, prinprint_debug_message/1, print_debug_message/2, print_debug_message/3]).
+-import('utilities', [println/1, println/2, print_debug_message/1, print_debug_message/2, print_debug_message/3]).
 -include("globals.hrl").
 -include("records.hrl").
--define(DEBUGPRINT_APP, false).
+-define(DEBUGPRINT_APP, true).
 
 
 callback_mode() -> [state_functions, state_enter].
@@ -186,13 +186,13 @@ initDataGpsModule(PidGpsServer,InitialPosition) ->
 							map_side = ?MAP_SIDE}.
 
 printDebug(ToPrint) ->
-	if ?DEBUGPRINT_APP -> io:format("<user>"),
+	if ?DEBUGPRINT_APP -> io:format("<app>"),
 		  				  utilities:print_debug_message(self(), [?TILDE_CHAR] ++ "p", ToPrint);
 	   true -> foo
 	end.
 
 printDebugList(ToPrint) ->
-	if ?DEBUGPRINT_APP -> io:format("<user>"),
+	if ?DEBUGPRINT_APP -> io:format("<app>"),
 		   				  utilities:print_debug_message(self(), [?TILDE_CHAR] ++ "w", ToPrint);
 	   true -> foo
 	end.
