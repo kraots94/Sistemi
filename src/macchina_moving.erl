@@ -4,7 +4,7 @@
 -include("records.hrl").
 -include("globals.hrl").
 -import('utilities', [println/1, println/2, print_debug_message/1, print_debug_message/2, print_debug_message/3, print_debug_message_raw/1]).
--define(DEBUGPRINT_MOVING, false).
+-define(DEBUGPRINT_MOVING, true).
 -define(TICKS_TO_CHARGE, 3).
 
 
@@ -84,7 +84,7 @@ init(State) ->
 %automa batt mi dice di andare a caricare, accodo percorso colonnina
 handle_common(cast, {goToCharge}, OldState, State) ->
 	if OldState /= moving -> 
-		    printDebug(State, "qualcosa sbagliato");
+		    keep_state_and_data;
 	   true ->
 			printDebug(State, "aggiorno tappe aggiungendo patch carica"), %nb: l'aggiunta del path è implicito settando il flag
 			{keep_state, State#movingCarState{mustCharge = true}}
@@ -327,6 +327,13 @@ charging(internal,charge, State) ->
 	ActualBat = State#movingCarState.batteryLevel,
 	NewStateCharged = State#movingCarState{batteryLevel = ActualBat + ?TICKS_TO_CHARGE},
 	{keep_state, NewStateCharged};
+
+charging({call,From}, {getDataElection}, State) ->
+	Cost_To_last_Target = 0,
+	Current_Target =  State#movingCarState.currentPos,
+	Battery_level = State#movingCarState.batteryLevel,
+	Packet = {Cost_To_last_Target, Current_Target, Battery_level},
+	{keep_state, State, [{reply,From,Packet}]};
 
 charging(cast, {charged}, State) ->
 	printDebug(State, "finito di caricare, sono al massimo"),

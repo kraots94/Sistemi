@@ -37,6 +37,36 @@ start(AttachedCarPid) ->
 init(State) ->
 	{ok, check_battery, State}.
 
+handle_common(info, {_From, tick}, OldState, State) ->
+	PidAttachedCar = Stato#batteryState.pidCar,
+	BatteryLevel = macchina_moving:getBatteryLevel(PidAttachedCar),
+	OldBatteryLevel = State#batteryLastCheck,
+	ActualTickSolarCharge = ...
+	if OldBatteryLevel == BatteryLevel and (ticksSolarCharge >= 30) ->
+		 invio solarCharge...
+		{keep_state, tickBat solare reset
+		true ->
+			{keep_state, State#batteryState{ticksSolarCharge = NewCounter}}
+			
+		
+	   
+
+handle_common(info, {_From, tick}, OldState, State) ->
+	if OldState == idle -> keep_state_and_data; %in idle ignora il tick
+	   OldState == charging ->					
+			ActualTickCounter = State#movingCarState.tick_counterBat,
+			NewCounter = ActualTickCounter + 1,
+			if (NewCounter >= ?TICKS_TO_CHARGE) -> {keep_state, State#movingCarState{tick_counterBat = 0}, [{next_event,internal,charge}]};
+	   			true ->  {keep_state, State#movingCarState{tick_counterBat = NewCounter}}
+			end;
+	   true -> %se in moving o movingToCharge muoviti, consuma tappe
+		ActualTickCounter = State#movingCarState.tick_counter,
+		NewCounter = ActualTickCounter + 1,
+		if (NewCounter >= ?TICKS_TO_MOVING) -> {keep_state, State#movingCarState{tick_counter = 0}, [{next_event,internal,move}]};
+	   		true ->  {keep_state, State#movingCarState{tick_counter = NewCounter}}
+		end
+	 end.
+
 check_battery(info, {_From, tick}, State) ->
 	ActualTickCounter = State#batteryState.tick_counter,
 	NewCounter = ActualTickCounter + 1,
