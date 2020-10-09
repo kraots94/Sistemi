@@ -4,7 +4,7 @@
 -include("records.hrl").
 -include("globals.hrl").
 -import('utilities', [println/1, println/2, print_debug_message/1, print_debug_message/2, print_debug_message/3, print_debug_message_raw/1]).
--define(DEBUGPRINT_MOVING, true).
+-define(DEBUGPRINT_MOVING, false).
 -define(TICKS_TO_CHARGE, 3).
 
 
@@ -130,7 +130,6 @@ handle_common(cast, {requestRcv, Request}, _OldState, State) ->
 %Queue = {costi,Tappe}
 handle_common(cast, {updateQueue, Queue}, _OldState, State) ->
 	printDebug(State,"Data Received:"),
-	print_debug_message(State#movingCarState.pidListener, "Data received: ~w", [Queue]),
 	printDebug(State, Queue),
 	{{Cost_1, Cost_2, _Cost_3}, TappeTarget, TappeColumn} = Queue,
 	Time_To_User_Pos = State#movingCarState.costToLastDestination + Cost_1,
@@ -203,17 +202,24 @@ moving(internal, move, State) ->
 	%e ora lavoro sulle tappe
 	TappeAttuali = State#movingCarState.tappe,
 	TappaAttuale = hd(TappeAttuali),
+	
+	PidListener = State#movingCarState.pidListener,
+	DataToPrint = [State#movingCarState.currentPos,TappaAttuale#tappa.node_name],
+	print_debug_message(PidListener, "Moving between nodes: [~p] to  [~p]", DataToPrint),
+
 	Time = TappaAttuale#tappa.t,
 	NewTime = Time - 1,
 	if 
 		NewTime > 0 -> %sono nello spostamento fra due nodi, decremento il tempo
 			TappaConSpostamento = TappaAttuale#tappa{t = NewTime},
 			NuoveTappe = [TappaConSpostamento] ++ tl(TappeAttuali),
-			NuovoStato =  State#movingCarState{tappe=NuoveTappe},
 			%io:format("-"),
 			% print_debug_message(self(), "Sto raggiungendo: ~w", [TappaAttuale#tappa.node_name]),
 			%printState(NuovoStato),
-			{keep_state, NuovoStato#movingCarState{batteryLevel = NewBattery, costToLastDestination = NewCostToLastDest}};
+			UpdatedState = State#movingCarState{batteryLevel = NewBattery, 
+													costToLastDestination = NewCostToLastDest,
+													tappe=NuoveTappe},
+			{keep_state, UpdatedState};
 		true -> %tempo = 0 , quindi ho raggiunto nodo nuovo
 			printDebug(State, "raggiunto nuovo nodo"),
 			TipoNodoAttuale = TappaAttuale#tappa.type,
@@ -224,7 +230,7 @@ moving(internal, move, State) ->
 					arrivedInTargetPosition(PersonaAttuale, State);
 				TipoNodoAttuale =:= user_start ->
 					arrivedInUserPosition(PersonaAttuale, State);
-				true -> foo
+				true -> nothing_to_do
 			end,
 			if 
 				tl(TappeAttuali) =:= [] -> %ho finito il servizio
@@ -232,11 +238,13 @@ moving(internal, move, State) ->
 							printDebug(State, "Moving to charging"),
 							checkColumnHere(NewState, NewBattery); %check se la colonnina è qui e in tal caso vai subito in charging
 					    true -> 
-						   	{next_state, idle, NewState#movingCarState{batteryLevel = NewBattery, costToLastDestination = 0}}
+							UpdatedState = NewState#movingCarState{batteryLevel = NewBattery, costToLastDestination = 0},
+						   	{next_state, idle, UpdatedState}
 					end;
 				true -> %ho ancora tappe
-					printState(NewState),
-					{keep_state, NewState#movingCarState{batteryLevel = NewBattery, costToLastDestination = NewCostToLastDest}}
+					UpdatedState = NewState#movingCarState{batteryLevel = NewBattery, costToLastDestination = NewCostToLastDest},
+					printState(UpdatedState),
+					{keep_state,UpdatedState}
 			end
 	end;
 

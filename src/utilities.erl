@@ -46,7 +46,12 @@ print_debug_message(PID, Format, Data) ->
 			if Data == none -> 
 					io:format("[Debug] {~w} - ~p ~n", [PID, Format]);
 				true ->	
-					io:format("[Debug] {~w} - "++Format++"~n", [PID, Data])
+					if is_list(Data) -> HeadList = hd(Data),
+										if is_list(HeadList) -> io:format("[Debug] {~w} - "++Format++"~n", [PID] ++ Data);
+													   true -> io:format("[Debug] {~w} - "++Format++"~n", [PID, Data])
+										end;
+						true -> io:format("[Debug] {~w} - "++Format++"~n", [PID, Data])
+					end
 			end	   
 	end.
 	
