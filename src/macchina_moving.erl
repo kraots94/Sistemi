@@ -96,6 +96,9 @@ handle_common({call,From}, {areYouBusy}, OldState, State) ->
 	   		  true -> true
 			end,
 	{next_state, OldState, State, [{reply,From,Reply}]};
+
+handle_common(cast, {charged}, _OldState, _State) ->
+	keep_state_and_data;
 		
 handle_common({call,From}, {getBattery}, OldState, State) ->
 	Battery = State#movingCarState.batteryLevel,
@@ -143,7 +146,7 @@ handle_common(cast, {updateQueue, Queue}, _OldState, State) ->
 
 handle_common(info, {_From, tick}, OldState, State) ->
 	if OldState == idle -> keep_state_and_data; %in idle ignora il tick
-	   OldState == charging ->					%per ora aumenta di una carica ogni tick
+	   OldState == charging ->					
 			ActualTickCounter = State#movingCarState.tick_counterBat,
 			NewCounter = ActualTickCounter + 1,
 			if (NewCounter >= ?TICKS_TO_CHARGE) -> {keep_state, State#movingCarState{tick_counterBat = 0}, [{next_event,internal,charge}]};

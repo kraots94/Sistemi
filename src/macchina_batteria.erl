@@ -6,6 +6,7 @@
 -import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3]).
 
 callback_mode() -> [state_functions].
+-define(TICKS_CHECK_BATTERY, 1).
 
 %!!!to do ricarica solare!!!
 %nextToDo :
@@ -36,24 +37,23 @@ start(AttachedCarPid) ->
 init(State) ->
 	{ok, check_battery, State}.
 
-check_battery(info, {_From, tick}, Stato) ->
-	TickCount = Stato#batteryState.tick_counter,
+check_battery(info, {_From, tick}, State) ->
+	ActualTickCounter = State#batteryState.tick_counter,
+	NewCounter = ActualTickCounter + 1,
 	%for testi porp vedo a ogni tick
-	if TickCount < 2 -> {keep_state, Stato#batteryState{tick_counter = TickCount + 1}}; 
+	if NewCounter >= ?TICKS_CHECK_BATTERY -> {keep_state, State#batteryState{tick_counter = 0}, [{next_event,internal,checkThresholds}]};
 		true ->
-			PidAttachedCar = Stato#batteryState.pidCar,
-			Battery = macchina_moving:getBatteryLevel(PidAttachedCar),
-			NewState = check_threshold(Battery, Stato), %controllo < > min/max e same value from N ticks
-			{keep_state, NewState}	
-	end.
+			{keep_state, State#batteryState{tick_counter = NewCounter}}
+	end;
 
 %% ====================================================================
 %% Internal Functions
 %% ====================================================================
 
-%controlla i threshold e torna nuovo stato
-check_threshold(BatteryLevel, Stato) ->
+
+check_battery(internal, checkThresholds, Stato) ->
 	PidAttachedCar = Stato#batteryState.pidCar,
+	BatteryLevel = macchina_moving:getBatteryLevel(PidAttachedCar),
 	AlreadyEnabledColPath = Stato#batteryState.columnPathEnabled,
 	Notified = Stato#batteryState.notifiedChargedBat,
 	NewState = if (BatteryLevel < ?BATTERY_LEVEL_LOW) and not(AlreadyEnabledColPath) ->
@@ -61,9 +61,11 @@ check_threshold(BatteryLevel, Stato) ->
 		   			Stato#batteryState{columnPathEnabled = true};
 				  (BatteryLevel > ?BATTERY_LEVEL_LOW) and AlreadyEnabledColPath ->
 					Stato#batteryState{columnPathEnabled = false, notifiedChargedBat = false};
-				  (BatteryLevel > ?BATTERY_LEVEL_MAX) and not(Notified)-> 
+				  (BatteryLevel >= ?BATTERY_LEVEL_MAX) and not(Notified)-> 
 					macchina_moving:fullBattery(PidAttachedCar), %...e questo lo fa tornare in idle
 					Stato#batteryState{notifiedChargedBat = true};
 				  true -> Stato
 			   end,
-	NewState#batteryState{tick_counter = 0}.
+	{keep_state, NewState}.
+	
+	
