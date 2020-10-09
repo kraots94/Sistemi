@@ -3,14 +3,15 @@
 /ebin/
 
 #latex useless files
-*.aux
-*.ini
-*.lof
-*.log
-*.toc
-*.gz
-*.pdf
-*.out
+relazione/*.aux
+relazione/*.ini
+relazione/*.lof
+relazione/*.log
+relazione/*.toc
+relazione/*.gz
+relazione/*.pdf
+relazione/figure/*.pdf
+relazione/*.out
 
 #python cache
 __pycache__

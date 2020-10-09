@@ -131,8 +131,8 @@ def createNodes(N):
 
 
 def calculateSquaredDistance(P, Q):
-    diff1 = P.x - Q.x
-    diff2 = P.y - Q.y
+    diff1 = P["x"] - Q["x"]
+    diff2 = P["y"] - Q["y"]
     return diff1*diff1 + diff2*diff2
 
 
@@ -140,13 +140,33 @@ def mapValues(value, istart, istop, ostart, ostop):
     return ostart + (ostop - ostart) * ((value - istart) / (istop - istart))
 
 
-def calculateWeight(V, W):
-    Node_From = getNodeFromIndex(V)
-    Node_To = getNodeFromIndex(V)
+def getNodeFromID(node_id, Nodes):
+    outNode = None
+    for node in Nodes:
+        if(type(node_id) == int):
+            val = str(base26to10(node[0]))
+
+            if node_id == val:
+                outNode = node
+                break
+        else:
+            if node_id == node[0]:
+                outNode = node
+                break
+    return outNode
+
+def calculateWeight(V, W, Nodes):
+    if type(V) is list:
+        Node_From = V
+        Node_To = W
+    else:
+        Node_From = getNodeFromID(V, Nodes)
+        Node_To = getNodeFromID(W, Nodes)
+
     P = {"x": Node_From[1], "y": Node_From[2]}
     Q = {"x": Node_To[1], "y": Node_To[2]}
     squaredDistance = calculateSquaredDistance(P, Q)
-    return mapValues(squaredDistance, 0, MAX_DISTANCE_SQUARED, WEIGHT_MIN, WEIGHT_MAX)
+    return math.floor(mapValues(squaredDistance, 0, MAX_DISTANCE_SQUARED, WEIGHT_MIN, WEIGHT_MAX))
 
 
 def createPath(V, E):
@@ -164,7 +184,7 @@ def createPath(V, E):
     while len(initialList) > 0:
         index = randint(0, len(initialList)-1)
         adjVertex = initialList[index]
-        weight = calculateWeight(currentVertex, adjVertex)
+        weight = calculateWeight(currentVertex, adjVertex, V)
         edge = [weight, currentVertex, adjVertex]
         E.append(edge)
         initialList.remove(adjVertex)
@@ -210,7 +230,7 @@ def add_edges(graph_edges, graph_vertices, total_nodes, total_to_add):
         current_combination = combinations[index]
         V = graph_vertices[current_combination[0]]
         W = graph_vertices[current_combination[1]]
-        weight = calculateWeight(V, W)
+        weight = calculateWeight(V, W, graph_vertices)
         graph_edges.append([weight, V[0], W[0]])
         visited_combo.append(index)
 
