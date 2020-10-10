@@ -7,11 +7,19 @@
 
 -record(column_entity_data,{dist, node_name}).
 
--import('graph', [from_file/1, num_of_edges/1, num_of_vertices/1, del_graph/1, pprint/1, edges_with_weights/1]).
+-import('graph', [from_file/1, num_of_edges/1, 
+					num_of_vertices/1, del_graph/1, 
+					pprint/1, edges_with_weights/1]).
 -import('graph_utils', [getDataPath/2, getWeight/3]).
 -import('dijkstra', [run/2]).
--import('nodes_util', [load_nodes/0, load_charging_cols/0, getNodeID/2, getNodeName/2, getPositionFromNodeName/2]).
--import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3, createPairsFromList/1, calculateSquaredDistance/2]).
+-import('nodes_util', [load_nodes/0, load_charging_cols/0, 
+						getNodeID/2, getNodeName/2, 
+						getPositionFromNodeName/2]).
+-import('utilities', [print_debug_message/1, 
+						print_debug_message/2, 
+						print_debug_message/3, 
+						createPairsFromList/1, 
+						calculateSquaredDistance/2]).
 %% ====================================================================
 %% API functions
 %% ====================================================================
@@ -19,11 +27,12 @@
 
 init_city() -> 
 	Map = load_map(),
-	City = #city{total_nodes = num_of_vertices(Map),
-				 total_edges = num_of_edges(Map),
-				 city_graph = Map,
-				 nodes = load_nodes(),
-				 column_positions = load_charging_cols()},
+	City = #city{
+		total_nodes = num_of_vertices(Map),
+		total_edges = num_of_edges(Map),
+		city_graph = Map,
+		nodes = load_nodes(),
+		column_positions = load_charging_cols()},
 	City.
 
 calculate_path(CityData, {P, Q}) -> 
@@ -69,8 +78,10 @@ create_records(User, Nodes, Queue_Car_User, Queue_User_Target, Queue_Target_Colu
 	{Cost_1, Queue_1} = Queue_Car_User,
 	{Cost_2, Queue_2} = Queue_User_Target,
 	{Cost_3, Queue_3} = Queue_Target_Column,
-	Queue_To_User_Dest = createRecordToUser(Queue_1, User, Nodes, []) ++ createRecordToTarget(Queue_2, User, Nodes, []),
-	Queue_To_Column =  createRecordToColumn(Queue_3, Nodes, []),
+	Queue_To_User_Dest = 
+		createRecordToUser(Queue_1, User, Nodes, []) ++ 
+		createRecordToTarget(Queue_2, User, Nodes, []),
+	Queue_To_Column = createRecordToColumn(Queue_3, Nodes, []),
 	{{Cost_1, Cost_2, Cost_3}, Queue_To_User_Dest, Queue_To_Column}.
 
 % user_start, user_target, intermediate, column_path, column_end, none
@@ -78,71 +89,78 @@ create_records(User, Nodes, Queue_Car_User, Queue_User_Target, Queue_Target_Colu
 
 createRecordToUser([], _Username, _Nodes, ACC) -> ACC;
 createRecordToUser([H | T], Username, Nodes, ACC) ->
-   {Cost, NextHop} = H,
+  	{Cost, NextHop} = H,
 	NextHopName = getNodeName(NextHop, Nodes),
-	Temp = #tappa
-			{
-				user = Username,
-				type = none,
-				t = Cost,
-				node_name = NextHopName
-			},
-	NewTappa =  if T =:= [] ->  Temp#tappa{type = user_start};
-					true -> 	Temp#tappa{type = intermediate}
-			 	end,
+	Temp = #tappa{
+		user = Username,
+		type = none,
+		t = Cost,
+		node_name = NextHopName
+	},
+	NewTappa = if 
+		T =:= [] ->  
+			Temp#tappa{type = user_start};
+		true -> 	
+			Temp#tappa{type = intermediate}
+	end,
 
-   NewACC = ACC ++ [NewTappa],
+	NewACC = ACC ++ [NewTappa],
 	createRecordToUser(T, Username, Nodes, NewACC).
 
 
 createRecordToTarget([], _Username, _Nodes, ACC) -> ACC;
 createRecordToTarget([H | T], Username, Nodes, ACC) ->
-   {Cost, NextHop} = H,
+   	{Cost, NextHop} = H,
    	NextHopName = getNodeName(NextHop, Nodes),
-	Temp = #tappa
-			{
-				user = Username,
-				type = none,
-				t = Cost,
-				node_name = NextHopName
-			},
-	NewTappa =  if T =:= [] ->  Temp#tappa{type = user_target};
-					true -> 	Temp#tappa{type = intermediate}
-			 	end,
+	Temp = #tappa{
+		user = Username,
+		type = none,
+		t = Cost,
+		node_name = NextHopName
+	},
+	NewTappa = if 
+		T =:= [] ->  
+			Temp#tappa{type = user_target};
+		true ->
+			Temp#tappa{type = intermediate}
+	end,
 
-   NewACC = ACC ++ [NewTappa],
+	NewACC = ACC ++ [NewTappa],
 	createRecordToTarget(T, Username, Nodes, NewACC).
 
 createRecordToColumn([], _Nodes, ACC) -> ACC;
 createRecordToColumn([H | T], Nodes, ACC) ->
    {Cost, NextHop} = H,
    	NextHopName = getNodeName(NextHop, Nodes),
-	Temp = #tappa
-			{
-				user = none,
-				type = none,
-				t = Cost,
-				node_name = NextHopName
-			},
-	NewTappa =  if T =:= [] ->  Temp#tappa{type = column};
-					true -> 	Temp#tappa{type = intermediate}
-			 	end,
+	Temp = #tappa {
+		user = none,
+		type = none,
+		t = Cost,
+		node_name = NextHopName
+	},
+	NewTappa = if 
+		T =:= [] ->
+			Temp#tappa{type = column};
+		true ->
+			Temp#tappa{type = intermediate}
+	end,
 
-   NewACC = ACC ++ [NewTappa],
+   	NewACC = ACC ++ [NewTappa],
 	createRecordToColumn(T, Nodes, NewACC).
 
 calculateColsDistances(CurrentPosName, Nodes, Cols_Nodes) ->
 	{StartNode_X, StartNode_Y} = getPositionFromNodeName(CurrentPosName, Nodes),
 	
 	MapFunc = fun(Node) ->	  
-				Curr_X = Node#node.pos_x,
-				Curr_Y = Node#node.pos_y,
-				SquaredDistanceNodes = calculateSquaredDistance({StartNode_X, StartNode_Y}, {Curr_X, Curr_Y}),
-				#column_entity_data{
-					dist = SquaredDistanceNodes, 
-					node_name = Node#node.name
-					}
-			end,
+		Curr_X = Node#node.pos_x,
+		Curr_Y = Node#node.pos_y,
+		SquaredDistanceNodes = 
+			calculateSquaredDistance({StartNode_X, StartNode_Y}, {Curr_X, Curr_Y}),
+		#column_entity_data{
+			dist = SquaredDistanceNodes, 
+			node_name = Node#node.name
+		}
+	end,
 
 	ColumnNodesDistances = lists:map(MapFunc, Cols_Nodes),	
 	ColumnNodesDistances.

@@ -48,7 +48,7 @@ init(InitData) ->
 	%creo pid delle entita' associate
 	PidGpsModule = gps_module:start_gps_module(initDataGpsModule(PidGpsServer,InitialPos)), %start gps module (and register)
 	PidMoving = macchina_moving:start(InitialPos,self()),
-	PidBattery  = macchina_batteria:start(PidMoving),
+	PidBattery  = 1, % macchina_batteria:start(PidMoving),
 	PidElection = macchina_elezione:start(self(),PidMoving,PidGpsModule,City_Map),
 	PidClock = tick_server:start_clock([self(),PidMoving,PidBattery,PidElection]),
 	State = #taxiListenerState {

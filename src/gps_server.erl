@@ -6,7 +6,10 @@
 -include("records.hrl").
 -include("globals.hrl").
 
--import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3, calculateSquaredDistance/2]).
+-import('utilities', [print_debug_message/1, 
+					print_debug_message/2, 
+					print_debug_message/3, 
+					calculateSquaredDistance/2]).
 -import('send', [send_message/2, send_message/3]).
 
 -record(nodeDistance,{dist, entities}).
@@ -15,7 +18,8 @@
 -record(gpsServerState, {entities, nodes}).
 
 -export([start_gps_server/1, init/1, end_gps_server/1, 
-		sendPosToGps/2, deleteMyLocationTracks/1, getNearestCar/1, printInternalState/1]).
+		sendPosToGps/2, deleteMyLocationTracks/1, 
+		getNearestCar/1, printInternalState/1]).
 
 %% ====================================================================
 %% API functions
@@ -78,47 +82,49 @@ initNode([H | T], ACC) ->
 
 loop(S) ->
 	receive 
-		{Pid, {register, Type, Pos}} 				->  %print_debug_message(self(), "ADD: [PID ~w | TYPE ~w | POS ~w]", [Pid, Type, Pos])
-								  		   				NewState = registerNewEntity(S, Pid, Type, Pos),
-								           				loop(NewState);
-		{Pid, {setPosition, NewPos}}   	    		->  
-														NewState = updateEntityPosition(S, Pid, NewPos),
-									       			    loop(NewState);
-		{Pid, {getPosition}}            			->  
-														{Ent, EntityIsRegistered} = getEntityFromEntities(S#gpsServerState.entities, Pid),
-														Pos =   if EntityIsRegistered == ok -> 
-																			Ent#entity.position;
-																		true -> 
-																			""
-																end,
-														send_message(Pid, Pos),
-									   					loop(S);
-		{printState}			 	    			->  
-														print_debug_message(self(), "GPS Server State: ~w", S),
-									       				loop(S);
-		{Pid, {removeEntity}}   	    			->  
-														{Ent, EntityIsRegistered} = getEntityFromEntities(S#gpsServerState.entities, Pid),
-														S1 =   if EntityIsRegistered == ok -> 
-																		removeEntityFromPosition(S, Ent#entity.position, Pid);
-																		true -> 
-																			S
-																end,
-														NewState = removeEntity(S1, Pid), 
-									       				loop(NewState);
+		{Pid, {register, Type, Pos}} ->  
+			NewState = registerNewEntity(S, Pid, Type, Pos),
+			loop(NewState);
+		{Pid, {setPosition, NewPos}} ->  
+			NewState = updateEntityPosition(S, Pid, NewPos),
+			loop(NewState);
+		{Pid, {getPosition}} ->  
+			{Ent, EntityIsRegistered} = getEntityFromPid(S#gpsServerState.entities, Pid),
+			Pos = if 
+				EntityIsRegistered == ok -> 
+					Ent#entity.position;
+				true -> 
+					""
+			end,
+			send_message(Pid, Pos),
+			loop(S);
+		{printState} ->  
+			print_debug_message(self(), "GPS Server State: ~w", S),
+			loop(S);
+		{Pid, {removeEntity}} ->  
+			{Ent, EntityIsRegistered} = getEntityFromPid(S#gpsServerState.entities, Pid),
+			S1 = if 
+				EntityIsRegistered == ok -> 
+						removeEntityFromPosition(S, Ent#entity.position, Pid);
+					true -> 
+						S
+					end,
+			NewState = removeEntity(S1, Pid), 
+			loop(NewState);
 		{Pid, {getNearEntities, CurrentPos, Power}} -> 
-														Results = getNearEntities(S, CurrentPos, Power),
-														send_message(Pid, self(), Results),
-														loop(S);
+			Results = getNearEntities(S, CurrentPos, Power),
+			send_message(Pid, self(), Results),
+			loop(S);
 		{Pid, {getSortedEntities, CurrentPos, Power}} -> 
-														Results = getEntitiesSortedByDistance(S, CurrentPos, Power),
-														send_message(Pid, self(), Results),
-														loop(S);
-		{Pid, Ref, terminate}						->
-														send_message(Pid, {Ref, ok}),
-														print_debug_message(self(), "Exiting Gps Server loop", []);
+			Results = getEntitiesSortedByDistance(S, CurrentPos, Power),
+			send_message(Pid, self(), Results),
+			loop(S);
+		{Pid, Ref, terminate} ->
+			send_message(Pid, {Ref, ok}),
+			print_debug_message(self(), "Exiting Gps Server loop", []);
         Unknown ->
-														print_debug_message(self(), "Gps Server Received Unknown: ~p.", [Unknown]),
-														loop(S)
+			print_debug_message(self(), "Gps Server Received Unknown: ~p.", [Unknown]),
+			loop(S)
 	end.
 
 %% ====================================================================
@@ -127,94 +133,104 @@ loop(S) ->
 
 % Register the new entity. If it is already there updates position
 registerNewEntity(S, Pid, Type, Pos) -> 
-	{_Ent, EntityIsRegistered} = getEntityFromEntities(S#gpsServerState.entities, Pid),
-	FinalState =  if EntityIsRegistered == ok -> 
-						updateEntityPosition(S, Pid, Pos);
-					true -> 
-						S1 = insertEntityInPosition(S, Pos, {Pid, Type}),
-						NewEntity = #entity{pid = Pid, type = Type, position = Pos},	
-						NewEntities = S#gpsServerState.entities ++ [NewEntity],
-						S2 = S1#gpsServerState{entities = NewEntities},
-						S2
-				end,
+	{_Ent, EntityIsRegistered} = getEntityFromPid(S#gpsServerState.entities, Pid),
+	FinalState = if 
+		EntityIsRegistered == ok -> 
+			updateEntityPosition(S, Pid, Pos);
+		true -> 
+			S1 = insertEntityInPosition(S, Pos, {Pid, Type}),
+			NewEntity = #entity{pid = Pid, type = Type, position = Pos},	
+			NewEntities = [NewEntity] ++ S#gpsServerState.entities,
+			S1#gpsServerState{entities = NewEntities}
+	end,
 	FinalState.
 
 insertEntityInPosition(State, NodeName, NodeEnt) ->
 	CurrentNodesData = State#gpsServerState.nodes,
 	F = fun(Node) ->
-			Name = Node#nodeEntities.nodeData#node.name,
-			EntitiesInNode = Node#nodeEntities.entities,
-			NewEntities = if Name =:= NodeName -> EntitiesInNode ++ [NodeEnt];
-							true -> EntitiesInNode
-						end,
-			Node#nodeEntities{entities = NewEntities}
+		Name = Node#nodeEntities.nodeData#node.name,
+		EntitiesInNode = Node#nodeEntities.entities,
+		NewEntities = if 
+			Name =:= NodeName -> 
+				EntitiesInNode ++ [NodeEnt];
+			true -> 
+				EntitiesInNode
 		end,
+		Node#nodeEntities{entities = NewEntities}
+	end,
 	NewNodesData = lists:map(F, CurrentNodesData),
 	State#gpsServerState{nodes = NewNodesData}.
 
 updateEntityPosition(State, Pid, NewNodeName) ->
 	CurrentEntities = State#gpsServerState.entities,
-	{Ent, EntityIsRegistered} = getEntityFromEntities(CurrentEntities, Pid),
+	{Ent, EntityIsRegistered} = getEntityFromPid(CurrentEntities, Pid),
 
-	FinalState = if EntityIsRegistered == ok -> 
-						% rimuovere il pid da dov'è se l'entità è già presente
-						S1 = removeEntityFromPosition(State, Ent#entity.position, Pid),
-						% metterlo nella lista nel nuovo nodo
-						NodeEnt = {Pid, Ent#entity.type},
-						S2 = insertEntityInPosition(S1, NewNodeName, NodeEnt),
-						% aggiornare la sua posizione nella hash
+	FinalState = if 
+		EntityIsRegistered == ok -> 
+			% rimuovere il pid da dov'è se l'entità è già presente
+			S1 = removeEntityFromPosition(State, Ent#entity.position, Pid),
+			% metterlo nella lista nel nuovo nodo
+			NodeEnt = {Pid, Ent#entity.type},
+			S2 = insertEntityInPosition(S1, NewNodeName, NodeEnt),
+			% aggiornare la sua posizione nella hash
 
-						F = fun(Entity) ->
-							E_Pid = Entity#entity.pid,
-							Position = Entity#entity.position,
-							NewPosition = if E_Pid =:= Pid -> NewNodeName;
-												true -> Position
-											end,
-							Entity#entity{position = NewPosition}
-						end,
-
-						NewEntities= lists:map(F, CurrentEntities),
-						NewState = S2#gpsServerState{
-							entities = NewEntities	
-						},
-						NewState;
+			F = fun(Entity) ->
+				E_Pid = Entity#entity.pid,
+				Position = Entity#entity.position,
+				NewPosition = if 
+					E_Pid =:= Pid -> 
+						NewNodeName;
 					true -> 
-						State
+						Position
 				end,
+				Entity#entity{position = NewPosition}
+			end,
+
+			NewEntities= lists:map(F, CurrentEntities),
+			NewState = S2#gpsServerState{
+				entities = NewEntities	
+			},
+			NewState;
+		true -> 
+			State
+	end,
 	FinalState.
 
 removeEntityFromPosition(State, NodeName, Pid) -> 
 	CurrentNodesData = State#gpsServerState.nodes,
-	F = fun(Node) ->
-			Name = Node#nodeEntities.nodeData#node.name,
-			EntitiesInNode = Node#nodeEntities.entities,
-			F = fun(X) -> {Pid_Ent, _Type} = X, 
-						not (Pid == Pid_Ent)
-				end,
-			NewEntities = if Name =:= NodeName -> 
-								 	lists:filter(F, EntitiesInNode);
-								true -> 
-									EntitiesInNode
-							end,
-			Node#nodeEntities{entities = NewEntities}
+	Filter_F = fun(X) -> 
+		{Pid_Ent, _Type} = X, 
+		not (Pid == Pid_Ent)
+	end,
+	Map_F = fun(Node) ->
+		Name = Node#nodeEntities.nodeData#node.name,
+		EntitiesInNode = Node#nodeEntities.entities,
+		NewEntities = if 
+			Name =:= NodeName -> 
+				lists:filter(Filter_F, EntitiesInNode);
+			true -> 
+				EntitiesInNode
 		end,
-	NewNodesData = lists:map(F, CurrentNodesData),
+		Node#nodeEntities{entities = NewEntities}
+	end,
+	NewNodesData = lists:map(Map_F, CurrentNodesData),
 	State#gpsServerState{nodes = NewNodesData}.
 
 removeEntity(State, Pid) ->
 	CurrentEntities = State#gpsServerState.entities,
-	{Ent, EntityIsRegistered} = getEntityFromEntities(CurrentEntities, Pid),
-	NewState =  if EntityIsRegistered == ok -> 
-						S1 = removeEntityFromPosition(State, Ent#entity.position, Pid),
-							Filter = fun(N) -> 
-											N_Pid = N#entity.pid,
-											not (Pid == N_Pid)
-											end,
-							NewEntities = lists:filter(Filter, CurrentEntities),
-							S1#gpsServerState{entities = NewEntities};
-					true -> 
-						State
+	{Ent, EntityIsRegistered} = getEntityFromPid(CurrentEntities, Pid),
+	NewState =  if 
+		EntityIsRegistered == ok -> 
+			S1 = removeEntityFromPosition(State, Ent#entity.position, Pid),
+				Filter = fun(N) -> 
+					N_Pid = N#entity.pid,
+					not (Pid == N_Pid)
 				end,
+				NewEntities = lists:filter(Filter, CurrentEntities),
+				S1#gpsServerState{entities = NewEntities};
+		true -> 
+			State
+	end,
 	NewState.
 
 %% ====================================================================
@@ -226,14 +242,15 @@ calculateNodesDistances(State, CurrentPosName) ->
 	{StartNode_X, StartNode_Y} = getPositionFromNodes(CurrentPosName, GPS_Nodes),
 	
 	MapFunc = fun(Node) ->	  
-				NodeData = Node#nodeEntities.nodeData,
-				Curr_X = NodeData#node.pos_x,
-				Curr_Y = NodeData#node.pos_y,
-				SquaredDistanceNodes = calculateSquaredDistance({StartNode_X, StartNode_Y}, {Curr_X, Curr_Y}),
-				#nodeDistance{dist = SquaredDistanceNodes,
-							entities = Node#nodeEntities.entities
-							}
-			end,
+		NodeData = Node#nodeEntities.nodeData,
+		Curr_X = NodeData#node.pos_x,
+		Curr_Y = NodeData#node.pos_y,
+		SquaredDistanceNodes = calculateSquaredDistance({StartNode_X, StartNode_Y}, {Curr_X, Curr_Y}),
+		#nodeDistance{
+			dist = SquaredDistanceNodes,
+			entities = Node#nodeEntities.entities
+		}
+	end,
 
 	EntitiesDistances = lists:map(MapFunc, GPS_Nodes),	
 	EntitiesDistances.
@@ -248,9 +265,7 @@ getEntitiesSortedByDistance(State, CurrentPosName, Max_Distance) ->
 	NodesDistances = calculateNodesDistances(State, CurrentPosName),
 	FilteredNodes = filterNodesByDistance(NodesDistances, Max_Distance),
 
-	SortFun = fun(A, B) -> 
-						A#nodeDistance.dist < B#nodeDistance.dist
-						end,
+	SortFun = fun(A, B) -> A#nodeDistance.dist < B#nodeDistance.dist end,
 	Sorted_Nodes = lists:sort(SortFun, FilteredNodes),
 
 	PackedEntities = packNodesEntities(Sorted_Nodes, []),
@@ -277,9 +292,11 @@ getPos(NodeName, [H | T]) ->
 	   true -> getPos(NodeName, T)
 	end.
 
-getEntityFromEntities(Entities, ToSearch) ->
+getEntityFromPid(Entities, ToSearch) ->
 	Out = lists:filter(fun(X) -> (X#entity.pid == ToSearch) end, Entities),
-	if Out =:= [] -> {[], none};
+	if 
+		Out =:= [] -> 
+			{[], none};
 		true -> 
 			El = hd(Out),
 			{El, ok}

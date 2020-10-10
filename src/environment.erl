@@ -7,7 +7,9 @@
 -import('send', [send_message/2, send_message/3]).
 -import('city_map', [init_city/0]).
 -import('nodes_util',[getRandomPositionName/1]).
--import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3]).
+-import('utilities', [print_debug_message/1, 
+						print_debug_message/2, 
+						print_debug_message/3]).
 
 -include("records.hrl").
 -include("globals.hrl").
@@ -17,6 +19,8 @@
 							total_cars,
 							users, 
 							total_users,
+							cars_crashed,
+							total_cars_crashed,
 							city, 
 							tick_s_pid, 
 							pid_gps_server, 
@@ -54,8 +58,10 @@ init() ->
 	PID_server_gps = start_gps_server(City#city.nodes),
 	S = #environmentState{cars = [], 
 						  users = [], 
+						  cars_crashed = [],
 						  total_cars = 0,
 						  total_users = 0,
+						  total_cars_crashed = 0,
 						  city = City, 
 						  tick_s_pid = Pid_Tick, 
 						  pid_gps_server = PID_server_gps, 
@@ -89,7 +95,7 @@ loop(State) ->
 			loop(State);
 		{spawn, cars, N} -> 	
 			print_debug_message(self(), "Have to spawn ~w cars", [N]),
-			NewState = generate_multiple_cars(N, State),
+			NewState = generate_multiple_cars(State, N),
 			loop(NewState);
 		{spawn, users, N} -> 
 			print_debug_message(self(), "Have to spawn ~w users", State),
@@ -111,65 +117,90 @@ loop(State) ->
 handle_event(S, N) ->
 	NewState = if 	
 	    % Nothing
-	    N < 0 ->  print_debug_message(self(), "Event: ~p", "nothing happened"),
-				  S;
+	    N < 0 ->  
+			print_debug_message(self(), "Event: ~p", "nothing happened"),
+			S;
 		% Spawn Car
-		N < 10 -> print_debug_message(self(), "Event: ~p", "spawn car"),
-				  generate_single_car(S);
+		N < 10 -> 
+			print_debug_message(self(), "Event: ~p", "spawn car"),
+			generate_single_car(S);
 					
-	   	N < 15 -> print_debug_message(self(), "Event: ~p", "nothing happened"),
-				  S;
+	   	N < 15 -> 
+			print_debug_message(self(), "Event: ~p", "nothing happened"),
+			S;
 
-		N < 25 -> print_debug_message(self(), "Event: ~p", "spawn client"),
-				  generate_single_user(S);
+		N < 25 -> 
+			print_debug_message(self(), "Event: ~p", "spawn client"),
+			generate_single_user(S);
 	   	
-		N < 35 -> print_debug_message(self(), "Event: ~p", "nothing happened"),
-				  S;
+		N < 35 -> 
+			print_debug_message(self(), "Event: ~p", "nothing happened"),
+			S;
 	   	
-		N < 45 -> print_debug_message(self(), "Event: ~p", "client change target"),
-				  S;
+		N < 45 -> 
+			print_debug_message(self(), "Event: ~p", "client change target"),
+			Pid_User = getRandomUser(S),
+			NewDestination = getRandomNode(S),
+			print_debug_message(self(), "User {~w} has now new target [~p]", [Pid_User, NewDestination]),
+			S;
+		
+		N < 50 -> 
+			print_debug_message(self(), "Event: ~p", "nothing happened"),
+			S;
+		
+		N < 60 -> 
+			print_debug_message(self(), "Event: ~p", "car crash"),
+			CarID = getRandomCar(S),
+			print_debug_message(self(), "Car {~w} crashed!", [CarID]),
+			S;
 	   	
-		N < 50 -> print_debug_message(self(), "Event: ~p", "nothing happened"),
-				  S;
-	   	
-		N < 60 -> print_debug_message(self(), "Event: ~p", "car crash"),
-				  S;
-	   	
-		N < 70 -> print_debug_message(self(), "Event: ~p", "fix car"),
-				  S;
+		N < 70 -> 
+			print_debug_message(self(), "Event: ~p", "fix car"),
+			S;
 		
-		N < 75 -> print_debug_message(self(), "Event: ~p", "nothing happened"),
-				  S;
+		N < 75 -> 
+			print_debug_message(self(), "Event: ~p", "nothing happened"),
+			S;
 		
-		N < 77 -> print_debug_message(self(), "Event: ~p", "add node to map"),
-				  S;
+		N < 77 -> 
+			print_debug_message(self(), "Event: ~p", "add node to map"),
+			S;
 		
-		N == 77 -> print_debug_message(self(), "Event: ~p", "nothing happened"),
-				  S;
+		N == 77 -> 
+			print_debug_message(self(), "Event: ~p", "nothing happened"),
+			S;
 		
-		N < 80 -> print_debug_message(self(), "Event: ~p", "add street to map"),
-				  S;
+		N < 80 -> 
+			print_debug_message(self(), "Event: ~p", "add street to map"),
+			S;
 		
-		N == 80 -> print_debug_message(self(), "Event: ~p", "nothing happened"),
-				  S;
+		N == 80 -> 
+			print_debug_message(self(), "Event: ~p", "nothing happened"),
+			S;
 		
-		N < 83 -> print_debug_message(self(), "Event: ~p", "remove node from map"),
-				  S;
+		N < 83 -> 
+			print_debug_message(self(), "Event: ~p", "remove node from map"),
+			S;
 		
-		N == 83 -> print_debug_message(self(), "Event: ~p", "nothing happened"),
-				  S;
+		N == 83 -> 
+			print_debug_message(self(), "Event: ~p", "nothing happened"),
+			S;
 		
-		N < 86 -> print_debug_message(self(), "Event: ~p", "remove street from map"),
-				  S;
+		N < 86 -> 
+			print_debug_message(self(), "Event: ~p", "remove street from map"),
+			S;
 		
-		N < 95 -> print_debug_message(self(), "Event: ~p", "nothing happened"),
-				  S;
+		N < 95 -> 
+			print_debug_message(self(), "Event: ~p", "nothing happened"),
+			S;
 		
-		N < 100 -> print_debug_message(self(), "Event: ~p", "remove car"),
-				  S;
+		N < 100 -> 
+			print_debug_message(self(), "Event: ~p", "remove car"),
+			S;
 		
-		true -> print_debug_message(self(), "Event: ~p", "nothing happened"),
-				  S
+		true -> 
+			print_debug_message(self(), "Event: ~p", "nothing happened"),
+			S
 	end,
 	NewState.
 
@@ -177,16 +208,16 @@ handle_event(S, N) ->
 %% Internal functions
 %% ====================================================================
 
-generate_multiple_cars(N, State) ->
+generate_multiple_cars(State, N) ->
 	Cars_Generated = generate_entities(State, N, fun generate_taxi/1, []),
 	NewCars = Cars_Generated ++ State#environmentState.cars,
-	Total_Cars = State#environmentState.total_cars + 1,
+	Total_Cars = State#environmentState.total_cars + N,
 	State#environmentState{cars = NewCars, total_cars = Total_Cars}.
 
-generate_multiple_users(N, State) -> 
-	Users = generate_entities(State, N, fun generate_user/1, []),
-	NewUsers = Users ++ State#environmentState.users,
-	Total_Users = State#environmentState.total_users + 1,
+generate_multiple_users(State, N) -> 
+	Users_Generated = generate_entities(State, N, fun generate_user/1, []),
+	NewUsers = Users_Generated ++ State#environmentState.users,
+	Total_Users = State#environmentState.total_users + N,
 	State#environmentState{users = NewUsers, total_users = Total_Users}.
 	
 generate_single_car(State) ->

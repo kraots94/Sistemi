@@ -35,25 +35,38 @@ print_debug_message_raw(Text) -> io:format(Text).
 print_debug_message(Message) -> print_debug_message("", Message, none).
 print_debug_message(Format, Data) -> print_debug_message("", Format, Data).
 print_debug_message(PID, Format, Data) ->
-	if PID == "" -> 
-		   if Data == none -> 
-				  		io:format("[Debug] ~p ~n", [Format]);
-					true ->	
-						io:format("[Debug] "++Format++"~n", Data)
-		   end;
+	if 	PID == "" -> 
+		   	if 
+				Data == none -> 
+					io:format("[Debug] ~p ~n", [Format]);
+
+				true ->	
+					if 
+						is_list(Data) -> 
+							io:format("[Debug] "++Format++"~n", Data);
+						true ->
+							io:format("[Debug] "++Format++"~n", [Data])
+					end					
+		   	end;
 		true -> 
-			if Data == none -> 
+			if 
+				Data == none -> 
 					io:format("[Debug] {~w} - ~p ~n", [PID, Format]);
 				true ->	
-					if is_list(Data) -> HeadList = hd(Data),
-										if is_list(HeadList) -> io:format("[Debug] {~w} - "++Format++"~n", [PID] ++ Data);
-													   true -> io:format("[Debug] {~w} - "++Format++"~n", [PID, Data])
-										end;
-						true -> io:format("[Debug] {~w} - "++Format++"~n", [PID, Data])
+					if 
+						is_list(Data) -> 
+							HeadList = hd(Data),
+							if 
+								is_list(HeadList) -> 
+									io:format("[Debug] {~w} - "++Format++"~n", [PID] ++ Data);
+								true -> 
+									io:format("[Debug] {~w} - "++Format++"~n", [PID, Data])
+								end;
+						true -> 
+							io:format("[Debug] {~w} - "++Format++"~n", [PID, Data])
 					end
 			end	   
 	end.
-	
 
 calculateSquaredDistance({Px, Py}, {Qx, Qy}) ->
 	Diff_1 = Qx - Px,
@@ -73,7 +86,8 @@ generate_random_number(MAX) ->
 %% Internal functions
 %% ====================================================================
 
-createPairs([], ACC) -> ACC;
+createPairs([], ACC) -> 
+	ACC;
 
 createPairs([A , B | []], ACC) -> 
 	NEW_LIST = ACC ++ [{A, B}],
