@@ -65,7 +65,7 @@ init(InitData) ->
 					pidClock = PidClock,
 					pidAppUser = -1
 			},
-	%print_debug_message(self(), "Pids Created: ~w", [PidMoving, PidBattery, PidElection]),
+	print_car_message(self(), "Car ready in position [ ~p ]", InitialPos),
 	{ok, idle, State}.
 
 handle_common(cast, {die}, _OldState, State) ->
@@ -74,9 +74,13 @@ handle_common(cast, {die}, _OldState, State) ->
 	PidElection = State#taxiListenerState.pidElection,
 	PidGps = State#taxiListenerState.pidGps,
 	PidClock = State#taxiListenerState.pidClock,
+	% Kill car automata
 	gen_statem:stop(PidMov),gen_statem:stop(PidBattery),gen_statem:stop(PidElection), %ammazzo automi
-	gps_module:end_gps_module(PidGps), tick_server:end_clock(PidClock), %ammazzo server
-	print_debug_message("ho eliminato tutti"),
+	% Kill internal servers
+	gps_module:end_gps_module(PidGps), 
+	tick_server:end_clock(PidClock),
+
+	print_debug_message(self(), "Killed all car automata"),
 	gen_statem:stop(self()).
 	
 %roba che deve uscire

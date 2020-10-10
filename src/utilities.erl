@@ -26,7 +26,8 @@
 		 print_message/4,
 		 calculateSquaredDistance/2, 
 		 generate_random_number/1, 
-		 createPairsFromList/1]).
+		 createPairsFromList/1,
+		 getRandomEntity/2]).
 
 %print normal text
 %print normal text
@@ -87,6 +88,13 @@ generate_random_number(MAX) ->
 % 	print_debug_message("", "Generated number: ~w ~n", N)
 	N.
 
+getRandomEntity(Entities, Total_Entities) ->
+	Out = getRandomElement(Entities, Total_Entities),
+	if 
+		Out == empty_list -> 
+			-1;
+		true -> Out
+	end.
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
@@ -174,3 +182,9 @@ createPairs([A | []], _ACC) ->
 createPairs([A , B | Tail], ACC) ->
 	NEW_LIST = ACC ++ [{A, B}],
 	createPairs([B] ++ Tail, NEW_LIST).
+
+getRandomElement(List, 0) -> 
+	empty_list;
+getRandomElement(List, List_length) ->
+	RandomN = utilities:generate_random_number(List_length),
+	lists:nth(RandomN, List).
