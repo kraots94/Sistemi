@@ -2,7 +2,13 @@
 -compile(export_all).
 -behaviour(gen_statem).
 -import('send', [send_message/2, send_message/3]).
--import('utilities', [println/1, println/2, print_debug_message/1, print_debug_message/2, print_debug_message/3]).
+-import('utilities', [println/1, println/2, 
+						print_debug_message/1, 
+						print_debug_message/2, 
+						print_debug_message/3,
+						print_user_message/1,
+						print_user_message/2,
+						print_user_message/3]).
 -include("globals.hrl").
 -include("records.hrl").
 -define(DEBUGPRINT_APP, true).
@@ -94,8 +100,14 @@ waiting_election(cast, {winner, Data}, Stato) ->
 			printDebug("Winner Taxi_Data: "),
 			printDebugList(Data),
 			{next_state, waiting_car, Stato#userState{picCarServing = IdCarWinner}}
-	end.
+	end;
 
+waiting_election(cast, {already_running_election_wait}, Stato) -> 
+	print_user_message(self(), "Nearest Taxi is already running election."), 
+	Request = Stato#userState.request, %prendo la request
+	timer:sleep(3000), %aspetto un tempo random 
+	io:format("riprovo!"),
+	{next_state, idle, Stato, [{next_event,internal,{send_request,Request}}]}.
 
 %waitin_car_queue(cast, {changeDest, _NewDest}, _State) ->
 %	%invio evento non puoi cambiare path...

@@ -9,7 +9,10 @@
 -import('nodes_util',[getRandomPositionName/1]).
 -import('utilities', [print_debug_message/1, 
 						print_debug_message/2, 
-						print_debug_message/3]).
+						print_debug_message/3,
+						print_environment_message/1,
+						print_environment_message/2,
+						print_environment_message/3]).
 
 -include("records.hrl").
 -include("globals.hrl").
@@ -52,7 +55,7 @@ end_environment(Pid) ->
 %% ====================================================================
 
 init() -> 
-	print_debug_message("Start Environment"),
+	print_environment_message("Start Environment"),
 	City = init_city(),
 	Pid_Tick = start_clock([self()]),
 	PID_server_gps = start_gps_server(City#city.nodes),
@@ -71,9 +74,6 @@ init() ->
 
 loop(State) ->
     receive
-		{Pid, tot_nodes} -> 
-			Pid ! State#environmentState.city#city.total_nodes,
-			loop(State);
 		{_Pid, tick} -> 
 			CurrentTickCounter = State#environmentState.tick_counter,
 			NextTick = CurrentTickCounter + 1,
@@ -85,20 +85,20 @@ loop(State) ->
 					State#environmentState{tick_counter = NextTick}
 				end,
 			loop(NewState);
-		{_Pid, {event, N}} -> 
+		{event, N} -> 
 			loop(handle_event(State, N));
-		{_Pid, {print, wireless_card}} -> 
+		{print, wireless_card} -> 
 			State#environmentState.pid_gps_server ! {self(), {printState}},
 			loop(State);
-		{_Pid, {print, self}} -> 
-			print_debug_message(self(), "Environment State: ~w", State),
+		{print, self} -> 
+			print_environment_message(self(), "Environment State: ~w", State),
 			loop(State);
 		{spawn, cars, N} -> 	
-			print_debug_message(self(), "Have to spawn ~w cars", [N]),
+			print_debug_message(self(), "Have to spawn ~w cars", N),
 			NewState = generate_multiple_cars(State, N),
 			loop(NewState);
 		{spawn, users, N} -> 
-			print_debug_message(self(), "Have to spawn ~w users", State),
+			print_debug_message(self(), "Have to spawn ~w users", N),
 			NewState = generate_multiple_users(State, N),
 			loop(NewState);
         {Pid, Ref, terminate} ->
@@ -141,7 +141,7 @@ handle_event(S, N) ->
 			print_debug_message(self(), "Event: ~p", "client change target"),
 			Pid_User = getRandomUser(S),
 			NewDestination = getRandomNode(S),
-			print_debug_message(self(), "User {~w} has now new target [~p]", [Pid_User, NewDestination]),
+			print_environment_message(self(), "User {~w} has now new target [~p]", [Pid_User, NewDestination]),
 			S;
 		
 		N < 50 -> 
@@ -151,7 +151,7 @@ handle_event(S, N) ->
 		N < 60 -> 
 			print_debug_message(self(), "Event: ~p", "car crash"),
 			CarID = getRandomCar(S),
-			print_debug_message(self(), "Car {~w} crashed!", [CarID]),
+			print_environment_message(self(), "Car {~w} crashed!", [CarID]),
 			S;
 	   	
 		N < 70 -> 
@@ -271,17 +271,27 @@ getRandomNode(S) ->
 	NodeName.
 
 getRandomUser(S) -> 
-	Users = S#environmentState.cars,
 	TotalUsers = S#environmentState.total_users,
-	RandomN = utilities:generate_random_number(TotalUsers),
-	RandomUser = lists:nth(RandomN, Users),
+	RandomUser = if
+		TotalUsers > 0 ->
+			Users = S#environmentState.users,
+			RandomN = utilities:generate_random_number(TotalUsers),
+			lists:nth(RandomN, Users);
+		true ->
+			-1
+	end,
 	RandomUser.
 
 getRandomCar(S) ->
-	Cars = S#environmentState.cars,
 	Total_Cars = S#environmentState.total_cars,
-	RandomN = utilities:generate_random_number(Total_Cars),
-	RandomCar = lists:nth(RandomN, Cars),
+	RandomCar = if
+		Total_Cars > 0 ->
+			Cars = S#environmentState.cars,
+			RandomN = utilities:generate_random_number(Total_Cars),
+			lists:nth(RandomN, Cars);
+		true ->
+			-1
+	end,
 	RandomCar.
 
 generateUserRequest(State, User_Position) ->

@@ -2,7 +2,13 @@
 -compile(export_all).
 -behaviour(gen_statem).
 -import('send', [send_message/2, send_message/3]).
--import('utilities', [println/1, println/2, print_debug_message/1, print_debug_message/2, print_debug_message/3]).
+-import('utilities', [println/1, println/2, 
+						print_debug_message/1, 
+						print_debug_message/2, 
+						print_debug_message/3,
+						print_user_message/1,
+						print_user_message/2,
+						print_user_message/3]).
 -include("globals.hrl").
 -include("records.hrl").
 -define(DEBUGPRINT_USER, false).
