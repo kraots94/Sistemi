@@ -170,10 +170,6 @@ idle({call,From}, {getDataElection}, State) ->
 	Battery_level = State#movingCarState.batteryLevel,
 	Packet = {Cost_To_last_Target, Current_Target, Battery_level},
 	{keep_state, State, [{reply,From,Packet}]};
-
-%gestisco tick ricevuti in idle ignorandoli
-idle(info, {_From, tick}, _State) ->
-	keep_state_and_data;
 	
 ?HANDLE_COMMON.
 	  

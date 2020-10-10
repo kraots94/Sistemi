@@ -6,7 +6,7 @@
 %timeToTick: espresso in secondi, tempo di attesa tra due tick
 %Subscribers: lista dei processi che ricevono il tick
 start_clock(Subcribers) ->
-	Pid = spawn(tick_server, tick_generation, [Subcribers]),
+	Pid = spawn_link(tick_server, tick_generation, [Subcribers]),
 	Pid.
 
 tick_generation(Subscribers) ->
