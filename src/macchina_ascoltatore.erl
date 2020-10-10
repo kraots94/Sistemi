@@ -6,7 +6,13 @@
 -behaviour(gen_statem).
 -include("records.hrl").
 -include("globals.hrl").
--import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3, generate_random_number/1]).
+-import('utilities', [print_debug_message/1, 
+						print_debug_message/2, 
+						print_debug_message/3, 
+						print_car_message/1,
+						print_car_message/2,
+						print_car_message/3, 
+						generate_random_number/1]).
 
 callback_mode() -> [state_functions].
 
@@ -133,8 +139,8 @@ listen_election(cast, {to_outside, {Target, Data}}, _Stato) ->
 	keep_state_and_data;
 
 listen_election(cast, {beginElection, Data}, _Stato) ->
-	{PID_APP_USER, _Request} = Data,
-	gen_statem:cast(PID_APP_USER, {already_running_election_wait}),
+	{_From, _To, PidAppUser} = Data,
+	gen_statem:cast(PidAppUser, {already_running_election_wait}),
 	keep_state_and_data;
 
 listen_election(cast, {partecipateElection, Data}, _Stato) ->

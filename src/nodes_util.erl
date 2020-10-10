@@ -6,7 +6,7 @@
 
 -include("records.hrl").
 -include("globals.hrl").
--import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3, print_debug_message_raw/1]).
+-import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3, print_message_raw/1]).
 %% ====================================================================
 %% API functions
 %% ====================================================================
@@ -25,7 +25,7 @@ load_charging_cols() ->
 	Nodes.
 
 print_nodes(Nodes) -> 
-	print_debug_message_raw("id name x y~n"),
+	print_message_raw("id name x y~n"),
 	print_node(Nodes).
 
 getNodeID(NodeName,Nodes) -> 

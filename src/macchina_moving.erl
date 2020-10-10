@@ -3,7 +3,14 @@
 -behaviour(gen_statem).
 -include("records.hrl").
 -include("globals.hrl").
--import('utilities', [println/1, println/2, print_debug_message/1, print_debug_message/2, print_debug_message/3, print_debug_message_raw/1]).
+-import('utilities', [println/1, println/2, 
+						print_debug_message/1, 
+						print_debug_message/2, 
+						print_debug_message/3, 
+						print_message_raw/1,
+						print_car_message/1,
+						print_car_message/2,
+						print_car_message/3]).
 -define(DEBUGPRINT_MOVING, true).
 -define(TICKS_TO_CHARGE, 3).
 

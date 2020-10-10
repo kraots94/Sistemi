@@ -3,7 +3,12 @@
 -behaviour(gen_statem).
 -include("globals.hrl").
 -include("records.hrl").
--import('utilities', [print_debug_message/1, print_debug_message/2, print_debug_message/3]).
+-import('utilities', [print_debug_message/1, 
+						print_debug_message/2, 
+						print_debug_message/3,
+						print_car_message/1,
+						print_car_message/2,
+						print_car_message/3]).
 
 callback_mode() -> [state_functions].
 -define(TICKS_CHECK_BATTERY, 1).
