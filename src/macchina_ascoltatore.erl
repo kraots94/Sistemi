@@ -58,13 +58,15 @@ dieSoft(ListenerPid) ->
 	end.
 
 die(ListenerdPid) ->
-	gen_statem:cast(ListenerdPid, {die}).
+	gen_statem:cast(ListenerdPid, {die}),
+	killed.
 
 %% ====================================================================
 %% Automata functions
 %% ====================================================================
 
 init(InitData) -> 
+	print_debug_message(self(), "Spawning Car with data: ~w", InitData),
 	{InitialPos, PidGpsServer, City_Map} = InitData,
 	%creo pid delle entita' associate
 	PidGpsModule = gps_module:start_gps_module(initDataGpsModule(PidGpsServer,InitialPos)), %start gps module (and register)
@@ -80,7 +82,7 @@ init(InitData) ->
 					pidClock = PidClock,
 					pidAppUser = -1
 			},
-	print_car_message(self(), "Car ready in position [ ~p ]", InitialPos),
+	print_car_message(self(), "Car ready in position [~p]", InitialPos),
 	{ok, idle, State}.
 
 handle_common({call,From}, {areYouKillable}, OldState, State) ->
@@ -91,7 +93,7 @@ handle_common({call,From}, {areYouKillable}, OldState, State) ->
 	end;
 
 handle_common(cast, {die}, _OldState, State) ->
-	ammazzami(State).
+	killEntities(State).
 
 %roba che deve uscire
 idle(cast, {to_outside, {Target, Data}}, _Stato) ->
@@ -117,6 +119,7 @@ idle(cast, {send_requestNoElection, Request}, Stato) ->
 %begin election ricevuto da app utente
 %Data = {From,To,PidAppUser}
 idle(cast, {beginElection, Data}, Stato) ->
+	print_debug_message(self(), "Have to start election, received request: ~w", Data),
 	{From,To,PidAppUser} = Data,
 	Request = #user_request{from = From, to = To},
 	NewData = #dataElectionBegin{request = Request, pidAppUser = PidAppUser},
@@ -127,7 +130,7 @@ idle(cast, {beginElection, Data}, Stato) ->
 
 %partecipate election ricevuto da altra macchina
 idle(cast, {partecipateElection, Data}, Stato) ->
-	%print_debug_message(self(), "Listener - partecipateElection - ~w", [Data]),
+	print_debug_message(self(), "Request to partecipate election:  ~w", Data),
 	PidElezione = Stato#taxiListenerState.pidElection,
 	gen_statem:cast(PidElezione, {partecipateElection, Data}),
 	{next_state, listen_election, Stato};
@@ -147,7 +150,8 @@ listen_election(cast, {election_data, Data}, Stato) ->
 	PidElezione = Stato#taxiListenerState.pidElection,
 	gen_statem:cast(PidElezione, Data),
 	keep_state_and_data;
-%roba che deve uscire
+
+% data out of this car
 listen_election(cast, {to_outside, {Target, Data}}, _Stato) ->
 	gen_statem:cast(Target, Data),
 	keep_state_and_data;
@@ -160,37 +164,40 @@ listen_election(cast, {beginElection, Data}, _Stato) ->
 listen_election(cast, {partecipateElection, Data}, _Stato) ->
 	PidSender = Data#dataElectionPartecipate.pidParent,
 	gen_statem:cast(PidSender, {election_data, {invite_result, {self(), i_can_not_join}}}),
-	%print_debug_message(self(), "Listener - i_can_not_join To ~w", [PidSender]),
 	keep_state_and_data;
 
 listen_election(cast, {election_results, Data}, Stato) ->
-%[Debug] {<0.10850.0>} - Listener - Winning Results: [{election_result_to_car,<0.10838.0>,<0.10856.0>}]
 	PidElezione = Stato#taxiListenerState.pidElection,
-	{DataToUse, Is_Initiator} = if is_list(Data) -> 
-													% Tolgo l'elezione dallo stato di calcolo
-													gen_statem:cast(PidElezione, {exit_final_state_initator}),
-													{hd(Data), true};
-											true -> {Data, false}
-								end,
+	{DataToUse, Is_Initiator} = if 
+		is_list(Data) -> %meaning received by initiator
+			% Tolgo l'elezione dallo stato di calcolo
+			gen_statem:cast(PidElezione, {exit_final_state_initator}),
+			{hd(Data), true};
+		true -> 
+			{Data, false}
+	end,
 
 	Pid_Car = DataToUse#election_result_to_car.id_winner,
 
-	if (Pid_Car == -1) and (Is_Initiator)-> % Avviso l'utente se non c'è un vincitore
-								notify_user_no_taxi(Stato#taxiListenerState.pidAppUser);
-					Pid_Car == self() -> 
-								gen_statem:call(PidElezione, {sendMovingQueue}),
-								%% Update coda moving
-								PidMoving = Stato#taxiListenerState.pidMoving,
-								Pid_User = DataToUse#election_result_to_car.id_app_user,
-								TimeToUser = macchina_moving:getTimeToUser(PidMoving),
-								DataToUser = #election_result_to_user{
-										id_car_winner = Pid_Car, 
-										time_to_wait = TimeToUser
-									},
-								gen_statem:cast(Pid_User, {winner, DataToUser});
-					true -> ok
+	if 
+		(Pid_Car == -1) and (Is_Initiator) -> % Avviso l'utente se non c'è un vincitore
+			notify_user_no_taxi(Stato#taxiListenerState.pidAppUser);
+		Pid_Car == self() -> 
+			print_debug_message(self(), "I have won election"),
+			%% Update coda moving
+			gen_statem:call(PidElezione, {sendMovingQueue}),
+
+			% notifica utente
+			PidMoving = Stato#taxiListenerState.pidMoving,
+			Pid_User = DataToUse#election_result_to_car.id_app_user,
+			TimeToUser = macchina_moving:getTimeToUser(PidMoving),
+			DataToUser = #election_result_to_user{
+				id_car_winner = Pid_Car, 
+				time_to_wait = TimeToUser
+			},
+			gen_statem:cast(Pid_User, {winner, DataToUser});
+		true -> ok
 	end,
-	%print_debug_message(self(), "Listener - Winning Results: ~w", [Data]),
 	{next_state, idle, Stato};
 
 ?HANDLE_COMMON.
@@ -206,22 +213,22 @@ listen_election(cast, {election_results, Data}, Stato) ->
 
 initDataGpsModule(PidGpsServer,InitialPosition) ->
 	#dataInitGPSModule{
-							pid_entity = self(), 
-							type = car, 
-							pid_server_gps = PidGpsServer,
-							starting_pos = InitialPosition, 
-							signal_power = ?GPS_MODULE_POWER, 
-							map_side = ?MAP_SIDE}.
+		pid_entity = self(), 
+		type = car, 
+		pid_server_gps = PidGpsServer,
+		starting_pos = InitialPosition, 
+		signal_power = ?GPS_MODULE_POWER, 
+		map_side = ?MAP_SIDE}.
 
 notify_user_no_taxi(PID) ->
 	Pid_User = PID,
 	DataToUser = #election_result_to_user{
-			id_car_winner = -1, 
-			time_to_wait = -1
-		},
+		id_car_winner = -1, 
+		time_to_wait = -1
+	},
 	gen_statem:cast(Pid_User, {winner, DataToUser}).
 
-ammazzami(State) ->
+killEntities(State) ->
 	PidMov = State#taxiListenerState.pidMoving,
 	PidBattery =  State#taxiListenerState.pidBattery,
 	PidElection = State#taxiListenerState.pidElection,
@@ -229,5 +236,5 @@ ammazzami(State) ->
 	PidClock = State#taxiListenerState.pidClock,
 	gen_statem:stop(PidMov),gen_statem:stop(PidBattery),gen_statem:stop(PidElection), %ammazzo automi
 	gps_module:end_gps_module(PidGps), tick_server:end_clock(PidClock), %ammazzo server
-	print_debug_message("ho eliminato tutti"),
+	print_debug_message(self(), "All linked entities killed"),
 	gen_statem:stop(self()).

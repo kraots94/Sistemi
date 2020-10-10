@@ -45,7 +45,7 @@ start_gps_server(Nodes) ->
 	spawn_link('gps_server', init, [Nodes]).
 
 end_gps_server(Pid) ->
-	print_debug_message("Killing GPS Server", []),
+	print_debug_message("Killing GPS Server"),
 	Ref = erlang:monitor(process, Pid),
 	send_message(Pid, {self(), Ref, terminate}),
 	
@@ -123,7 +123,7 @@ loop(S) ->
 			send_message(Pid, {Ref, ok}),
 			print_debug_message(self(), "Exiting Gps Server loop");
         Unknown ->
-			print_debug_message(self(), "Gps Server Received Unknown: ~p.", [Unknown]),
+			print_debug_message(self(), "Gps Server Received Unknown: ~w", [Unknown]),
 			loop(S)
 	end.
 

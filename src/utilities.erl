@@ -4,6 +4,7 @@
 
 -module(utilities).
 -include("globals.hrl").
+-define(PRINT_DEBUG_ENABLE, true).
 %% ====================================================================
 %% API functions
 %% ====================================================================
@@ -114,6 +115,24 @@ fix_and_print_message(Type, PID, Format, Data) ->
 	end.
 
 printMessage(Type, PID, Format, Data) ->
+	CanPrint = if 
+		Type == "Debug" ->
+			if ?PRINT_DEBUG_ENABLE -> 
+					ok;
+				true -> 
+					not_ok
+			end;
+		true -> 
+			ok
+	end,
+	if 
+		CanPrint == ok ->
+			printMessageConsole(Type, PID, Format, Data);
+		true -> 
+			ok
+	end.
+
+printMessageConsole(Type, PID, Format, Data) ->
 	if 	PID == "" -> 
 		   	if 
 				Data == none -> 

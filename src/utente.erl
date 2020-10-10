@@ -56,22 +56,16 @@ init(InitData) ->
 				  pidApp = PidApp},
 	{ok, idle, State}.
 
-handle_common(cast, {die}, OldState, State) ->
-	ammazzami(State);
+handle_common(cast, {die}, _OldState, State) ->
+	killEntities(State);
 
 handle_common(cast, {dieSoft}, OldState, State) ->
 	if OldState == idle ->
-		  ammazzami(State);
+		killEntities(State);
 	   true ->
 		   keep_state_and_data
 	end.
        
-
-%env mi invia spostamento (formattato come sempre)
-idle(info, {moveToTarget, Request}, State) -> 
-	appUtente_flusso:sendRequest(State#user.pidApp, Request),
-	{next_state,waitingService,State};
-
 idle(cast, {send_request, Request}, State) ->
 	appUtente_flusso:sendRequest(State#user.pidApp, Request),
 	{next_state,waitingService,State};
@@ -104,8 +98,9 @@ moving(cast, arrivedTargetPosition, _State) ->
 %% Internal functions
 %% ====================================================================
 
-ammazzami(State) ->
-	gen_statem:stop(State#user.pidApp),
+killEntities(State) ->
+	PidAdd = State#user.pidApp,
+	gen_statem:cast(PidAdd, {die}),
 	gen_statem:stop(self()).
 
 printDebug(ToPrint) ->

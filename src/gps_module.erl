@@ -116,7 +116,7 @@ loop(S) ->
                         end,
                     send_message(Pid_Entity, FirstCar);
                 Unknown -> 
-                    print_debug_message(self(), "Bad data received: ~p", [Unknown])
+                    print_debug_message(self(), "Bad data received: ~w", [Unknown])
             end,
             loop(S);
         {getNearCars} -> 
@@ -132,7 +132,7 @@ loop(S) ->
                     ClearedResults = lists:delete(Pid_Entity, MappedResults),
                     send_message(Pid_Entity, ClearedResults);
                 Unknown -> 
-                    print_debug_message(self(), "Bad data received: ~p", [Unknown])
+                    print_debug_message(self(), "Bad data received: ~w", [Unknown])
             end,
             loop(S);
         {PID, getNearCars} -> 
@@ -148,7 +148,7 @@ loop(S) ->
                         ClearedResults = lists:delete(Pid_Entity, MappedResults),
                         send_message(PID, ClearedResults);
                 Unknown -> 
-                        print_debug_message(self(), "Bad data received: ~p", [Unknown])
+                        print_debug_message(self(), "Bad data received: ~w", [Unknown])
             end,
             loop(S);
         {Pid, Ref, terminate} ->
@@ -156,9 +156,9 @@ loop(S) ->
             Pid_S = S#gpsModuleState.pid_gps_server,
             Pid_Entity = S#gpsModuleState.pid_entity,
             send_message(Pid_S, Pid_Entity, {removeEntity}),
-            print_debug_message(self(), "Exiting gps module loop", []);
+            print_debug_message(self(), "Exiting gps module loop");
         Unknown ->
-            print_debug_message(self(), "Gps Module Received Unknown: ~p.", [Unknown]),
+            print_debug_message(self(), "Gps Module Received Unknown: ~w.", [Unknown]),
             loop(S)
 	end.
 

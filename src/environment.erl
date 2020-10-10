@@ -58,7 +58,7 @@ end_environment(Pid) ->
 %% ====================================================================
 
 init() -> 
-	print_environment_message("Start Environment"),
+	print_debug_message("Start Environment"),
 	City = init_city(),
 	Pid_Tick = start_clock([self()]),
 	PID_server_gps = start_gps_server(City#city.nodes),
@@ -72,7 +72,7 @@ init() ->
 						  tick_s_pid = Pid_Tick, 
 						  pid_gps_server = PID_server_gps, 
 						  tick_counter = 0},
-	print_debug_message(self(), "Environment Created"),
+	print_environment_message(self(), "Environment Created"),
 	loop(S).
 
 loop(State) ->
@@ -152,7 +152,13 @@ handle_event(S, N) ->
 			print_debug_message(self(), "Event: ~p", "client change target"),
 			Pid_User = getRandomUser(S),
 			NewDestination = getRandomNode(S),
-			print_environment_message(self(), "User {~w} has now new target [~p]", [Pid_User, NewDestination]),
+			UserChangedDest = changeDestUser(Pid_User, NewDestination),
+			if 
+				UserChangedDest == changed ->
+					print_environment_message(self(), "User {~w} has now new target [~p]", [Pid_User, NewDestination]);
+				true ->
+					ok
+			end,
 			S;
 		
 		N < 50 -> 
@@ -174,7 +180,7 @@ handle_event(S, N) ->
 					New_total_cars_crashed = Total_Crashed + 1,
 					%TODO Write here code to notify car
 
-					print_environment_message(self(), "Car {~w} crashed!", Car_To_Crash),
+					print_environment_message(self(), "Car with pid {~w} has punctured rubber of the car!", Car_To_Crash),
 					S#environmentState{
 						cars_crashed = New_crashed_cars,
 						total_cars_crashed = New_total_cars_crashed
@@ -195,7 +201,7 @@ handle_event(S, N) ->
 					New_total_cars_crashed = Total_Crashed - 1,
 					%TODO Write here code to notify car
 				
-					print_environment_message(self(), "Car {~w} fixed!", Car_To_Fix),
+					print_environment_message(self(), "Car with pid {~w} has been fixed!", Car_To_Fix),
 					S#environmentState{
 						cars_crashed = New_crashed_cars,
 						total_cars_crashed = New_total_cars_crashed
@@ -250,6 +256,7 @@ handle_event(S, N) ->
 					if Pid_Removed == -1 ->
 							print_debug_message(self(), "Event kill car not occurred because not found car in idle");
 						true ->
+							print_environment_message(self(), "Car with pid {~w} has been removed!", Pid_Removed),
 							Cars = S#environmentState.cars,
 							NewCars = lists:delete(Pid_Removed, Cars),
 							New_Total_Cars = Total_Cars - 1,
@@ -305,8 +312,8 @@ generate_user(State) ->
 	NodeStart = getRandomNode(State),
 	Request = generateUserRequest(State, NodeStart),
 	PidGpsServer = State#environmentState.pid_gps_server,
-	PidUtente = appUtente_flusso:start({NodeStart, PidGpsServer}),
-	appUtente_flusso:sendRequest(PidUtente, Request),
+	PidUtente = utente:start({NodeStart, PidGpsServer}),
+	utente:sendRequest(PidUtente, Request),
 	PidUtente.
 
 kill_car(Pid, ForceKill) ->
@@ -318,26 +325,24 @@ kill_car(Pid, ForceKill) ->
 	end,
 	if 
 		Out == killed ->
-			print_environment_message(self(), "Car with PID {~w} removed", Pid);
+			print_debug_message(self(), "Car with PID {~w} has been removed", Pid);
 		true ->
-			print_environment_message(self(), "Car with PID {~w} removed", Pid)
+			print_debug_message(self(), "Car with PID {~w} has been not removed", Pid)
 	end,
 	Out.
 
-kill_user(Pid, ForceKill) -> %TODO Notify user
+kill_user(Pid, ForceKill) ->
 	Out = if 
 		ForceKill -> 
-%			utente:die(Pid),
-			killed;
+			utente:die(Pid);
 		true ->
-%			utente:dieSoft(Pid),
-			killed
+			utente:dieSoft(Pid)
 	end,
 		if 
 		Out == killed ->
-			print_environment_message(self(), "User with PID {~w} removed", Pid);
+			print_debug_message(self(), "User with PID {~w} removed", Pid);
 		true ->
-			print_environment_message(self(), "User with PID {~w} removed", Pid)
+			print_debug_message(self(), "User with PID {~w} removed", Pid)
 	end,
 	Out.
 
@@ -350,6 +355,10 @@ remove_car_from_state(State, Pid) ->
 	NewCars = lists:delete(Pid, State#environmentState.cars),
 	Total_Cars = State#environmentState.total_cars - 1,
 	State#environmentState{users = NewCars, total_cars = Total_Cars}.
+
+changeDestUser(_Pid, _NewDest) ->
+	%TODO check if user can change ad make it real
+	changed.
 
 % uccide l'orologio e gli automi delle macchine / utenti
 terminate(State) ->

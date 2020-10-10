@@ -68,9 +68,13 @@ handle_common(cast, {newNodeReached, NewNode}, OldState, State) ->
 				  true -> %ricevuto non in moving, potrei dire a utente servito dov'è auto mentre si sposta da lui
 					State
 			   end,
-	{keep_state, NewState}.
+	{keep_state, NewState};
+
+handle_common(cast, {die}, _OldState, State) ->
+	PidGpsModule = State#userState.pidGPSModule,
+	gps_module:end_gps_module(PidGpsModule),
+	gen_statem:stop(self()).
   		   
-	
 idle(enter, _OldState, _Stato) -> keep_state_and_data;
  
 idle(internal,{send_request, Request}, State) ->
