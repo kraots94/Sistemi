@@ -25,3 +25,6 @@ appUtente_flusso:sendRequest(PidUser, {"c","p"}).
 appUtente_flusso:sendRequest(PidUser2, {"p","j"}).
 
 appUtente_flusso:sendRequest(PidUser3, {"a","s"}).
+
+
+f(), make:all(), PID_ENV = main:start_project().

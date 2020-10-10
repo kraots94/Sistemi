@@ -12,10 +12,13 @@
 						print_debug_message/3,
 						print_environment_message/1,
 						print_environment_message/2,
-						print_environment_message/3]).
+						print_environment_message/3,
+						getRandomEntity/2]).
 
 -include("records.hrl").
 -include("globals.hrl").
+-define(MAX_KILL_TRIES, 20).
+
 % State environment:
 
 -record(environmentState,  {cars,
@@ -69,7 +72,7 @@ init() ->
 						  tick_s_pid = Pid_Tick, 
 						  pid_gps_server = PID_server_gps, 
 						  tick_counter = 0},
-	print_debug_message(self(), "Environment Created", none),
+	print_debug_message(self(), "Environment Created"),
 	loop(S).
 
 loop(State) ->
@@ -101,10 +104,18 @@ loop(State) ->
 			print_debug_message(self(), "Have to spawn ~w users", N),
 			NewState = generate_multiple_users(State, N),
 			loop(NewState);
+		{task_complete, user, Pid} -> 	
+			print_debug_message(self(), "Have to remove user with Pid {~w}", Pid),
+			NewState = remove_user_from_state(State, Pid),
+			loop(NewState);
+		{task_complete, car, Pid} -> 	
+			print_debug_message(self(), "Have to remove car with Pid {~w}", Pid),
+			NewState = remove_car_from_state(State, Pid),
+			loop(NewState);
         {Pid, Ref, terminate} ->
 			send_message(Pid, {Ref, ok}),
 			terminate(State),
-			print_debug_message(self(), "Exiting enviroment loop", []);
+			print_debug_message(self(), "Exiting enviroment loop");
         Unknown ->
 			print_debug_message(self(), "Environment Received Unknown: ~p", Unknown),
             loop(State)
@@ -150,14 +161,47 @@ handle_event(S, N) ->
 		
 		N < 60 -> 
 			print_debug_message(self(), "Event: ~p", "car crash"),
-			CarID = getRandomCar(S),
-			print_environment_message(self(), "Car {~w} crashed!", [CarID]),
-			S;
+			Total_Cars = S#environmentState.total_cars,
+			Total_Crashed = S#environmentState.total_cars_crashed,
+			if
+				Total_Cars == Total_Crashed ->
+					print_debug_message(self(), "Event car crash not occurred because all cars are already crashed"),
+					S;
+				true ->					
+					CrashedCars = S#environmentState.cars_crashed,
+					Car_To_Crash = searchCarNotCrashed(S, CrashedCars, true, -1),
+					New_crashed_cars = [Car_To_Crash] ++ CrashedCars,
+					New_total_cars_crashed = Total_Crashed + 1,
+					%TODO Write here code to notify car
+
+					print_environment_message(self(), "Car {~w} crashed!", Car_To_Crash),
+					S#environmentState{
+						cars_crashed = New_crashed_cars,
+						total_cars_crashed = New_total_cars_crashed
+					}
+			end;
 	   	
 		N < 70 -> 
 			print_debug_message(self(), "Event: ~p", "fix car"),
-			S;
-		
+			Total_Crashed = S#environmentState.total_cars_crashed,
+			if
+				Total_Crashed == 0 ->
+					print_debug_message(self(), "Event car fix not occurred because no cars are crashed"),
+					S;
+				true ->					
+					Car_To_Fix = getRandomCrashedCar(S),
+					CrashedCars = S#environmentState.cars_crashed,
+					New_crashed_cars = lists:delete(Car_To_Fix, CrashedCars),
+					New_total_cars_crashed = Total_Crashed - 1,
+					%TODO Write here code to notify car
+				
+					print_environment_message(self(), "Car {~w} fixed!", Car_To_Fix),
+					S#environmentState{
+						cars_crashed = New_crashed_cars,
+						total_cars_crashed = New_total_cars_crashed
+					}
+			end;
+
 		N < 75 -> 
 			print_debug_message(self(), "Event: ~p", "nothing happened"),
 			S;
@@ -196,7 +240,25 @@ handle_event(S, N) ->
 		
 		N < 100 -> 
 			print_debug_message(self(), "Event: ~p", "remove car"),
-			S;
+			Total_Cars = S#environmentState.total_cars,
+			if 
+				Total_Cars == 0 ->
+					print_debug_message(self(), "Event kill car not occurred because no cars are "),
+					S;
+				true ->
+					Pid_Removed = findAndKillCar(S, not_killed, -1, 0),
+					if Pid_Removed == -1 ->
+							print_debug_message(self(), "Event kill car not occurred because not found car in idle");
+						true ->
+							Cars = S#environmentState.cars,
+							NewCars = lists:delete(Pid_Removed, Cars),
+							New_Total_Cars = Total_Cars - 1,
+							S#environmentState{
+								cars = NewCars,
+								total_cars = New_Total_Cars
+							}
+					end
+			end;
 		
 		true -> 
 			print_debug_message(self(), "Event: ~p", "nothing happened"),
@@ -247,8 +309,54 @@ generate_user(State) ->
 	appUtente_flusso:sendRequest(PidUtente, Request),
 	PidUtente.
 
+kill_car(Pid, ForceKill) ->
+	Out = if 
+		ForceKill -> 
+			macchina_ascoltatore:die(Pid);
+		true ->
+			macchina_ascoltatore:dieSoft(Pid)
+	end,
+	if 
+		Out == killed ->
+			print_environment_message(self(), "Car with PID {~w} removed", Pid);
+		true ->
+			print_environment_message(self(), "Car with PID {~w} removed", Pid)
+	end,
+	Out.
+
+kill_user(Pid, ForceKill) -> %TODO Notify user
+	Out = if 
+		ForceKill -> 
+%			utente:die(Pid),
+			killed;
+		true ->
+%			utente:dieSoft(Pid),
+			killed
+	end,
+		if 
+		Out == killed ->
+			print_environment_message(self(), "User with PID {~w} removed", Pid);
+		true ->
+			print_environment_message(self(), "User with PID {~w} removed", Pid)
+	end,
+	Out.
+
+remove_user_from_state(State, Pid) ->
+	NewUsers = lists:delete(Pid, State#environmentState.users),
+	Total_Users = State#environmentState.total_users - 1,
+	State#environmentState{users = NewUsers, total_users = Total_Users}.
+
+remove_car_from_state(State, Pid) ->
+	NewCars = lists:delete(Pid, State#environmentState.cars),
+	Total_Cars = State#environmentState.total_cars - 1,
+	State#environmentState{users = NewCars, total_cars = Total_Cars}.
+
 % uccide l'orologio e gli automi delle macchine / utenti
 terminate(State) ->
+	Cars = State#environmentState.cars,
+	Users = State#environmentState.users,
+	killEntities(Cars, fun kill_car/2, true),
+	killEntities(Users, fun kill_user/2, true),
 	PID_clock = State#environmentState.tick_s_pid,
 	PID_server_gps = State#environmentState.pid_gps_server,
 	end_clock(PID_clock),
@@ -258,6 +366,24 @@ terminate(State) ->
 %% ====================================================================
 %% Utilities functions
 %% ====================================================================
+
+searchCarNotCrashed(_S, _CrashedCars, false, Result) -> Result; 
+searchCarNotCrashed(S, CrashedCars, true, _Result) -> 
+	RandomCar = getRandomCar(S),
+	Is_Member = lists:member(RandomCar, CrashedCars),
+	searchCarNotCrashed(S, CrashedCars, Is_Member, RandomCar).
+
+findAndKillCar(_S, killed, PidCarRemoved, _CurrentTries) -> PidCarRemoved; 
+findAndKillCar(_S, not_killed, _PidCarRemoved, ?MAX_KILL_TRIES) -> -1; 
+findAndKillCar(S, not_killed, _PidCarRemoved, CurrentTries) -> 
+	RandomCar = getRandomCar(S),
+	Out = kill_car(RandomCar, false),
+	findAndKillCar(S, Out, RandomCar, CurrentTries + 1).
+
+killEntities([], _KillFunc, _ForceKill) -> ok;
+killEntities([H | T], KillFunc, ForceKill) -> 
+	KillFunc(H, ForceKill),
+	killEntities(T, KillFunc, ForceKill).
 
 generate_entities(_State, 0, _GenerateFunc, PIDS) -> PIDS;
 generate_entities(State, N, GenerateFunc, PIDS) -> 
@@ -270,29 +396,14 @@ getRandomNode(S) ->
 	NodeName = getRandomPositionName(Nodes),
 	NodeName.
 
-getRandomUser(S) -> 
-	TotalUsers = S#environmentState.total_users,
-	RandomUser = if
-		TotalUsers > 0 ->
-			Users = S#environmentState.users,
-			RandomN = utilities:generate_random_number(TotalUsers),
-			lists:nth(RandomN, Users);
-		true ->
-			-1
-	end,
-	RandomUser.
+getRandomUser(S) ->
+	getRandomEntity(S#environmentState.users, S#environmentState.total_users).
 
 getRandomCar(S) ->
-	Total_Cars = S#environmentState.total_cars,
-	RandomCar = if
-		Total_Cars > 0 ->
-			Cars = S#environmentState.cars,
-			RandomN = utilities:generate_random_number(Total_Cars),
-			lists:nth(RandomN, Cars);
-		true ->
-			-1
-	end,
-	RandomCar.
+	getRandomEntity(S#environmentState.cars, S#environmentState.total_cars).
+
+getRandomCrashedCar(S) ->
+	getRandomEntity(S#environmentState.cars_crashed, S#environmentState.total_cars_crashed).
 
 generateUserRequest(State, User_Position) ->
 	{User_Position, getRandomNode(State)}.

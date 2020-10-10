@@ -13,7 +13,7 @@ tick_generation(Subscribers) ->
 	receive 
 		{Pid, Ref, terminate} ->
 			send_message(Pid, {Ref, ok}),
-			print_debug_message(self(), "Exiting clock loop", []);
+			print_debug_message(self(), "Exiting clock loop");
 		Unknown ->
 			print_debug_message(self(), "Tick Server Received Unknown: ~p", [Unknown]),
 			tick_generation(Subscribers)
@@ -30,7 +30,6 @@ send_notification([H | T]) ->
 
 
 end_clock(Pid) ->
-	print_debug_message("Killing clock"),
 	Ref = erlang:monitor(process, Pid),
 	send_message(Pid, {self(), Ref, terminate}),
 	receive

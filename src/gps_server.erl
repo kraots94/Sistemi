@@ -121,7 +121,7 @@ loop(S) ->
 			loop(S);
 		{Pid, Ref, terminate} ->
 			send_message(Pid, {Ref, ok}),
-			print_debug_message(self(), "Exiting Gps Server loop", []);
+			print_debug_message(self(), "Exiting Gps Server loop");
         Unknown ->
 			print_debug_message(self(), "Gps Server Received Unknown: ~p.", [Unknown]),
 			loop(S)
