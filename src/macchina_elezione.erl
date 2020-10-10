@@ -465,7 +465,7 @@ calculateSelfCost(Points, Battery_Avaiable, CityData, Self_Pid) ->
 			{-1, -1, i_can_not_win, []};		
 		true -> 					
 			{Cost_P2_P3, Queue_P2_P3} = calculate_path(CityData, {P2, P3}),
-			RemainingCharge_P3 =  RemainingCharge_P2 -Cost_P2_P3,
+			RemainingCharge_P3 =  RemainingCharge_P2 - Cost_P2_P3,
 			if  
 				RemainingCharge_P3 < 0 -> 	
 					print_debug_message(Self_Pid, "I have no battery for Target Position", none),

@@ -61,6 +61,8 @@ handle_common(cast, {dieSoft}, OldState, State) ->
 	end.
        
 idle(cast, {send_request, Request}, State) ->
+	{From, To} = Request,
+	print_user_message(self(), "I'm a new user, i'm going from [~p] to [~p]", [From, To]),
 	appUtente:sendRequest(State#user.pidApp, Request),
 	{next_state,waitingService,State};
 
@@ -81,7 +83,7 @@ waiting_car(cast, {arrivedUserPosition, PID_Car}, State) ->
 ?HANDLE_COMMON.
 
 moving(cast, {arrivedTargetPosition, Dest}, State) ->
-	print_user_message(self(), "I'm arrived in my target position [~w], goodbye!", Dest),
+	print_user_message(self(), "I'm arrived in my target position [~p], goodbye!", Dest),
 	killEntities(State);
 
 ?HANDLE_COMMON.

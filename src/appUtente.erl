@@ -110,10 +110,10 @@ waiting_election(enter, _OldState, _Stato) ->
 waiting_election(cast, {winner, Data}, Stato) -> 
 	IdCarWinner = Data#election_result_to_user.id_car_winner,
 	if IdCarWinner == -1 -> %non c'è un vincitore, devo riprovare fra un po' di tempo
-			print_debug_message(Stato#appUserState.pidUser, "App_User - No taxi has won election running election."), 
+			print_user_message(Stato#appUserState.pidUser, "App_User - No taxi has won election running election."), 
 			Request = Stato#appUserState.request, %prendo la request
 			wait_random_time(),
-			print_debug_message(Stato#appUserState.pidUser, "App_User - Waited random time, going back to begin election"),
+			print_user_message(Stato#appUserState.pidUser, "App_User - Waited random time, going back to begin election"),
 			{next_state, idle, Stato, [{next_event,internal,{send_request,Request}}]};
 	true -> %hooray vincitore trovato
 			sendToUser({gotElectionData,Data},Stato),
@@ -121,10 +121,10 @@ waiting_election(cast, {winner, Data}, Stato) ->
 	end;
 
 waiting_election(cast, {already_running_election_wait}, Stato) -> 
-	print_debug_message(Stato#appUserState.pidUser, "App_User - Nearest Taxi is already running election."), 
+	print_user_message(Stato#appUserState.pidUser, "App_User - Nearest Taxi is already running election."), 
 	Request = Stato#appUserState.request, %prendo la request
 	wait_random_time(), %aspetto un tempo random 
-	print_debug_message(Stato#appUserState.pidUser, "App_User - Waited random time, going back to begin election"),
+	print_user_message(Stato#appUserState.pidUser, "App_User - Waited random time, going back to begin election"),
 	{next_state, idle, Stato, [{next_event,internal,{send_request,Request}}]}.
 
 %waitin_car_queue(cast, {changeDest, _NewDest}, _State) ->

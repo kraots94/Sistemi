@@ -4,7 +4,7 @@
 
 -module(utilities).
 -include("globals.hrl").
--define(PRINT_DEBUG_ENABLE, true).
+-define(PRINT_DEBUG_ENABLE, false).
 %% ====================================================================
 %% API functions
 %% ====================================================================
@@ -87,13 +87,12 @@ createPairsFromList(List) -> createPairs(List, []).
 % Generates a number 1 <= x <= MAX
 generate_random_number(MAX) ->
 	N = rand:uniform(MAX),
-% 	print_debug_message("", "Generated number: ~w ~n", N)
 	N.
 
 generate_random_number(MIN, MAX) ->
 	DIFF = MAX - MIN - 1,
 	N = rand:uniform(DIFF),
-	MIN + DIFF.
+	MIN + N.
 
 getRandomEntity(Entities, Total_Entities) ->
 	Out = getRandomElement(Entities, Total_Entities),
@@ -208,8 +207,9 @@ createPairs([A , B | Tail], ACC) ->
 	NEW_LIST = ACC ++ [{A, B}],
 	createPairs([B] ++ Tail, NEW_LIST).
 
-getRandomElement(List, 0) -> 
+getRandomElement(_List, 0) -> 
 	empty_list;
+
 getRandomElement(List, List_length) ->
 	RandomN = utilities:generate_random_number(List_length),
 	lists:nth(RandomN, List).

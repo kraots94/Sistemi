@@ -39,6 +39,12 @@ calculate_path(CityData, {P, Q}) ->
 	{City_Graph, Nodes} = CityData,
 	ID_P = getNodeID(P, Nodes),
 	ID_Q = getNodeID(Q, Nodes),
+	if 
+		(ID_P == -1) or (ID_Q == -1) -> 
+			exit(node_does_not_exists);
+		true ->
+			ok
+	end,
 	Out_Djsktra_P = dijkstra:run(City_Graph, ID_P),
 	EdgesWeights = edges_with_weights(City_Graph),
 	Queue_Car_P_Q = calculate_path_costs(EdgesWeights, Out_Djsktra_P,ID_P, ID_Q),

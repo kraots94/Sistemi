@@ -6,7 +6,7 @@
 -import('gps_server', [start_gps_server/1, end_gps_server/1]).
 -import('send', [send_message/2, send_message/3]).
 -import('city_map', [init_city/0]).
--import('nodes_util',[getRandomPositionName/1]).
+-import('nodes_util',[getRandomPositionName/2]).
 -import('utilities', [print_debug_message/1, 
 						print_debug_message/2, 
 						print_debug_message/3,
@@ -402,17 +402,7 @@ generate_entities(State, N, GenerateFunc, PIDS) ->
 
 getRandomNode(S) -> getRandomNode(S, "").
 getRandomNode(S, NodeName) -> 
-	NodeName = if 
-		not (NodeName == "") ->
-			FilterFunc = fun (X) -> 
-				not(X == NodeName)
-			end,
-			AvaiableNodes = lists:filter(FilterFunc, S#environmentState.city#city.nodes),
-			NodeName = getRandomPositionName(AvaiableNodes);			
-		true ->
-			Nodes = S#environmentState.city#city.nodes,
-			NodeName = getRandomPositionName(Nodes)
-	end.
+	getRandomPositionName(S#environmentState.city#city.nodes, NodeName).
 
 getRandomUser(S) ->
 	getRandomEntity(S#environmentState.users, S#environmentState.total_users).
