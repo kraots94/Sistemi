@@ -25,11 +25,10 @@ start(AttachedCarPid) ->
 					sameBatteryCounter = 0,
 					tick_counter = 0,
 					columnPathEnabled = false,
-					notifiedChargedBat = false},
+					notifiedChargedBat = false
+	},
 	{ok, Pid} = gen_statem:start_link(?MODULE,State, []),
 	Pid.
-
-
 
 %% ====================================================================
 %% Automata Functions
@@ -42,49 +41,64 @@ handle_common(info, {_From, tick}, _OldState, State) ->
 	PidAttachedCar = State#batteryState.pidCar,
 	IsCarStationary = macchina_moving:areYouStationary(PidAttachedCar),
 	
-	if IsCarStationary -> %è ferma in idle
-		   ActualTickStillStationary = State#batteryState.sameBatteryCounter + 1,
-		   BatteryLevel = macchina_moving:getBatteryLevel(PidAttachedCar),
-		   if (ActualTickStillStationary >= ?TICKS_TOGOSOLARCHARGE) and (BatteryLevel < ?BATTERY_LEVEL_MAX) ->  {keep_state, State#batteryState{sameBatteryCounter = 0}, [{next_event,internal,activateSolarCharge}]};
-			  true -> {keep_state, State#batteryState{sameBatteryCounter = ActualTickStillStationary}}
-		   end;
-	   true -> % è in moving oppure in carica, non è stazionaria in idle 
-		   ActualTickBatteryCheck = State#batteryState.tick_counter + 1,
-		   if ((ActualTickBatteryCheck >= ?TICKS_CHECK_BATTERY)) -> {keep_state, State#batteryState{tick_counter = 0, sameBatteryCounter = 0}, [{next_event,internal,checkThresholds}]}; 
-				true -> {keep_state, State#batteryState{tick_counter = ActualTickBatteryCheck}}
-		   end
+	if 
+		IsCarStationary -> %è ferma in idle
+			ActualTickStillStationary = State#batteryState.sameBatteryCounter + 1,
+			BatteryLevel = macchina_moving:getBatteryLevel(PidAttachedCar),
+			if 
+				(ActualTickStillStationary >= ?TICKS_TOGOSOLARCHARGE) and (BatteryLevel < ?BATTERY_LEVEL_MAX) ->  
+					print_debug_message(State#batteryState.pidCar, "Battery - Triggered Solar Charging"),
+					NewState = State#batteryState{sameBatteryCounter = 0},
+					{keep_state, NewState, [{next_event,internal,activateSolarCharge}]};
+				true -> 
+					{keep_state, State#batteryState{sameBatteryCounter = ActualTickStillStationary}}
+			end;
+	  	true -> % è in moving oppure in carica, non è stazionaria in idle 
+		   	ActualTickBatteryCheck = State#batteryState.tick_counter + 1,
+			if 	
+				ActualTickBatteryCheck >= ?TICKS_CHECK_BATTERY -> 
+					NewState = State#batteryState{tick_counter = 0, sameBatteryCounter = 0},
+					{keep_state, NewState, [{next_event,internal,checkThresholds}]}; 
+				true -> 
+					NewState = State#batteryState{tick_counter = ActualTickBatteryCheck},
+					{keep_state, NewState}
+			end
 	 end.
-		
 
 %% ====================================================================
 %% Internal Functions
 %% ====================================================================
 
-
 check_battery(internal, checkThresholds, Stato) ->
 	PidAttachedCar = Stato#batteryState.pidCar,
 	BatteryLevel = macchina_moving:getBatteryLevel(PidAttachedCar),
 	DoingSolarCharge = macchina_moving:areYouDoingSolarCharge(PidAttachedCar) ,
-	if DoingSolarCharge -> %sta facendo ricarica solare
-		if (BatteryLevel > ?BATTERY_LEVEL_MAX) -> 
-			   macchina_moving:fullBattery(PidAttachedCar),
-			   keep_state_and_data;
-		   true -> keep_state_and_data
-		end;
+	if 
+		DoingSolarCharge -> %sta facendo ricarica solare
+			if 
+				BatteryLevel > ?BATTERY_LEVEL_MAX -> % smetti di ricaricare
+					macchina_moving:fullBattery(PidAttachedCar);
+				true -> 
+					nothing_to_do
+			end,
+			keep_state_and_data;
 		true -> %è in movimento, oppure in carica non solare
 			AlreadyEnabledColPath = Stato#batteryState.columnPathEnabled,
 			Notified = Stato#batteryState.notifiedChargedBat,
-			NewState = if (BatteryLevel < ?BATTERY_LEVEL_LOW) and not(AlreadyEnabledColPath) ->
-		   					macchina_moving:enablePathCharge(PidAttachedCar), %macchina accoda tappe colonnina e poi va in stato ricarica...
-		   					Stato#batteryState{columnPathEnabled = true};
-				  			(BatteryLevel > ?BATTERY_LEVEL_LOW) and AlreadyEnabledColPath ->
-							Stato#batteryState{columnPathEnabled = false, notifiedChargedBat = false};
-				  			(BatteryLevel > ?BATTERY_LEVEL_MAX) and not(Notified)-> 
-							macchina_moving:fullBattery(PidAttachedCar), %...e questo lo fa tornare in idle
-							Stato#batteryState{notifiedChargedBat = true};
-							true -> Stato
-						end,
-	   {keep_state, NewState}	
+			NewState = if 
+				(BatteryLevel < ?BATTERY_LEVEL_LOW) and not(AlreadyEnabledColPath) ->
+					print_debug_message(PidAttachedCar, "Battery - Level under minimum value"),
+					macchina_moving:enablePathCharge(PidAttachedCar), %macchina accoda tappe colonnina e poi va in stato ricarica...
+					Stato#batteryState{columnPathEnabled = true};
+				(BatteryLevel > ?BATTERY_LEVEL_LOW) and AlreadyEnabledColPath ->
+					Stato#batteryState{columnPathEnabled = false, notifiedChargedBat = false};
+				(BatteryLevel > ?BATTERY_LEVEL_MAX) and not(Notified)-> 
+					print_debug_message(PidAttachedCar, "Battery - Level over maximum value"),
+					macchina_moving:fullBattery(PidAttachedCar), %...e questo lo fa tornare in idle
+					Stato#batteryState{notifiedChargedBat = true};
+				true -> Stato
+			end,
+	   		{keep_state, NewState}	
 	end;
 
 check_battery(internal, activateSolarCharge, Stato) ->
@@ -92,8 +106,4 @@ check_battery(internal, activateSolarCharge, Stato) ->
 	macchina_moving:activateSolarCharge(PidAttachedCar),
 	keep_state_and_data;
 	
-	
-
 ?HANDLE_COMMON.
-	
-	

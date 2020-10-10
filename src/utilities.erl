@@ -26,7 +26,8 @@
 		 print_environment_message/3, 
 		 print_message/4,
 		 calculateSquaredDistance/2, 
-		 generate_random_number/1, 
+		 generate_random_number/1,
+		 generate_random_number/2, 
 		 createPairsFromList/1,
 		 getRandomEntity/2]).
 
@@ -88,6 +89,11 @@ generate_random_number(MAX) ->
 	N = rand:uniform(MAX),
 % 	print_debug_message("", "Generated number: ~w ~n", N)
 	N.
+
+generate_random_number(MIN, MAX) ->
+	DIFF = MAX - MIN - 1,
+	N = rand:uniform(DIFF),
+	MIN + DIFF.
 
 getRandomEntity(Entities, Total_Entities) ->
 	Out = getRandomElement(Entities, Total_Entities),

@@ -23,8 +23,6 @@ callback_mode() -> [state_functions].
 %% API functions
 %% ====================================================================
 
-%nelle api metti il die che ammazza anche app
-
 receiveFromApp(PidUser, Data) ->
 	gen_statem:cast(PidUser, Data).
 
@@ -41,19 +39,15 @@ dieSoft(UserPid) ->
 %% Automata Functions
 %% ====================================================================
 
-
-%InitData = {InitialPos, PID_GPS_Server},
 start(InitData) ->
 	{ok, Pid} = gen_statem:start_link(?MODULE,InitData, []),
 	Pid.
 
-
 init(InitData) ->
 	{InitialPos, PidGpsServer} = InitData,
 	InitDataApp = {InitialPos, PidGpsServer, self()},
-	PidApp = appUtente_flusso:start(InitDataApp),
-	State = #user{
-				  pidApp = PidApp},
+	PidApp = appUtente:start(InitDataApp),
+	State = #user{pidApp = PidApp},
 	{ok, idle, State}.
 
 handle_common(cast, {die}, _OldState, State) ->
@@ -67,30 +61,28 @@ handle_common(cast, {dieSoft}, OldState, State) ->
 	end.
        
 idle(cast, {send_request, Request}, State) ->
-	appUtente_flusso:sendRequest(State#user.pidApp, Request),
+	appUtente:sendRequest(State#user.pidApp, Request),
 	{next_state,waitingService,State};
 
 ?HANDLE_COMMON.
 	
 waitingService(cast, {gotElectionData, Data}, State) ->
+	PID_Car = Data#election_result_to_user.id_car_winner,
 	TimeToWait = Data#election_result_to_user.time_to_wait,
-	printDebug("Servizio disponibile!"),
-	printDebug("Tempo d'attesa:"),
-	printDebug(TimeToWait),
+	print_user_message(self(), "Taxi ~w is serving me with ~w time to wait", [PID_Car, TimeToWait]),
 	{next_state, waiting_car,State};
 
 ?HANDLE_COMMON.
 
-waiting_car(cast, arrivedUserPosition, State) ->
-	printDebug("taxi arrivato da me!"),
+waiting_car(cast, {arrivedUserPosition, PID_Car}, State) ->
+	print_user_message(self(), "Taxi ~w is arrived in my position!", PID_Car),
 	{next_state, moving, State};
 
 ?HANDLE_COMMON.
 
-moving(cast, arrivedTargetPosition, _State) ->
-	printDebug("raggiunto destinazione finale!"),
-	printDebug("me ne vado..."),
-	keep_state_and_data;
+moving(cast, {arrivedTargetPosition, Dest}, State) ->
+	print_user_message(self(), "I'm arrived in my target position [~w], goodbye!", Dest),
+	killEntities(State);
 
 ?HANDLE_COMMON.
 	
@@ -105,12 +97,6 @@ killEntities(State) ->
 
 printDebug(ToPrint) ->
 	if ?DEBUGPRINT_USER -> io:format("<user>"),
-		  				  utilities:print_debug_message(self(), [?TILDE_CHAR] ++ "p", ToPrint);
+		  				  	utilities:print_debug_message(self(), [?TILDE_CHAR] ++ "p", ToPrint);
 	   true -> foo
 	end.
-
-
-	
-
-
-

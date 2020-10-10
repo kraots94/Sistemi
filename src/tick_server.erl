@@ -28,7 +28,6 @@ send_notification([H | T]) ->
 	send_message(H, self(), tick),
 	send_notification(T).
 
-
 end_clock(Pid) ->
 	Ref = erlang:monitor(process, Pid),
 	send_message(Pid, {self(), Ref, terminate}),

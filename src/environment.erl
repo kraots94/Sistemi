@@ -400,10 +400,19 @@ generate_entities(State, N, GenerateFunc, PIDS) ->
 	New_Pids = [NewPid]	++ PIDS,
 	generate_entities(State, N-1, GenerateFunc, New_Pids).
 
-getRandomNode(S) -> 
-	Nodes = S#environmentState.city#city.nodes,
-	NodeName = getRandomPositionName(Nodes),
-	NodeName.
+getRandomNode(S) -> getRandomNode(S, "").
+getRandomNode(S, NodeName) -> 
+	NodeName = if 
+		not (NodeName == "") ->
+			FilterFunc = fun (X) -> 
+				not(X == NodeName)
+			end,
+			AvaiableNodes = lists:filter(FilterFunc, S#environmentState.city#city.nodes),
+			NodeName = getRandomPositionName(AvaiableNodes);			
+		true ->
+			Nodes = S#environmentState.city#city.nodes,
+			NodeName = getRandomPositionName(Nodes)
+	end.
 
 getRandomUser(S) ->
 	getRandomEntity(S#environmentState.users, S#environmentState.total_users).
@@ -415,4 +424,4 @@ getRandomCrashedCar(S) ->
 	getRandomEntity(S#environmentState.cars_crashed, S#environmentState.total_cars_crashed).
 
 generateUserRequest(State, User_Position) ->
-	{User_Position, getRandomNode(State)}.
+	{User_Position, getRandomNode(State, User_Position)}.
