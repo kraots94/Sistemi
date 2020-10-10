@@ -40,7 +40,7 @@ start(InitialPos, PidListener) ->
 					pathCol = [],
 					currentUser = none,
 					currentPos = InitialPos,
-					batteryLevel = ?BATTERY_LEVEL_MAX,
+					batteryLevel = ?BATTERY_LEVEL_MAX - 10,
 					mustCharge = false,
 					lastDestination = InitialPos,
 					costToLastDestination = 0,
@@ -52,8 +52,11 @@ crash(Pid) ->
 	gen_statem:cast(Pid, {crash}).
 
 %NB: questo torna la risposta al chiamante, se imposti timer e non c'è risposta invece la chiamata fallisce
-areYouBusy(Pid) ->
-	gen_statem:call(Pid, {areYouBusy}).
+areYouStationary(Pid) ->
+	gen_statem:call(Pid, {areYouStationary}).
+
+areYouDoingSolarCharge(Pid) ->
+	gen_statem:call(Pid, {doingSolarCharge}).
 
 getBatteryLevel(Pid) ->
 	gen_statem:call(Pid, {getBattery}).
@@ -66,6 +69,9 @@ getTimeToUser(Pid) ->
 
 enablePathCharge(Pid) ->
 	gen_statem:cast(Pid, {goToCharge}).
+
+activateSolarCharge(Pid) ->
+	gen_statem:cast(Pid, {activateSolCharge}).
 
 updateQueue(Pid, Queue) ->
 	gen_statem:cast(Pid, {updateQueue, Queue}).
@@ -91,13 +97,18 @@ handle_common(cast, {goToCharge}, OldState, State) ->
 	end;
 
 %solo per V0
-handle_common({call,From}, {areYouBusy}, OldState, State) ->
-	Reply = if OldState == idle -> false;
-	   		  true -> true
+handle_common({call,From}, {areYouStationary}, OldState, State) ->
+	Reply = if OldState == idle -> true;
+	   		  true -> false
 			end,
 	{next_state, OldState, State, [{reply,From,Reply}]};
 
-		
+handle_common({call, From}, {doingSolarCharge}, OldState, State) ->
+	Reply = if OldState == solarCharging -> true;
+	   		  true -> false
+			end,
+	{next_state, OldState, State, [{reply,From,Reply}]};
+
 handle_common({call,From}, {getBattery}, OldState, State) ->
 	Battery = State#movingCarState.batteryLevel,
 	{next_state, OldState, State, [{reply,From,Battery}]};
@@ -144,7 +155,7 @@ handle_common(cast, {updateQueue, Queue}, _OldState, State) ->
 
 handle_common(info, {_From, tick}, OldState, State) ->
 	if OldState == idle -> keep_state_and_data; %in idle ignora il tick
-	   OldState == charging ->					
+	   (OldState == charging) or (OldState == solarCharging) ->					
 			ActualTickCounter = State#movingCarState.tick_counterBat,
 			NewCounter = ActualTickCounter + 1,
 			if (NewCounter >= ?TICKS_TO_CHARGE) -> {keep_state, State#movingCarState{tick_counterBat = 0}, [{next_event,internal,charge}]};
@@ -171,11 +182,44 @@ idle({call,From}, {getDataElection}, State) ->
 	Packet = {Cost_To_last_Target, Current_Target, Battery_level},
 	{keep_state, State, [{reply,From,Packet}]};
 
-%gestisco tick ricevuti in idle ignorandoli
-idle(info, {_From, tick}, _State) ->
+idle(cast, {activateSolCharge}, State) ->
+	Battery_level = State#movingCarState.batteryLevel,
+	if (Battery_level < ?BATTERY_LEVEL_MAX) ->
+		printDebug(State, "sto andando a fare ricarica solare..."),
+		{next_state, solarCharging, State};
+	true ->
+		printDebug(State, "non mi serve carica solare"),
+		keep_state_and_data
+	end;
+
+?HANDLE_COMMON.
+  %nb : potresti riusare charging riadattando
+solarCharging(enter, _OldState, _State) ->
+	keep_state_and_data;
+
+solarCharging(internal, charge, State) ->
+	printState(State),
+	ActualBat = State#movingCarState.batteryLevel,
+	NewStateCharged = State#movingCarState{batteryLevel = ActualBat + 1},
+	{keep_state, NewStateCharged};
+
+solarCharging(cast, {charged}, State) ->
+	printDebug(State, "finito di caricare con solare, sono al massimo"),
+	{next_state, idle, State#movingCarState{batteryLevel = ?BATTERY_LEVEL_MAX}};
+
+solarCharging(cast, activateSolCharge, State) -> 
+	printDebug(State, "meh"),
 	keep_state_and_data;
 	
+solarCharging({call,From}, {getDataElection}, State) ->
+	Cost_To_last_Target = 0,
+	Current_Target =  State#movingCarState.currentPos,
+	Battery_level = State#movingCarState.batteryLevel,
+	Packet = {Cost_To_last_Target, Current_Target, Battery_level},
+	{keep_state, State, [{reply,From,Packet}]};
+
 ?HANDLE_COMMON.
+
 	  
 moving(enter, _OldState, State) ->
 	printDebug(State,"Sono in moving"),
