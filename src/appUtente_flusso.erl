@@ -11,21 +11,23 @@
 						print_user_message/3]).
 -include("globals.hrl").
 -include("records.hrl").
--define(DEBUGPRINT_APP, true).
+-define(DEBUGPRINT_APP, false).
 
 
 callback_mode() -> [state_functions, state_enter].
 -record(userState, {
 					pidGPSModule,
+					picCarServing,
+					pidUser,
 					currentPos,
 					currentDestination,
-  					request,
-					picCarServing
+  					request
 					}).
 %% ====================================================================
 %% API functions
 %% ====================================================================
 
+%InitData = {InitialPos, PidGpsServer, PidUser}
 start(InitData) ->
 	{ok, Pid} = gen_statem:start_link(?MODULE,InitData, []),
 	Pid.
@@ -46,10 +48,11 @@ sendRequestNoElection(UserPid, Request) ->
 %% ====================================================================
 
 init(InitData) ->
-	{InitialPos, PidGpsServer} = InitData,
+	{InitialPos, PidGpsServer, PidUser} = InitData,
 	PidGpsModule = gps_module:start_gps_module(initDataGpsModule(PidGpsServer,InitialPos)), %start gps module (and register)
 	State = #userState{
 		pidGPSModule = PidGpsModule, 
+		pidUser = PidUser,
 		currentPos = InitialPos,
 		currentDestination = none,
 		request = none,
@@ -73,17 +76,10 @@ idle(enter, _OldState, _Stato) -> keep_state_and_data;
 idle(internal,{send_request, Request}, State) ->
 	sendRequestToTaxi(Request,State);
 
-%env manda qua la richiesta sostanzialmente
 idle(cast, {send_request, Request}, State) ->
 	sendRequestToTaxi(Request,State);
 
-%richiesta senza la elezione (prende il piu' vicino)
-idle(cast, {send_requestNoElection, Request}, State) ->
-	checkValidityRequest(State#userState.currentPos, Request),
-	NearestCar = findTaxi(State),
-	{From, To} = Request,
-	gen_statem:cast(NearestCar, {send_requestNoElection, {From,To, self()}}),
-	keep_state_and_data.
+?HANDLE_COMMON.
 
 waiting_election(enter, _OldState, _Stato) -> 
 	%richiesta inviata, aspetto risultati
@@ -99,6 +95,7 @@ waiting_election(cast, {winner, Data}, Stato) ->
 	true -> %hooray vincitore trovato
 			printDebug("Winner Taxi_Data: "),
 			printDebugList(Data),
+			sendToUser({gotElectionData,Data},Stato),
 			{next_state, waiting_car, Stato#userState{picCarServing = IdCarWinner}}
 	end;
 
@@ -116,11 +113,10 @@ waiting_election(cast, {already_running_election_wait}, Stato) ->
 waiting_car(enter, _OldState, _Stato) -> keep_state_and_data;
 
 waiting_car(cast, taxiServingYou, State) ->
-	printDebug("taxi serving me"),
 	{keep_state, State};
 
 waiting_car(cast, arrivedUserPosition, State) ->
-	printDebug("taxi arrived to me"),
+	sendToUser(arrivedUserPosition, State),
 	{next_state, moving, State};
 	
 ?HANDLE_COMMON.
@@ -132,7 +128,7 @@ waiting_car(cast, arrivedUserPosition, State) ->
 moving(enter, _OldState, _Stato) -> keep_state_and_data;
 
 moving(cast, arrivedTargetPosition, State) ->
-	printDebug("target position reached"),
+	sendToUser(arrivedTargetPosition, State),
 	{next_state, ending, State};
 
 %moving(cast, {changeDest, _NewDest}, _State) ->
@@ -144,8 +140,8 @@ moving(cast, arrivedTargetPosition, State) ->
   
 ending(enter, _OldState, State) ->
 	deletePosGps(State),
-	printDebug("I'm dying..."),
-	gen_statem:stop(self()),
+	gen_statem:stop(State#userState.pidUser), %ammazzo utente
+	gen_statem:stop(self()), %...e me stesso
 	keep_state_and_data.
 
 %% ====================================================================
@@ -154,6 +150,10 @@ ending(enter, _OldState, State) ->
 sendPosToGps(CurrentPosition,S) ->
 	GpsModulePid = S#userState.pidGPSModule,
 	gps_module:setPosition(GpsModulePid, CurrentPosition).
+
+sendToUser(Data, S) ->
+	PidUser = S#userState.pidUser,
+	utente:receiveFromApp(PidUser, Data).
 
 deletePosGps(S) ->
 	gps_module:deleteLocationTracks(S#userState.pidGPSModule).

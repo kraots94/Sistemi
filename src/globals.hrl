@@ -11,7 +11,6 @@
 -define(TICKTIME, 1).
 
 %numero di tick da ricevere per fare alc
--define(TICKS_TO_MOVING, 1).
 -define(TICKS_TIMEOUT_ELECTION, 2).
 -define(TICKS_EVENT, 20).
 

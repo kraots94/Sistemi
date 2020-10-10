@@ -11,8 +11,9 @@
 						print_car_message/1,
 						print_car_message/2,
 						print_car_message/3]).
--define(DEBUGPRINT_MOVING, true).
+-define(DEBUGPRINT_MOVING, false).
 -define(TICKS_TO_CHARGE, 3).
+-define(TICKS_TO_MOVING, 1).
 
 
 callback_mode() -> [state_functions,state_enter].
@@ -38,7 +39,10 @@ callback_mode() -> [state_functions,state_enter].
 %% ====================================================================
 %% API functions
 %% ====================================================================
-start(InitialPos, PidListener) ->
+
+%InitData = {InitialPos, PidListener}
+start(InitData) ->
+	{InitialPos, PidListener} = InitData,
 	State = #movingCarState {
 					tick_counter = 0,
 					tick_counterBat = 0,
@@ -47,7 +51,7 @@ start(InitialPos, PidListener) ->
 					pathCol = [],
 					currentUser = none,
 					currentPos = InitialPos,
-					batteryLevel = ?BATTERY_LEVEL_MAX - 10,
+					batteryLevel = ?BATTERY_LEVEL_MAX,
 					mustCharge = false,
 					lastDestination = InitialPos,
 					costToLastDestination = 0,
@@ -83,6 +87,9 @@ activateSolarCharge(Pid) ->
 updateQueue(Pid, Queue) ->
 	gen_statem:cast(Pid, {updateQueue, Queue}).
 
+areYouKillable(Pid) ->
+	gen_statem:call(Pid, {areYouKillable}).
+
 fullBattery(Pid) ->
 	gen_statem:cast(Pid, {charged}).
 
@@ -93,6 +100,11 @@ fullBattery(Pid) ->
 
 init(State) ->
 	{ok, idle, State}.
+
+handle_common({call,From}, {areYouKillable}, OldState, State) ->
+	if OldState == idle -> {next_state, idle, State, [{reply,From,true}]};
+		true -> {next_state, OldState, State, [{reply,From,false}]}
+	end;
 
 %automa batt mi dice di andare a caricare, accodo percorso colonnina
 handle_common(cast, {goToCharge}, OldState, State) ->
@@ -124,26 +136,6 @@ handle_common({call,From}, {getTimeToUser}, OldState, State) ->
 	TimeToUser = State#movingCarState.timeToUser,
 	{next_state, OldState, State, [{reply,From,TimeToUser}]};
 
-%ricezione richiesta senza elezione
-handle_common(cast, {requestRcv, Request}, _OldState, State) ->
-	{From, To, UserPid} = Request,
-	Actualpos = State#movingCarState.currentPos,
-	%calcola posizione finale nel caso di utenti in coda e usa quella in calculatePath
-	{Costi, Tappe} = city_map:calculate_path(UserPid,Actualpos,From,To),
-	CostoAlCliente = hd(Costi),
-	CostoAlTarget = hd(tl(Costi)),
-	% Tolgo tappe colonnine  da TappeAttuali
-	%imposto tappe colonnina nell'attributo:
-	PathColonnina = ["test"],
-	%TappeAttuali = State#state.tappe
-	LastDestination = calculateLastDestination(Tappe),
-	NewTappe = State#movingCarState.tappe ++ Tappe,
-	%NuovaBatteria = State#movingCarState.batteryLevel - (CostoAlCliente + CostoAlTarget),
-	{next_state, moving, State#movingCarState{tappe=NewTappe, 
-											pathCol = PathColonnina, 
-											lastDestination = LastDestination, 
-											costToLastDestination = CostoAlCliente + CostoAlTarget}};
-
 %la ricezione della queue con elezione fatta
 %Queue = {costi,Tappe}
 handle_common(cast, {updateQueue, Queue}, _OldState, State) ->
@@ -159,7 +151,7 @@ handle_common(cast, {updateQueue, Queue}, _OldState, State) ->
 											lastDestination = LastDestination, 
 											costToLastDestination = CostToLastDest, 
 											timeToUser = Time_To_User_Pos}};
-
+%gestione del tick
 handle_common(info, {_From, tick}, OldState, State) ->
 	if OldState == idle -> keep_state_and_data; %in idle ignora il tick
 	   (OldState == charging) or (OldState == solarCharging) ->					
@@ -215,7 +207,7 @@ solarCharging(cast, {charged}, State) ->
 	{next_state, idle, State#movingCarState{batteryLevel = ?BATTERY_LEVEL_MAX}};
 
 solarCharging(cast, activateSolCharge, State) -> 
-	printDebug(State, "meh"),
+	printDebug(State, "wtf"),
 	keep_state_and_data;
 	
 solarCharging({call,From}, {getDataElection}, State) ->

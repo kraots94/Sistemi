@@ -167,13 +167,13 @@ idle(cast, {partecipateElection, Data}, S) ->
 			{next_state, running_election, S3} 
 	end;
 	
-idle(cast, {sendMovingQueue}, S) ->   
+idle({call,From}, {sendMovingQueue}, S) ->   
 	QueueData = S#electionState.car_moving_queue_data,
 	PidMovingCar = S#electionState.pidMovingCar,
 	macchina_moving:updateQueue(PidMovingCar, QueueData),
 	%resest stat
 	S1 =  S#electionState{car_moving_queue_data = none},
-	{keep_state, S1}.	
+	{keep_state, S1, [{reply,From,finished}]}.	
 
 %% ====================================================================
 %% Running Election States functions

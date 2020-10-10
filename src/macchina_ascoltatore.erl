@@ -23,6 +23,9 @@ callback_mode() -> [state_functions].
 							pidClock,
 							pidAppUser}).
 
+-define(TICKS_TO_CHARGE, 3).
+
+
 %% ====================================================================
 %% API functions
 %% ====================================================================
@@ -42,6 +45,18 @@ updatePosition(ListenerPid, Position) ->
 sendToEsternalAutomata(ListenerdPid, Target, Data) ->
 	gen_statem:cast(ListenerdPid, {to_outside, {Target, Data}}).
 
+areYouKillable(Pid) ->
+	gen_statem:call(Pid, {areYouKillable}).
+
+dieSoft(ListenerPid) ->
+	IsKillable = macchina_ascoltatore:areYouKillable(ListenerPid),
+	if IsKillable ->
+		   gen_statem:cast(ListenerPid, {die}),
+		   killed;
+	   true ->
+		   not_killed
+	end.
+
 die(ListenerdPid) ->
 	gen_statem:cast(ListenerdPid, {die}).
 
@@ -53,7 +68,7 @@ init(InitData) ->
 	{InitialPos, PidGpsServer, City_Map} = InitData,
 	%creo pid delle entita' associate
 	PidGpsModule = gps_module:start_gps_module(initDataGpsModule(PidGpsServer,InitialPos)), %start gps module (and register)
-	PidMoving = macchina_moving:start(InitialPos,self()),
+	PidMoving = macchina_moving:start({InitialPos,self()}),
 	PidBattery  = macchina_batteria:start(PidMoving),
 	PidElection = macchina_elezione:start(self(),PidMoving,PidGpsModule,City_Map),
 	PidClock = tick_server:start_clock([self(),PidMoving,PidBattery,PidElection]),
@@ -68,21 +83,16 @@ init(InitData) ->
 	print_car_message(self(), "Car ready in position [ ~p ]", InitialPos),
 	{ok, idle, State}.
 
-handle_common(cast, {die}, _OldState, State) ->
-	PidMov = State#taxiListenerState.pidMoving,
-	PidBattery =  State#taxiListenerState.pidBattery,
-	PidElection = State#taxiListenerState.pidElection,
-	PidGps = State#taxiListenerState.pidGps,
-	PidClock = State#taxiListenerState.pidClock,
-	% Kill car automata
-	gen_statem:stop(PidMov),gen_statem:stop(PidBattery),gen_statem:stop(PidElection), %ammazzo automi
-	% Kill internal servers
-	gps_module:end_gps_module(PidGps), 
-	tick_server:end_clock(PidClock),
+handle_common({call,From}, {areYouKillable}, OldState, State) ->
+	PidMoving =  State#taxiListenerState.pidMoving,
+	IsMovingKillable = macchina_moving:areYouKillable(PidMoving),
+	if (OldState == idle) and (IsMovingKillable) -> {next_state, idle, State, [{reply,From,true}]};
+		true -> {next_state, OldState, State, [{reply,From,false}]}
+	end;
 
-	print_debug_message(self(), "Killed all car automata"),
-	gen_statem:stop(self()).
-	
+handle_common(cast, {die}, _OldState, State) ->
+	ammazzami(State).
+
 %roba che deve uscire
 idle(cast, {to_outside, {Target, Data}}, _Stato) ->
 	gen_statem:cast(Target, Data),
@@ -168,7 +178,7 @@ listen_election(cast, {election_results, Data}, Stato) ->
 	if (Pid_Car == -1) and (Is_Initiator)-> % Avviso l'utente se non c'è un vincitore
 								notify_user_no_taxi(Stato#taxiListenerState.pidAppUser);
 					Pid_Car == self() -> 
-								gen_statem:cast(PidElezione, {sendMovingQueue}),
+								gen_statem:call(PidElezione, {sendMovingQueue}),
 								%% Update coda moving
 								PidMoving = Stato#taxiListenerState.pidMoving,
 								Pid_User = DataToUse#election_result_to_car.id_app_user,
@@ -210,3 +220,14 @@ notify_user_no_taxi(PID) ->
 			time_to_wait = -1
 		},
 	gen_statem:cast(Pid_User, {winner, DataToUser}).
+
+ammazzami(State) ->
+	PidMov = State#taxiListenerState.pidMoving,
+	PidBattery =  State#taxiListenerState.pidBattery,
+	PidElection = State#taxiListenerState.pidElection,
+	PidGps = State#taxiListenerState.pidGps,
+	PidClock = State#taxiListenerState.pidClock,
+	gen_statem:stop(PidMov),gen_statem:stop(PidBattery),gen_statem:stop(PidElection), %ammazzo automi
+	gps_module:end_gps_module(PidGps), tick_server:end_clock(PidClock), %ammazzo server
+	print_debug_message("ho eliminato tutti"),
+	gen_statem:stop(self()).

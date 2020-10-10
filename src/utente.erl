@@ -11,7 +11,7 @@
 						print_user_message/3]).
 -include("globals.hrl").
 -include("records.hrl").
--define(DEBUGPRINT_USER, false).
+-define(DEBUGPRINT_USER, true).
 
 callback_mode() -> [state_functions].
 
@@ -19,43 +19,102 @@ callback_mode() -> [state_functions].
 			   pidApp
   				}).
 
-start(InitialPos, PID_GPS_Server) ->
-	InitData = {InitialPos, PID_GPS_Server},
+%% ====================================================================
+%% API functions
+%% ====================================================================
+
+%nelle api metti il die che ammazza anche app
+
+receiveFromApp(PidUser, Data) ->
+	gen_statem:cast(PidUser, Data).
+
+sendRequest (PidUser, Request) ->
+	gen_statem:cast(PidUser, {send_request,Request}).
+
+die(UserPid) ->
+	gen_statem:cast(UserPid, {die}).
+
+dieSoft(UserPid) ->
+	gen_statem:cast(UserPid, {dieSoft}).
+
+%% ====================================================================
+%% Automata Functions
+%% ====================================================================
+
+
+%InitData = {InitialPos, PID_GPS_Server},
+start(InitData) ->
 	{ok, Pid} = gen_statem:start_link(?MODULE,InitData, []),
 	Pid.
 
 
 init(InitData) ->
 	{InitialPos, PidGpsServer} = InitData,
-	PidApp = appUtente_flusso:start(InitialPos, PidGpsServer),
+	InitDataApp = {InitialPos, PidGpsServer, self()},
+	PidApp = appUtente_flusso:start(InitDataApp),
 	State = #user{
 				  pidApp = PidApp},
 	{ok, idle, State}.
 
-%env mi invia spostamento
-idle(info, {moveToTarget, Request}, Stato) -> 
-	appUtente_flusso:sendRequest(Stato#user.pidApp, Request),
-	print_debug_message("Servizio disponibile!"),
-	{nest_state,waitingService,Stato}.
+handle_common(cast, {die}, OldState, State) ->
+	ammazzami(State);
 
-waitingService(cast, {gotElectionData, Data}, Stato) ->
+handle_common(cast, {dieSoft}, OldState, State) ->
+	if OldState == idle ->
+		  ammazzami(State);
+	   true ->
+		   keep_state_and_data
+	end.
+       
+
+%env mi invia spostamento (formattato come sempre)
+idle(info, {moveToTarget, Request}, State) -> 
+	appUtente_flusso:sendRequest(State#user.pidApp, Request),
+	{next_state,waitingService,State};
+
+idle(cast, {send_request, Request}, State) ->
+	appUtente_flusso:sendRequest(State#user.pidApp, Request),
+	{next_state,waitingService,State};
+
+?HANDLE_COMMON.
+	
+waitingService(cast, {gotElectionData, Data}, State) ->
 	TimeToWait = Data#election_result_to_user.time_to_wait,
-	printDebug("Tempo d'attesa"),
+	printDebug("Servizio disponibile!"),
+	printDebug("Tempo d'attesa:"),
 	printDebug(TimeToWait),
-	print_debug_message("Tempo d'attesa:"),
-	{next_state, waiting_car,Stato}.
-	
-	
+	{next_state, waiting_car,State};
 
+?HANDLE_COMMON.
 
+waiting_car(cast, arrivedUserPosition, State) ->
+	printDebug("taxi arrivato da me!"),
+	{next_state, moving, State};
 
+?HANDLE_COMMON.
+
+moving(cast, arrivedTargetPosition, _State) ->
+	printDebug("raggiunto destinazione finale!"),
+	printDebug("me ne vado..."),
+	keep_state_and_data;
+
+?HANDLE_COMMON.
 	
+%% ====================================================================
+%% Internal functions
+%% ====================================================================
+
+ammazzami(State) ->
+	gen_statem:stop(State#user.pidApp),
+	gen_statem:stop(self()).
 
 printDebug(ToPrint) ->
 	if ?DEBUGPRINT_USER -> io:format("<user>"),
 		  				  utilities:print_debug_message(self(), [?TILDE_CHAR] ++ "p", ToPrint);
 	   true -> foo
 	end.
+
+
 	
 
 
