@@ -429,7 +429,7 @@ crash(cast, {fixed}, State) ->
 	{next_state, idle, State};
 	
 	
-%definire getDataElection, tick rcv
+
 ?HANDLE_COMMON.
 %% ====================================================================
 %% Internal functions

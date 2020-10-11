@@ -18,7 +18,7 @@ tick_generation(Subscribers) ->
 			print_debug_message(self(), "Tick Server Received Unknown: ~p", [Unknown]),
 			tick_generation(Subscribers)
 
-	after ?TICKTIME*1000 -> 
+	after ?TICKTIME -> 
 		send_notification(Subscribers),
 		tick_generation(Subscribers)
 	end.

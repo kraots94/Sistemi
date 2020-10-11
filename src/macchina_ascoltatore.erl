@@ -22,7 +22,13 @@ callback_mode() -> [state_functions].
 							pidGps,
 							pidClock,
 							pidAppUser,
-							nome}).
+							usersInQueue,
+							nome}). %lista di record del tipo {Pid, Pos, Destination}
+
+-record(userInQueue , {pid,
+					   position,
+					   target}
+	   ).
 
 -define(TICKS_TO_CHARGE, 3).
 
@@ -88,6 +94,7 @@ init(InitData) ->
 					pidGps = PidGpsModule,
 					pidClock = PidClock,
 					pidAppUser = -1,
+					usersInQueue = [],
 					nome = Name
 			},
 	print_car_message(self(), "Car ready in position [~p]", InitialPos),
@@ -126,12 +133,6 @@ idle(info, {_From, tick}, _Stato) ->
 idle(cast, {updatePosition, CurrentPosition}, Stato) ->
 	PidGps = Stato#taxiListenerState.pidGps,
 	gps_module:setPosition(PidGps, CurrentPosition),
-	keep_state_and_data;
-
-%richiesta senza elezione (debugging porp.)
-idle(cast, {send_requestNoElection, Request}, Stato) ->
-	%{From,To,PidAppUser} = Request,
-	gen_statem:cast(Stato#taxiListenerState.pidMoving, {requestRcv,Request}),
 	keep_state_and_data;
 	
 %begin election ricevuto da app utente
@@ -205,7 +206,7 @@ listen_election(cast, {election_results, Data}, Stato) ->
 			%% Update coda moving
 			gen_statem:call(PidElezione, {sendMovingQueue}),
 
-			% notifica utente
+			
 			PidMoving = Stato#taxiListenerState.pidMoving,
 			Pid_User = DataToUse#election_result_to_car.id_app_user,
 			TimeToUser = macchina_moving:getTimeToUser(PidMoving),
@@ -213,6 +214,8 @@ listen_election(cast, {election_results, Data}, Stato) ->
 				id_car_winner = Pid_Car, 
 				time_to_wait = TimeToUser
 			},
+			%NewListOfQueuedUsers = calculateNewlist(State, Data),
+			%inserisco lista dei nuovi utenti queued nello stato
 			gen_statem:cast(Pid_User, {winner, DataToUser});
 		true -> ok
 	end,

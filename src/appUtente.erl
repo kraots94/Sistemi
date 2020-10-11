@@ -13,10 +13,11 @@
 -include("globals.hrl").
 -include("records.hrl").
 -define(DEBUGPRINT_APP, false).
+-define(TIMETOWAITREPLY, ?TICKTIME * 2).
 
 % time is in milliseconds
--define(MIN_RANDOM_TIME_WAIT, ?TICKTIME * 2 * 1000).
--define(MAX_RANDOM_TIME_WAIT, ?TICKTIME * 4 * 1000).
+-define(MIN_RANDOM_TIME_WAIT, ?TICKTIME * 2).
+-define(MAX_RANDOM_TIME_WAIT, ?TICKTIME * 4).
 
 callback_mode() -> [state_functions, state_enter].
 -record(appUserState, {
@@ -107,6 +108,11 @@ waiting_election(enter, _OldState, _Stato) ->
 	%richiesta inviata, aspetto risultati
 	keep_state_and_data;
 
+waiting_election(state_timeout, noReply, Stato) -> %non ho ricevuto risposta dentro al timer
+	print_user_message(Stato#appUserState.pidUser, "App_User - no reply from taxi, going back to begin election"),
+ 	Request = Stato#appUserState.request, %prendo la request
+	{next_state, idle, Stato, [{next_event,internal,{send_request,Request}}]};
+	
 waiting_election(cast, {winner, Data}, Stato) -> 
 	IdCarWinner = Data#election_result_to_user.id_car_winner,
 	if IdCarWinner == -1 -> %non c'è un vincitore, devo riprovare fra un po' di tempo
@@ -187,7 +193,7 @@ checkValidityRequest(UserPos, Request) ->
 			end
 	end.
 
-%trova il taxi piu' vicino (in futuro basic elezione)
+%trova il taxi piu' vicino, se non presente torna none
 findTaxi(State) ->
 	send_message(State#appUserState.pidGPSModule, {getNearestCar}),
 	receive 
@@ -195,11 +201,17 @@ findTaxi(State) ->
 	end.
 
 sendRequestToTaxi(Request, State) ->
-	NearestCar = findTaxi(State),
 	{From, To} = Request,
 	CorrectRequest = {From, To, self()},
-	gen_statem:cast(NearestCar, {beginElection, CorrectRequest}),
-	{next_state, waiting_election, State#appUserState{request = Request}}.
+	NearestCar = findTaxi(State),
+	if NearestCar == none ->  %nessuna macchina nei paraggi
+		   	wait_random_time(),
+			print_user_message(State#appUserState.pidUser, "App_User - Waited random time, no one near, going back to begin election"),
+			{next_state, idle, State, [{next_event,internal,{send_request,Request}}]};
+	   true ->
+		   gen_statem:cast(NearestCar, {beginElection, CorrectRequest}),
+		   {next_state, waiting_election, State#appUserState{request = Request}, [{state_timeout,?TIMETOWAITREPLY,noReply}]}
+	end.
 	
 
 initDataGpsModule(PidGpsServer, InitialPosition) ->

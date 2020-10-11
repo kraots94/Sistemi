@@ -8,7 +8,7 @@
     ?FUNCTION_NAME(T, C, D) -> handle_common(T, C,?FUNCTION_NAME, D)).
 
 % Every Tick will last for TICKTIME seconds
--define(TICKTIME, 1).
+-define(TICKTIME, 1000).
 
 %numero di tick da ricevere per fare alc
 -define(TICKS_TIMEOUT_ELECTION, 2).
