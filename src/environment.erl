@@ -1,7 +1,5 @@
 -module(environment).
 
--export([start_link/0, end_environment/1]).
-
 -import('tick_server',[start_clock/1, end_clock/1]).
 -import('gps_server', [start_gps_server/1, end_gps_server/1]).
 -import('send', [send_message/2, send_message/3]).
@@ -30,13 +28,46 @@
 							city, 
 							tick_s_pid, 
 							pid_gps_server, 
-							tick_counter}).
+							tick_counter,
+							autoEvents}).
 						
 %% ====================================================================
 %% API functions
 %% ====================================================================
-%%% Client API
+-export([start_link/0, end_environment/1, triggerEvent/2,
+		enableAutoEvents/1, disableAutoEvents/1, printGpsState/1, 
+		printSelfState/1, spawnCars/2, spawnUsers/2, removeCar/2, removeUser/2]).
+
 start_link() -> spawn_link(fun init/0).
+
+triggerEvent(PID_ENV, ID) ->
+	send_message(PID_ENV, {event, ID}).
+
+enableAutoEvents(PID_ENV) ->
+	send_message(PID_ENV, {enable_auto_events}).
+
+disableAutoEvents(PID_ENV) ->
+	send_message(PID_ENV, {disable_auto_events}).
+
+printGpsState(PID_ENV) ->
+	send_message(PID_ENV, {print, gps_server_state}).
+
+printSelfState(PID_ENV) ->
+	send_message(PID_ENV, {print, self}).
+
+spawnCars(PID_ENV, N) ->
+	send_message(PID_ENV, {spawn, cars, N}).
+
+spawnUsers(PID_ENV, N) ->
+	send_message(PID_ENV, {spawn, users, N}).
+
+% Just removes ref from internal, does not kill
+removeCar(PID_ENV, Pid) ->
+	send_message(PID_ENV, {task_complete, car, Pid}).
+
+% Just removes ref from internal, does not kill	
+removeUser(PID_ENV, Pid) -> 
+	send_message(PID_ENV, {task_complete, user, Pid}).
 
 end_environment(Pid) ->
 	print_debug_message("Killing Environment"),
@@ -71,26 +102,35 @@ init() ->
 						  city = City, 
 						  tick_s_pid = Pid_Tick, 
 						  pid_gps_server = PID_server_gps, 
-						  tick_counter = 0},
+						  tick_counter = 0,
+						  autoEvents = false},
 	print_environment_message(self(), "Environment Created"),
 	loop(S).
 
 loop(State) ->
     receive
 		{_Pid, tick} -> 
-			CurrentTickCounter = State#environmentState.tick_counter,
-			NextTick = CurrentTickCounter + 1,
-			NewState =
-				if NextTick >= ?TICKS_EVENT -> 
-						HandledState = handle_event(State, utilities:generate_random_number(100)),
-						HandledState#environmentState{tick_counter = 0};
+			NewState = if 
+				State#environmentState.autoEvents ->
+					CurrentTickCounter = State#environmentState.tick_counter,
+					NextTick = CurrentTickCounter + 1,
+					if NextTick >= ?TICKS_EVENT -> 
+							HandledState = handle_random_event(State, utilities:generate_random_number(100)),
+							HandledState#environmentState{tick_counter = 0};
+					true -> 
+						State#environmentState{tick_counter = NextTick}
+					end;
 				true -> 
-					State#environmentState{tick_counter = NextTick}
-				end,
+					State
+			end,
 			loop(NewState);
-		{event, N} -> 
-			loop(handle_event(State, N));
-		{print, wireless_card} -> 
+		{event, ID} -> 
+			loop(handle_event(State, ID));
+		{enable_auto_events} ->
+			loop(State#environmentState{autoEvents = true});
+		{disable_auto_events} ->
+			loop(State#environmentState{autoEvents = false});
+		{print, gps_server_state} -> 
 			State#environmentState.pid_gps_server ! {self(), {printState}},
 			loop(State);
 		{print, self} -> 
@@ -125,154 +165,157 @@ loop(State) ->
 %% Handle Events functions
 %% ====================================================================
 
-handle_event(S, N) ->
-	NewState = if 	
-	    % Nothing
-	    N < 0 ->  
+handle_random_event(S, N) ->
+	EventID = if 	
+	    N < 0   ->  -1;
+		N < 10  ->   1;
+	   	N < 15  ->  -1;
+		N < 25  ->   2;
+		N < 35  ->  -1;
+		N < 45  ->   3;
+		N < 50  ->  -1;
+		N < 60  ->   4;
+		N < 70  ->   5;
+		N < 75  ->  -1;
+		N < 77  ->   6;
+		N == 77 ->  -1;
+		N < 80  ->   7;
+		N == 80 ->  -1;
+		N < 83  ->   8;
+		N == 83 ->  -1;
+		N < 86  ->   9;
+		N < 95  ->  -1;
+		N < 100 ->  10;
+		true    ->   -1
+	end,
+	handle_event(S, EventID).
+
+handle_event(S, EventID) ->
+	NewState = if
+		EventID == -1 -> % Nothing
 			print_debug_message(self(), "Event: ~p", "nothing happened"),
 			S;
-		% Spawn Car
-		N < 10 -> 
+		EventID == 1 -> % Spawn car
 			print_debug_message(self(), "Event: ~p", "spawn car"),
-			generate_single_car(S);
-					
-	   	N < 15 -> 
-			print_debug_message(self(), "Event: ~p", "nothing happened"),
-			S;
-
-		N < 25 -> 
-			print_debug_message(self(), "Event: ~p", "spawn client"),
-			generate_single_user(S);
-	   	
-		N < 35 -> 
-			print_debug_message(self(), "Event: ~p", "nothing happened"),
-			S;
-	   	
-		N < 45 -> 
+			event_generate_car(S);
+		EventID == 2 -> % Spawn user
+			print_debug_message(self(), "Event: ~p", "spawn user"),
+			event_generate_user(S);
+		EventID == 3 -> % Change target
 			print_debug_message(self(), "Event: ~p", "client change target"),
-			Pid_User = getRandomUser(S),
-			NewDestination = getRandomNode(S),
-			UserChangedDest = changeDestUser(Pid_User, NewDestination),
-			if 
-				UserChangedDest == changed ->
-					print_environment_message(self(), "User {~w} has now new target [~p]", [Pid_User, NewDestination]);
-				true ->
-					ok
-			end,
-			S;
-		
-		N < 50 -> 
-			print_debug_message(self(), "Event: ~p", "nothing happened"),
-			S;
-		
-		N < 60 -> 
+			event_user_change_target(S);
+		EventID == 4 -> % Car crash
 			print_debug_message(self(), "Event: ~p", "car crash"),
-			Total_Cars = S#environmentState.total_cars,
-			Total_Crashed = S#environmentState.total_cars_crashed,
-			if
-				Total_Cars == Total_Crashed ->
-					print_debug_message(self(), "Event car crash not occurred because all cars are already crashed"),
-					S;
-				true ->					
-					CrashedCars = S#environmentState.cars_crashed,
-					Car_To_Crash = searchCarNotCrashed(S, CrashedCars, true, -1),
-					New_crashed_cars = [Car_To_Crash] ++ CrashedCars,
-					New_total_cars_crashed = Total_Crashed + 1,
-					%TODO Write here code to notify car
-
-					print_environment_message(self(), "Car with pid {~w} has punctured rubber of the car!", Car_To_Crash),
-					S#environmentState{
-						cars_crashed = New_crashed_cars,
-						total_cars_crashed = New_total_cars_crashed
-					}
-			end;
-	   	
-		N < 70 -> 
+			event_car_crash(S);
+		EventID == 5 -> % Fix car
 			print_debug_message(self(), "Event: ~p", "fix car"),
-			Total_Crashed = S#environmentState.total_cars_crashed,
-			if
-				Total_Crashed == 0 ->
-					print_debug_message(self(), "Event car fix not occurred because no cars are crashed"),
-					S;
-				true ->					
-					Car_To_Fix = getRandomCrashedCar(S),
-					CrashedCars = S#environmentState.cars_crashed,
-					New_crashed_cars = lists:delete(Car_To_Fix, CrashedCars),
-					New_total_cars_crashed = Total_Crashed - 1,
-					%TODO Write here code to notify car
-				
-					print_environment_message(self(), "Car with pid {~w} has been fixed!", Car_To_Fix),
-					S#environmentState{
-						cars_crashed = New_crashed_cars,
-						total_cars_crashed = New_total_cars_crashed
-					}
-			end;
-
-		N < 75 -> 
-			print_debug_message(self(), "Event: ~p", "nothing happened"),
-			S;
-		
-		N < 77 -> 
+			event_fix_car(S);
+		EventID == 6 -> % Add node to map
 			print_debug_message(self(), "Event: ~p", "add node to map"),
 			S;
-		
-		N == 77 -> 
-			print_debug_message(self(), "Event: ~p", "nothing happened"),
-			S;
-		
-		N < 80 -> 
+		EventID == 7 -> % Add street to map
 			print_debug_message(self(), "Event: ~p", "add street to map"),
 			S;
-		
-		N == 80 -> 
-			print_debug_message(self(), "Event: ~p", "nothing happened"),
-			S;
-		
-		N < 83 -> 
+		EventID == 8 -> % Remove node from map
 			print_debug_message(self(), "Event: ~p", "remove node from map"),
 			S;
-		
-		N == 83 -> 
-			print_debug_message(self(), "Event: ~p", "nothing happened"),
-			S;
-		
-		N < 86 -> 
+		EventID == 9 -> % Remove street from map
 			print_debug_message(self(), "Event: ~p", "remove street from map"),
 			S;
-		
-		N < 95 -> 
-			print_debug_message(self(), "Event: ~p", "nothing happened"),
-			S;
-		
-		N < 100 -> 
-			print_debug_message(self(), "Event: ~p", "remove car"),
-			Total_Cars = S#environmentState.total_cars,
-			if 
-				Total_Cars == 0 ->
-					print_debug_message(self(), "Event kill car not occurred because no cars are "),
-					S;
-				true ->
-					Pid_Removed = findAndKillCar(S, not_killed, -1, 0),
-					if Pid_Removed == -1 ->
-							print_debug_message(self(), "Event kill car not occurred because not found car in idle");
-						true ->
-							print_environment_message(self(), "Car with pid {~w} has been removed!", Pid_Removed),
-							Cars = S#environmentState.cars,
-							NewCars = lists:delete(Pid_Removed, Cars),
-							New_Total_Cars = Total_Cars - 1,
-							S#environmentState{
-								cars = NewCars,
-								total_cars = New_Total_Cars
-							}
-					end
-			end;
-		
-		true -> 
-			print_debug_message(self(), "Event: ~p", "nothing happened"),
+		EventID == 10 -> % Remove car
+			print_debug_message(self(), "Event: ~p", "remove car from environment"),
+			event_remove_car(S);
+		true ->
+			print_debug_message(self(), "Event ~w does not exist", EventID),
 			S
 	end,
 	NewState.
 
+%% ====================================================================
+%% Event functions
+%% ====================================================================
+
+event_generate_car(S) ->
+	generate_single_car(S).
+
+event_generate_user(S) ->
+	generate_single_user(S).
+
+event_user_change_target(S) ->
+	Pid_User = getRandomUser(S),
+	NewDestination = getRandomNode(S),
+	UserChangedDest = changeDestUser(Pid_User, NewDestination),
+	if 
+		UserChangedDest == changed ->
+			print_environment_message(self(), "User {~w} has now new target [~p]", [Pid_User, NewDestination]);
+		true ->
+			ok
+	end,
+	S.
+
+event_car_crash(S) ->
+	Total_Cars = S#environmentState.total_cars,
+	Total_Crashed = S#environmentState.total_cars_crashed,
+	if
+		Total_Cars == Total_Crashed ->
+			print_debug_message(self(), "Event car crash not occurred because all cars are already crashed"),
+			S;
+		true ->					
+			CrashedCars = S#environmentState.cars_crashed,
+			Car_To_Crash = searchCarNotCrashed(S, CrashedCars, true, -1),
+			New_crashed_cars = [Car_To_Crash] ++ CrashedCars,
+			New_total_cars_crashed = Total_Crashed + 1,
+			%TODO Write here code to notify car
+
+			print_environment_message(self(), "Car with pid {~w} has punctured rubber of the car!", Car_To_Crash),
+			S#environmentState{
+				cars_crashed = New_crashed_cars,
+				total_cars_crashed = New_total_cars_crashed
+			}
+	end.
+
+event_fix_car(S) ->
+	Total_Crashed = S#environmentState.total_cars_crashed,
+	if
+		Total_Crashed == 0 ->
+			print_debug_message(self(), "Event car fix not occurred because no cars are crashed"),
+			S;
+		true ->					
+			Car_To_Fix = getRandomCrashedCar(S),
+			CrashedCars = S#environmentState.cars_crashed,
+			New_crashed_cars = lists:delete(Car_To_Fix, CrashedCars),
+			New_total_cars_crashed = Total_Crashed - 1,
+			%TODO Write here code to notify car
+		
+			print_environment_message(self(), "Car with pid {~w} has been fixed!", Car_To_Fix),
+			S#environmentState{
+				cars_crashed = New_crashed_cars,
+				total_cars_crashed = New_total_cars_crashed
+			}
+	end.
+
+event_remove_car(S) ->
+	Total_Cars = S#environmentState.total_cars,
+	if 
+		Total_Cars == 0 ->
+			print_debug_message(self(), "Event kill car not occurred because no cars in environment"),
+			S;
+		true ->
+			Pid_Removed = findAndKillCar(S, not_killed, -1, 0),
+			if Pid_Removed == -1 ->
+					print_debug_message(self(), "Event kill car not occurred because not found car in idle");
+				true ->
+					print_environment_message(self(), "Car with pid {~w} has been removed!", Pid_Removed),
+					Cars = S#environmentState.cars,
+					NewCars = lists:delete(Pid_Removed, Cars),
+					New_Total_Cars = Total_Cars - 1,
+					S#environmentState{
+						cars = NewCars,
+						total_cars = New_Total_Cars
+					}
+			end
+	end.
+	
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
