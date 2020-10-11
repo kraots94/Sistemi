@@ -92,6 +92,12 @@ spawnCars(PID_ENV, N) ->
 spawnUsers(PID_ENV, N) ->
 	send_message(PID_ENV, {spawn, users, N}).
 
+spawnCar(PID_ENV, StartingPos) ->
+	send_message(PID_ENV, {spawn, car, StartingPos}).
+
+spawnUser(PID_ENV, From, To) ->
+	send_message(PID_ENV, {spawn, user, From, To}).
+
 % Just removes ref from internal, does not kill
 removeCar(PID_ENV, Pid) ->
 	send_message(PID_ENV, {task_complete, car, Pid}).
@@ -229,7 +235,20 @@ loop(State) ->
 		{print, self, users} ->
 			print_environment_message(self(), "Users in city: ~p", getDictionaryKeys(State#environmentState.user_pids)),
 			loop(State);
-		{spawn, cars, N} -> 	
+		{spawn, car, StartingPos} -> 
+			Nodes = State#environmentState.city#city.nodes,
+			StartingPosID = nodes_util:getID(StartingPos, Nodes),
+			NewState = if 
+				StartingPosID == -1 ->
+					print_environment_message(self(), "Node with name {~p} does not exist", StartingPos),
+					State;
+				true ->
+					generate_single_car(State, StartingPos)
+			end,
+			loop(NewState);
+		{spawn, user, From, To} ->
+			loop(generate_single_car(State, {From, To}));
+		{spawn, cars, N} ->
 			print_debug_message(self(), "Have to spawn ~w cars", N),
 			NewState = generate_multiple_cars(State, N),
 			loop(NewState);
@@ -329,10 +348,10 @@ handle_event(S, EventID, Data) ->
 %% ====================================================================
 
 event_generate_car(S) ->
-	generate_single_car(S).
+	generate_single_car(S, none).
 
 event_generate_user(S) ->
-	generate_single_user(S).
+	generate_single_user(S, none).
 
 event_user_change_target(S, Data) ->
 	ListData = tuple_to_list(Data),
@@ -477,7 +496,7 @@ event_remove_car(S, Target) ->
 %% ====================================================================
 
 generate_multiple_cars(State, N) ->
-	{NewState, Cars_Generated} = generate_entities(State, N, fun generate_taxi/1, fun updateLastCarName/1, []),
+	{NewState, Cars_Generated} = generate_entities(State, none, N, fun generate_taxi/2, fun updateLastCarName/1, []),
 	{Pids_Dict, Pids_List} = updateRefs(Cars_Generated, NewState#environmentState.car_pids, NewState#environmentState.cars),
 	Total_Cars = NewState#environmentState.total_cars + N,
 	NewState#environmentState{	cars = Pids_List, 
@@ -485,43 +504,53 @@ generate_multiple_cars(State, N) ->
 								car_pids = Pids_Dict}.
 
 generate_multiple_users(State, N) -> 
-	{NewState, Users_Generated} = generate_entities(State, N, fun generate_user/1, fun updateLastUserName/1, []),
+	{NewState, Users_Generated} = generate_entities(State, none,  N, fun generate_user/2, fun updateLastUserName/1, []),
 	{Pids_Dict, Pids_List} = updateRefs(Users_Generated, NewState#environmentState.user_pids, NewState#environmentState.users),
 	Total_Users = NewState#environmentState.total_users + N,
 	NewState#environmentState{	users = Pids_List, 
 								total_users = Total_Users,
 								user_pids = Pids_Dict}.
 	
-generate_single_car(State) ->
-	{NewState, TaxiData} =  generate_entities(State, 1, fun generate_taxi/1, fun updateLastCarName/1, []),
+generate_single_car(State, Data) ->
+	{NewState, TaxiData} =  generate_entities(State, Data, 1, fun generate_taxi/2, fun updateLastCarName/1, []),
 	{Pids_Dict, Pids_List} = updateRefs(TaxiData, NewState#environmentState.car_pids, NewState#environmentState.cars),
 	Total_Cars = State#environmentState.total_cars + 1,
 	NewState#environmentState{	cars = Pids_List, 
 								total_cars = Total_Cars,
 								car_pids = Pids_Dict}.
 
-generate_single_user(State) ->
-	{NewState, UserData} = generate_entities(State, 1, fun generate_user/1, fun updateLastUserName/1, []),
+generate_single_user(State, Data) ->
+	{NewState, UserData} = generate_entities(State, Data, 1, fun generate_user/2, fun updateLastUserName/1, []),
 	{Pids_Dict, Pids_List} = updateRefs(UserData, NewState#environmentState.user_pids, NewState#environmentState.users),
 	Total_Users = NewState#environmentState.total_users + 1,
 	NewState#environmentState{	users = Pids_List, 
 								total_users = Total_Users,
 								user_pids = Pids_Dict}.
 
-generate_taxi(State) ->
-	StartingPos = getRandomNode(State),
+generate_taxi(State, Pos) ->
+	StartingPos = if 
+		Pos == none -> 
+			getRandomNode(State);
+		true -> 
+			Pos
+	end,
 	PidGpsServer = State#environmentState.pid_gps_server,
 	City_Map = State#environmentState.city,
 	TaxiName = getUpdatedTaxiName(State),
 	PidTaxi = macchina_ascoltatore:start({StartingPos, PidGpsServer, City_Map, TaxiName}),
 	{TaxiName, PidTaxi}.
 
-generate_user(State) ->
-	NodeStart = getRandomNode(State),
-	Request = generateUserRequest(State, NodeStart),
+generate_user(State, Request) ->
+	GeneratedRequest = if
+		Request == none ->
+			NodeStart = getRandomNode(State),
+			generateUserRequest(State, NodeStart);
+		true -> Request
+	end,
+	{From, _To} = GeneratedRequest,
 	PidGpsServer = State#environmentState.pid_gps_server,
 	UserName = getUpdatedUserName(State),
-	PidUtente = utente:start({NodeStart, PidGpsServer, UserName, self()}),
+	PidUtente = utente:start({From, PidGpsServer, UserName, self()}),
 	utente:sendRequest(PidUtente, Request),
 	{UserName, PidUtente}.
 
@@ -644,12 +673,12 @@ killEntities([H | T], KillFunc, ForceKill) ->
 	KillFunc(H, ForceKill),
 	killEntities(T, KillFunc, ForceKill).
 
-generate_entities(State, 0, _GenerateFunc, _UpdateNameFunct, Outs) -> {State, Outs};
-generate_entities(State, N, GenerateFunc, UpdateNameFunct, Outs) -> 
+generate_entities(State, _Data, 0, _GenerateFunc, _UpdateNameFunct, Outs) -> {State, Outs};
+generate_entities(State, Data, N, GenerateFunc, UpdateNameFunct, Outs) -> 
 	Out = GenerateFunc(State),
-	NewS = UpdateNameFunct(State),
+	NewS = UpdateNameFunct(State, Data),
 	New_Outs = [Out] ++ Outs,
-	generate_entities(NewS, N-1, GenerateFunc, UpdateNameFunct, New_Outs).
+	generate_entities(NewS, Data, N-1, GenerateFunc, UpdateNameFunct, New_Outs).
 
 getRandomNode(S) -> getRandomNode(S, "").
 getRandomNode(S, NodeName) -> 
