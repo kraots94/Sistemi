@@ -497,6 +497,7 @@ taxiServingAppId(UserPid, S) ->
 
 arrivedInUserPosition(UserPid, S) ->
 	ListenerPid = S#movingCarState.pidListener,
+	gen_statem:cast(ListenerPid, {carrying, UserPid}),
 	macchina_ascoltatore:sendToEsternalAutomata(ListenerPid, UserPid, arrivedUserPosition).
 
 arrivedInTargetPosition(UserPid, S) ->

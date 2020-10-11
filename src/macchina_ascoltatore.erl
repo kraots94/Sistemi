@@ -23,6 +23,7 @@ callback_mode() -> [state_functions].
 							pidClock,
 							pidAppUser,
 							usersInQueue,
+							userCarrying,
 							nome}). %lista di record del tipo {Pid, Pos, Destination}
 
 -record(userInQueue , {pid,
@@ -95,6 +96,7 @@ init(InitData) ->
 					pidClock = PidClock,
 					pidAppUser = -1,
 					usersInQueue = [],
+					userCarrying = none,
 					nome = Name
 			},
 	print_car_message(self(), "Car ready in position [~p]", InitialPos),
@@ -119,11 +121,29 @@ handle_common(cast, {fixed}, _OldState, State) ->
 	PidMoving = State#taxiListenerState.pidMoving,
 	gen_statem:cast(PidMoving, {fixed}),
 	keep_state_and_data.
+
+handle_common(cast, {carrying, UserPid}, State) ->
+	{keep_state, State#taxiListenerState{userCarrying = UserPid}}.
 	
-%roba che deve uscire
-idle(cast, {to_outside, {Target, Data}}, _Stato) ->
-	gen_statem:cast(Target, Data),
-	keep_state_and_data;
+%roba che deve uscire, controllo se sto facendo uscire posizione e se è posizione di quello che sto trasportando
+idle(cast, {to_outside, {Target, Data}}, Stato) ->
+	if is_tuple(Data) -> %è un dato del tipo "newNodeReached"
+		   ListUsersInQueue = Stato#taxiListenerState.usersInQueue,
+		   {_First, Position} = Data,
+			NewList = if 
+				(Target == Stato#taxiListenerState.userCarrying) -> %è un cambio posizione del tipo che trasporto
+	 				OldRecord = hd(ListUsersInQueue),
+					NewRecord = OldRecord#userInQueue{position = Position},
+					[NewRecord] ++ tl(ListUsersInQueue);
+				true ->
+			    	ListUsersInQueue
+				end,
+		   gen_statem:cast(Target, Data),
+		   {keep_state, Stato#taxiListenerState{usersInQueue = NewList}};
+		true -> 
+			gen_statem:cast(Target, Data),
+			keep_state_and_data
+	end;
 	
 %ricezione del tick
 idle(info, {_From, tick}, _Stato) ->
@@ -197,16 +217,13 @@ listen_election(cast, {election_results, Data}, Stato) ->
 	end,
 
 	Pid_Car = DataToUse#election_result_to_car.id_winner,
-
-	if 
+	NewState = if 
 		(Pid_Car == -1) and (Is_Initiator) -> % Avviso l'utente se non c'è un vincitore
-			notify_user_no_taxi(Stato#taxiListenerState.pidAppUser);
+			notify_user_no_taxi(Stato#taxiListenerState.pidAppUser),
+			Stato;
 		Pid_Car == self() -> 
 			print_debug_message(self(), "I have won election"),
-			%% Update coda moving
-			gen_statem:call(PidElezione, {sendMovingQueue}),
-
-			
+			gen_statem:call(PidElezione, {sendMovingQueue}), %update queue moving
 			PidMoving = Stato#taxiListenerState.pidMoving,
 			Pid_User = DataToUse#election_result_to_car.id_app_user,
 			TimeToUser = macchina_moving:getTimeToUser(PidMoving),
@@ -214,12 +231,12 @@ listen_election(cast, {election_results, Data}, Stato) ->
 				id_car_winner = Pid_Car, 
 				time_to_wait = TimeToUser
 			},
-			%NewListOfQueuedUsers = calculateNewlist(State, Data),
-			%inserisco lista dei nuovi utenti queued nello stato
-			gen_statem:cast(Pid_User, {winner, DataToUser});
-		true -> ok
+			NewListQueuedUsers = calculateNewListQueuedUsers(Stato, DataToUse),
+			gen_statem:cast(Pid_User, {winner, DataToUser}),
+			Stato#taxiListenerState{usersInQueue = NewListQueuedUsers};
+		true -> Stato
 	end,
-	{next_state, idle, Stato};
+	{next_state, idle, NewState};
 
 ?HANDLE_COMMON.
 
@@ -259,3 +276,15 @@ killEntities(State) ->
 	gps_module:end_gps_module(PidGps), tick_server:end_clock(PidClock), %ammazzo server
 	print_debug_message(self(), "All linked entities killed"),
 	gen_statem:stop(self()).
+
+calculateNewListQueuedUsers(State, ElectionData) ->
+	PidNewUser = ElectionData#election_result_to_car.id_app_user,
+	Request =  ElectionData#election_result_to_car.request,
+	{From, To} = Request,
+	OldList = State#taxiListenerState.usersInQueue,
+	NewRecord = #userInQueue{pid = PidNewUser,
+							 position = From,
+						     target = To},
+	OldList ++ [NewRecord].
+
+
