@@ -11,7 +11,9 @@
 						print_environment_message/1,
 						print_environment_message/2,
 						print_environment_message/3,
-						getRandomEntity/2]).
+						getRandomEntity/2,
+						construct_string/2,
+						getDictionaryKeys/1]).
 
 -include("records.hrl").
 -include("globals.hrl").
@@ -29,19 +31,42 @@
 							tick_s_pid, 
 							pid_gps_server, 
 							tick_counter,
-							autoEvents}).
+							autoEvents,
+							user_pids,
+							last_user_id,
+							user_prefix = u,
+							car_pids,
+							last_car_id,
+							car_prefix = c}).
 						
 %% ====================================================================
 %% API functions
 %% ====================================================================
 -export([start_link/0, end_environment/1, triggerEvent/2,
 		enableAutoEvents/1, disableAutoEvents/1, printGpsState/1, 
-		printSelfState/1, spawnCars/2, spawnUsers/2, removeCar/2, removeUser/2]).
+		printSelfState/1, spawnCars/2, spawnUsers/2, removeCar/2, removeUser/2,
+		triggerChangeDestUser/2, triggerChangeDestUser/3, triggerCarCrash/2, 
+		triggerFixCar/2, triggerCarRemove/2, printCars/1, printUsers/1]).
 
 start_link() -> spawn_link(fun init/0).
 
 triggerEvent(PID_ENV, ID) ->
 	send_message(PID_ENV, {event, ID}).
+
+triggerChangeDestUser(PID_ENV, UserName) -> 
+	triggerChangeDestUser(PID_ENV, UserName, none).
+
+triggerChangeDestUser(PID_ENV, UserName, NewTarget) ->
+	send_message(PID_ENV, {event, 3, UserName, NewTarget}).
+
+triggerCarCrash(PID_ENV, CarName) -> 
+	send_message(PID_ENV, {event, 4, CarName}).
+
+triggerFixCar(PID_ENV, CarName) -> 
+	send_message(PID_ENV, {event, 5, CarName}).
+
+triggerCarRemove(PID_ENV, CarName) -> 
+	send_message(PID_ENV, {event, 10, CarName}).
 
 enableAutoEvents(PID_ENV) ->
 	send_message(PID_ENV, {enable_auto_events}).
@@ -54,6 +79,12 @@ printGpsState(PID_ENV) ->
 
 printSelfState(PID_ENV) ->
 	send_message(PID_ENV, {print, self}).
+
+printCars(PID_ENV) ->
+	send_message(PID_ENV, {print, self, cars}).
+
+printUsers(PID_ENV) ->
+	send_message(PID_ENV, {print, self, users}).
 
 spawnCars(PID_ENV, N) ->
 	send_message(PID_ENV, {spawn, cars, N}).
@@ -103,7 +134,11 @@ init() ->
 						  tick_s_pid = Pid_Tick, 
 						  pid_gps_server = PID_server_gps, 
 						  tick_counter = 0,
-						  autoEvents = false},
+						  autoEvents = false,
+						  user_pids = dict:new(),
+						  last_user_id = 1,
+						  car_pids = dict:new(),
+						  last_car_id = 1},
 	print_environment_message(self(), "Environment Created"),
 	loop(S).
 
@@ -124,17 +159,75 @@ loop(State) ->
 					State
 			end,
 			loop(NewState);
-		{event, ID} -> 
-			loop(handle_event(State, ID));
+		
+		{event, EventID} -> 
+			loop(handle_event(State, EventID, {none}));
+
+		{event, 3, UserName, NewTarget} ->  % Change target
+			Out = getPidFromDict(UserName, State#environmentState.user_pids),
+			NewState = if
+				Out == error -> 
+					print_environment_message(self(), "User with Name [~p] does not exists", [UserName]),
+					State;
+				true -> 
+					{ok, Pid} = Out,
+					handle_event(State, 3, {Pid, NewTarget})
+			end,
+			loop(NewState);		
+
+		{event, 4, Target} -> % Car crash
+			Out = getPidFromDict(Target, State#environmentState.car_pids),
+			NewState = if
+				Out == error -> 
+					print_environment_message(self(), "Car with Name [~p] does not exists", [Target]),
+					State;
+				true -> 
+					{ok, Target} = Out,
+					handle_event(State, 4, {Target})
+			end,
+			loop(NewState);				
+		
+		{event, 5, Target} -> % Fix car
+			Out = getPidFromDict(Target, State#environmentState.car_pids),
+			NewState = if
+				Out == error -> 
+					print_environment_message(self(), "Car with Name [~p] does not exists", [Target]),
+					State;
+				true -> 
+					{ok, Target} = Out,
+					handle_event(State,5, {Target})
+			end,
+			loop(NewState);		
+
+		{event, 10, Target} -> % Remove car
+			Out = getPidFromDict(Target, State#environmentState.car_pids),
+			NewState = if
+				Out == error -> 
+					print_environment_message(self(), "Car with Name [~p] does not exists", [Target]),
+					State;
+				true -> 
+					{ok, Target} = Out,
+					handle_event(State, 10, {Target})
+			end,
+			loop(NewState);	
+
 		{enable_auto_events} ->
+			print_environment_message(self(), "Auto Events Enabled"),
 			loop(State#environmentState{autoEvents = true});
 		{disable_auto_events} ->
+			print_environment_message(self(), "Auto Events Disabled"),
 			loop(State#environmentState{autoEvents = false});
 		{print, gps_server_state} -> 
 			State#environmentState.pid_gps_server ! {self(), {printState}},
 			loop(State);
 		{print, self} -> 
 			print_environment_message(self(), "Environment State: ~w", State),
+			loop(State);
+		{print, self, cars} ->
+			print_environment_message(self(), "Cars in city: ~p", getDictionaryKeys(State#environmentState.car_pids)),
+			loop(State);
+		{print, self, users} ->
+			print_environment_message(self(), "Users in city: ~p", getDictionaryKeys(State#environmentState.user_pids)),
 			loop(State);
 		{spawn, cars, N} -> 	
 			print_debug_message(self(), "Have to spawn ~w cars", N),
@@ -144,13 +237,13 @@ loop(State) ->
 			print_debug_message(self(), "Have to spawn ~w users", N),
 			NewState = generate_multiple_users(State, N),
 			loop(NewState);
-		{task_complete, user, Pid} -> 	
-			print_debug_message(self(), "Have to remove user with Pid {~w}", Pid),
-			NewState = remove_user_from_state(State, Pid),
-			loop(NewState);
 		{task_complete, car, Pid} -> 	
 			print_debug_message(self(), "Have to remove car with Pid {~w}", Pid),
-			NewState = remove_car_from_state(State, Pid),
+			NewState = removeCarFromEnvironment(Pid, State),
+			loop(NewState);
+		{task_complete, user, Pid} -> 	
+			print_debug_message(self(), "Have to remove user with Pid {~w}", Pid),
+			NewState = removeUserFromEnvironment(Pid, State),
 			loop(NewState);
         {Pid, Ref, terminate} ->
 			send_message(Pid, {Ref, ok}),
@@ -188,9 +281,9 @@ handle_random_event(S, N) ->
 		N < 100 ->  10;
 		true    ->   -1
 	end,
-	handle_event(S, EventID).
+	handle_event(S, EventID, {none}).
 
-handle_event(S, EventID) ->
+handle_event(S, EventID, Data) ->
 	NewState = if
 		EventID == -1 -> % Nothing
 			print_debug_message(self(), "Event: ~p", "nothing happened"),
@@ -203,13 +296,13 @@ handle_event(S, EventID) ->
 			event_generate_user(S);
 		EventID == 3 -> % Change target
 			print_debug_message(self(), "Event: ~p", "client change target"),
-			event_user_change_target(S);
+			event_user_change_target(S, Data);
 		EventID == 4 -> % Car crash
 			print_debug_message(self(), "Event: ~p", "car crash"),
-			event_car_crash(S);
+			event_car_crash(S, Data);
 		EventID == 5 -> % Fix car
 			print_debug_message(self(), "Event: ~p", "fix car"),
-			event_fix_car(S);
+			event_fix_car(S, Data);
 		EventID == 6 -> % Add node to map
 			print_debug_message(self(), "Event: ~p", "add node to map"),
 			S;
@@ -224,7 +317,7 @@ handle_event(S, EventID) ->
 			S;
 		EventID == 10 -> % Remove car
 			print_debug_message(self(), "Event: ~p", "remove car from environment"),
-			event_remove_car(S);
+			event_remove_car(S, Data);
 		true ->
 			print_debug_message(self(), "Event ~w does not exist", EventID),
 			S
@@ -241,79 +334,142 @@ event_generate_car(S) ->
 event_generate_user(S) ->
 	generate_single_user(S).
 
-event_user_change_target(S) ->
-	Pid_User = getRandomUser(S),
-	NewDestination = getRandomNode(S),
-	UserChangedDest = changeDestUser(Pid_User, NewDestination),
+event_user_change_target(S, Data) ->
+	ListData = tuple_to_list(Data),
+	TargetTest = hd(ListData),
+	{TargetUser, NewDest} = if 
+		TargetTest == none -> 
+			{getRandomUser(S), getRandomNode(S)}; 
+		true -> 
+			{User, PassedDest} = Data,
+			if 
+				PassedDest == none -> 
+					{User, getRandomNode(S)};
+				true -> 
+					{User, PassedDest}
+			end
+	end,
+
+ 	UserChangedDest = changeDestUser(TargetUser, NewDest),
 	if 
 		UserChangedDest == changed ->
-			print_environment_message(self(), "User {~w} has now new target [~p]", [Pid_User, NewDestination]);
+			print_environment_message(self(), "User {~w} has now new target [~p]", [TargetUser, NewDest]);
 		true ->
-			ok
+			print_environment_message(self(), "User {~w} has not changed his destination to [~p]", [TargetUser, NewDest])
 	end,
 	S.
 
-event_car_crash(S) ->
+event_car_crash(S, Data) ->
+	{Target} = Data,
 	Total_Cars = S#environmentState.total_cars,
 	Total_Crashed = S#environmentState.total_cars_crashed,
 	if
 		Total_Cars == Total_Crashed ->
-			print_debug_message(self(), "Event car crash not occurred because all cars are already crashed"),
+			print_environment_message(self(), "Event car crash not occurred because all cars are already crashed"),
 			S;
 		true ->					
 			CrashedCars = S#environmentState.cars_crashed,
-			Car_To_Crash = searchCarNotCrashed(S, CrashedCars, true, -1),
-			New_crashed_cars = [Car_To_Crash] ++ CrashedCars,
-			New_total_cars_crashed = Total_Crashed + 1,
-			%TODO Write here code to notify car
+			Car_To_Crash = if
+				Target == none -> 
+					searchCarNotCrashed(S, CrashedCars, true, -1);
+				true -> 
+					Is_Member = lists:member(Target, CrashedCars),
+					if Is_Member ->
+							already_crashed;
+						true ->
+							Target
+					end
+			end,
+			if 	
+				Car_To_Crash == already_crashed -> 
+					print_environment_message(self(), "Car already out of games!"),
+					S;
+				true ->
+					New_crashed_cars = [Car_To_Crash] ++ CrashedCars,
+					New_total_cars_crashed = Total_Crashed + 1,
+					%TODO Write here code to notify car
 
-			print_environment_message(self(), "Car with pid {~w} has punctured rubber of the car!", Car_To_Crash),
-			S#environmentState{
-				cars_crashed = New_crashed_cars,
-				total_cars_crashed = New_total_cars_crashed
-			}
+					print_environment_message(self(), "Car with pid {~w} has punctured rubber of the car!", Car_To_Crash),
+					S#environmentState{
+						cars_crashed = New_crashed_cars,
+						total_cars_crashed = New_total_cars_crashed
+					}
+			end
 	end.
 
-event_fix_car(S) ->
+event_fix_car(S, Target) ->
 	Total_Crashed = S#environmentState.total_cars_crashed,
 	if
 		Total_Crashed == 0 ->
 			print_debug_message(self(), "Event car fix not occurred because no cars are crashed"),
 			S;
-		true ->					
-			Car_To_Fix = getRandomCrashedCar(S),
+		true ->
 			CrashedCars = S#environmentState.cars_crashed,
-			New_crashed_cars = lists:delete(Car_To_Fix, CrashedCars),
-			New_total_cars_crashed = Total_Crashed - 1,
-			%TODO Write here code to notify car
-		
-			print_environment_message(self(), "Car with pid {~w} has been fixed!", Car_To_Fix),
-			S#environmentState{
-				cars_crashed = New_crashed_cars,
-				total_cars_crashed = New_total_cars_crashed
-			}
+			Car_To_Fix = if
+				Target == none -> 
+					getRandomCrashedCar(S);
+				true -> 
+					Is_Member = lists:member(Target, CrashedCars),
+					if Is_Member ->
+							Target;
+						true ->
+							already_fixed
+					end
+			end,
+			if 
+				Car_To_Fix == already_fixed ->
+					print_environment_message(self(), "Car is already fixed!"),
+					S;
+				true ->
+					New_crashed_cars = lists:delete(Car_To_Fix, CrashedCars),
+					New_total_cars_crashed = Total_Crashed - 1,
+					%TODO Write here code to notify car
+				
+					print_environment_message(self(), "Car with pid {~w} has been fixed!", Car_To_Fix),
+					S#environmentState{
+						cars_crashed = New_crashed_cars,
+						total_cars_crashed = New_total_cars_crashed
+					}
+			end
 	end.
 
-event_remove_car(S) ->
+event_remove_car(S, Target) ->
 	Total_Cars = S#environmentState.total_cars,
 	if 
 		Total_Cars == 0 ->
 			print_debug_message(self(), "Event kill car not occurred because no cars in environment"),
 			S;
 		true ->
-			Pid_Removed = findAndKillCar(S, not_killed, -1, 0),
-			if Pid_Removed == -1 ->
-					print_debug_message(self(), "Event kill car not occurred because not found car in idle");
-				true ->
-					print_environment_message(self(), "Car with pid {~w} has been removed!", Pid_Removed),
-					Cars = S#environmentState.cars,
-					NewCars = lists:delete(Pid_Removed, Cars),
-					New_Total_Cars = Total_Cars - 1,
-					S#environmentState{
-						cars = NewCars,
-						total_cars = New_Total_Cars
-					}
-			end
+			Cars = S#environmentState.cars,
+			NewState = if
+				Target == none -> 
+					Pid_Removed = findAndKillCar(S, not_killed, -1, 0),
+					if 	
+						Pid_Removed /= -1 ->
+							removeCarFromEnvironment(Pid_Removed, S),
+							print_environment_message(self(), "Car with pid {~w} has been removed!", Pid_Removed);
+						true ->
+							print_debug_message(self(), "Event kill car not occurred because not found car in idle"),
+							S
+					end;
+				true -> 
+					Is_Member = lists:member(Target, Cars),
+					if 
+						Is_Member ->
+							Out = kill_car(Target, false),
+							if 	Out == killed ->
+								removeCarFromEnvironment(Target, S),
+								print_environment_message(self(), "Car with pid {~w} has been removed!", Target);
+							true ->
+								print_environment_message(self(), "Event kill car not occurred because car was not in idle"),
+								S
+						end;
+					true ->
+						print_environment_message(self(), "Car has been already been removed"),
+						S
+					end
+			end,
+			NewState
 	end.
 	
 %% ====================================================================
@@ -321,43 +477,53 @@ event_remove_car(S) ->
 %% ====================================================================
 
 generate_multiple_cars(State, N) ->
-	Cars_Generated = generate_entities(State, N, fun generate_taxi/1, []),
-	NewCars = Cars_Generated ++ State#environmentState.cars,
-	Total_Cars = State#environmentState.total_cars + N,
-	State#environmentState{cars = NewCars, total_cars = Total_Cars}.
+	{NewState, Cars_Generated} = generate_entities(State, N, fun generate_taxi/1, fun updateLastCarName/1, []),
+	{Pids_Dict, Pids_List} = updateRefs(Cars_Generated, NewState#environmentState.car_pids, NewState#environmentState.cars),
+	Total_Cars = NewState#environmentState.total_cars + N,
+	NewState#environmentState{	cars = Pids_List, 
+								total_cars = Total_Cars,
+								car_pids = Pids_Dict}.
 
 generate_multiple_users(State, N) -> 
-	Users_Generated = generate_entities(State, N, fun generate_user/1, []),
-	NewUsers = Users_Generated ++ State#environmentState.users,
-	Total_Users = State#environmentState.total_users + N,
-	State#environmentState{users = NewUsers, total_users = Total_Users}.
+	{NewState, Users_Generated} = generate_entities(State, N, fun generate_user/1, fun updateLastUserName/1, []),
+	{Pids_Dict, Pids_List} = updateRefs(Users_Generated, NewState#environmentState.user_pids, NewState#environmentState.users),
+	Total_Users = NewState#environmentState.total_users + N,
+	NewState#environmentState{	users = Pids_List, 
+								total_users = Total_Users,
+								user_pids = Pids_Dict}.
 	
 generate_single_car(State) ->
-	PidTaxi = generate_taxi(State),
-	NewCars = [PidTaxi] ++ State#environmentState.cars,
+	{NewState, TaxiData} =  generate_entities(State, 1, fun generate_taxi/1, fun updateLastCarName/1, []),
+	{Pids_Dict, Pids_List} = updateRefs(TaxiData, NewState#environmentState.car_pids, NewState#environmentState.cars),
 	Total_Cars = State#environmentState.total_cars + 1,
-	State#environmentState{cars = NewCars, total_cars = Total_Cars}.
+	NewState#environmentState{	cars = Pids_List, 
+								total_cars = Total_Cars,
+								car_pids = Pids_Dict}.
 
 generate_single_user(State) ->
-	PidUtente = generate_user(State),
-	NewUsers = [PidUtente] ++ State#environmentState.users,
-	Total_Users = State#environmentState.total_users + 1,
-	State#environmentState{users = NewUsers, total_users = Total_Users}.
+	{NewState, UserData} = generate_entities(State, 1, fun generate_user/1, fun updateLastUserName/1, []),
+	{Pids_Dict, Pids_List} = updateRefs(UserData, NewState#environmentState.user_pids, NewState#environmentState.users),
+	Total_Users = NewState#environmentState.total_users + 1,
+	NewState#environmentState{	users = Pids_List, 
+								total_users = Total_Users,
+								user_pids = Pids_Dict}.
 
 generate_taxi(State) ->
 	StartingPos = getRandomNode(State),
 	PidGpsServer = State#environmentState.pid_gps_server,
 	City_Map = State#environmentState.city,
-	PidTaxi = macchina_ascoltatore:start({StartingPos, PidGpsServer, City_Map}),
-	PidTaxi.
+	TaxiName = getUpdatedTaxiName(State),
+	PidTaxi = macchina_ascoltatore:start({StartingPos, PidGpsServer, City_Map, TaxiName}),
+	{TaxiName, PidTaxi}.
 
 generate_user(State) ->
 	NodeStart = getRandomNode(State),
 	Request = generateUserRequest(State, NodeStart),
 	PidGpsServer = State#environmentState.pid_gps_server,
-	PidUtente = utente:start({NodeStart, PidGpsServer}),
+	UserName = getUpdatedUserName(State),
+	PidUtente = utente:start({NodeStart, PidGpsServer, UserName, self()}),
 	utente:sendRequest(PidUtente, Request),
-	PidUtente.
+	{UserName, PidUtente}.
 
 kill_car(Pid, ForceKill) ->
 	Out = if 
@@ -374,6 +540,34 @@ kill_car(Pid, ForceKill) ->
 	end,
 	Out.
 
+removeCarFromEnvironment(Pid, S) ->
+	Cars = S#environmentState.cars,
+	Dict = S#environmentState.car_pids,
+	Total_Cars = S#environmentState.total_cars,
+	NewCars = lists:delete(Pid, Cars),
+	New_Total_Cars = Total_Cars - 1,
+	FilterFunc = fun(_Key, Val) -> hd(Val) /= Pid end,
+	NewDict = dict:filter(FilterFunc, Dict),
+	S#environmentState{
+		cars = NewCars,
+		total_cars = New_Total_Cars,
+		car_pids = NewDict
+	}.
+
+removeUserFromEnvironment(Pid, S) ->
+	Users = S#environmentState.users,
+	Dict = S#environmentState.user_pids,
+	Total_users = S#environmentState.total_users,
+	NewUsers = lists:delete(Pid, Users),
+	New_Total_Users = Total_users - 1,
+	FilterFunc = fun(_Key, Val) -> hd(Val) /= Pid end,
+	NewDict = dict:filter(FilterFunc, Dict),
+	S#environmentState{
+		users = NewUsers,
+		total_users = New_Total_Users,
+		user_pids = NewDict
+	}.
+
 kill_user(Pid, ForceKill) ->
 	Out = if 
 		ForceKill -> 
@@ -388,16 +582,6 @@ kill_user(Pid, ForceKill) ->
 			print_debug_message(self(), "User with PID {~w} removed", Pid)
 	end,
 	Out.
-
-remove_user_from_state(State, Pid) ->
-	NewUsers = lists:delete(Pid, State#environmentState.users),
-	Total_Users = State#environmentState.total_users - 1,
-	State#environmentState{users = NewUsers, total_users = Total_Users}.
-
-remove_car_from_state(State, Pid) ->
-	NewCars = lists:delete(Pid, State#environmentState.cars),
-	Total_Cars = State#environmentState.total_cars - 1,
-	State#environmentState{users = NewCars, total_cars = Total_Cars}.
 
 changeDestUser(_Pid, _NewDest) ->
 	%TODO check if user can change ad make it real
@@ -418,6 +602,29 @@ terminate(State) ->
 %% ====================================================================
 %% Utilities functions
 %% ====================================================================
+getUpdatedTaxiName(S) -> 
+	construct_string("~p~w", [S#environmentState.car_prefix, S#environmentState.last_car_id]).
+
+getUpdatedUserName(S) -> 
+	construct_string("~p~w", [S#environmentState.user_prefix, S#environmentState.last_user_id]).
+
+updateLastCarName(S) ->
+	LastID = S#environmentState.last_car_id,
+	S#environmentState{last_car_id = LastID + 1}.
+
+updateLastUserName(S) ->
+	LastID = S#environmentState.last_user_id,
+	S#environmentState{last_user_id = LastID + 1}.
+
+updateRefs([], Pids_Dict, Pids_List) -> {Pids_Dict, Pids_List};
+updateRefs([H | T], Pids_Dict, Pids_List) -> 
+	{Name, Pid} = H,
+	New_Pids_List = [Pid] ++ Pids_List,
+	New_Pids_Dict = dict:append(Name, Pid, Pids_Dict),
+	updateRefs(T, New_Pids_Dict, New_Pids_List).
+
+getPidFromDict(Name, Dict) ->
+	dict:find(Name, Dict).
 
 searchCarNotCrashed(_S, _CrashedCars, false, Result) -> Result; 
 searchCarNotCrashed(S, CrashedCars, true, _Result) -> 
@@ -437,11 +644,12 @@ killEntities([H | T], KillFunc, ForceKill) ->
 	KillFunc(H, ForceKill),
 	killEntities(T, KillFunc, ForceKill).
 
-generate_entities(_State, 0, _GenerateFunc, PIDS) -> PIDS;
-generate_entities(State, N, GenerateFunc, PIDS) -> 
-	NewPid = GenerateFunc(State),	
-	New_Pids = [NewPid]	++ PIDS,
-	generate_entities(State, N-1, GenerateFunc, New_Pids).
+generate_entities(State, 0, _GenerateFunc, _UpdateNameFunct, Outs) -> {State, Outs};
+generate_entities(State, N, GenerateFunc, UpdateNameFunct, Outs) -> 
+	Out = GenerateFunc(State),
+	NewS = UpdateNameFunct(State),
+	New_Outs = [Out] ++ Outs,
+	generate_entities(NewS, N-1, GenerateFunc, UpdateNameFunct, New_Outs).
 
 getRandomNode(S) -> getRandomNode(S, "").
 getRandomNode(S, NodeName) -> 

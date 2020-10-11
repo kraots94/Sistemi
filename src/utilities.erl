@@ -4,7 +4,7 @@
 
 -module(utilities).
 -include("globals.hrl").
--define(PRINT_DEBUG_ENABLE, true).
+-define(PRINT_DEBUG_ENABLE, false).
 %% ====================================================================
 %% API functions
 %% ====================================================================
@@ -29,7 +29,9 @@
 		 generate_random_number/1,
 		 generate_random_number/2, 
 		 createPairsFromList/1,
-		 getRandomEntity/2]).
+		 getRandomEntity/2,
+		 construct_string/2,
+		 getDictionaryKeys/1]).
 
 %print normal text
 %print normal text
@@ -50,29 +52,29 @@ print_debug_message(Message) ->
 	printMessage("Debug", "", Message, none).
 print_debug_message(Format, Data) -> 
 	fix_and_print_message("Debug", "", Format, Data).
-print_debug_message(PID, Format, Data) -> 
-	printMessage("Debug", PID, Format, Data).
+print_debug_message(EntityName, Format, Data) -> 
+	printMessage("Debug", EntityName, Format, Data).
 
 print_user_message(Message) -> 
 	printMessage("User", "", Message, none).
 print_user_message(Format, Data) -> 
 	fix_and_print_message("User", "", Format, Data).
-print_user_message(PID, Format, Data) -> 
-	printMessage("User", PID, Format, Data).
+print_user_message(EntityName, Format, Data) -> 
+	printMessage("User", EntityName, Format, Data).
 
 print_car_message(Message) ->
 	printMessage("Car", "", Message, none).
 print_car_message(Format, Data) -> 
 	fix_and_print_message("Car", "", Format, Data).
-print_car_message(PID, Format, Data) -> 
-	printMessage("Car", PID, Format, Data).
+print_car_message(EntityName, Format, Data) -> 
+	printMessage("Car", EntityName, Format, Data).
 
 print_environment_message(Message) -> 
 	printMessage("Env", "", Message, none).
 print_environment_message(Format, Data) -> 
 	fix_and_print_message("Env", "", Format, Data).
-print_environment_message(PID, Format, Data) -> 
-	printMessage("Env", PID, Format, Data).
+print_environment_message(EntityName, Format, Data) -> 
+	printMessage("Env", EntityName, Format, Data).
 
 print_message(Type, PID, Format, Data) -> printMessage(Type, PID, Format, Data).
 
@@ -101,10 +103,20 @@ getRandomEntity(Entities, Total_Entities) ->
 			-1;
 		true -> Out
 	end.
+	
+construct_string(Format, Data) ->
+	lists:flatten(io_lib:format(Format, Data)).  
+
+getDictionaryKeys(Dict) ->
+	MapFunc = fun ({Key, _Val}) ->
+		Key
+	end,
+	OutList = lists:map(MapFunc, dict:to_list(Dict)),
+	OutList.
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
-fix_and_print_message(Type, PID, Format, Data) -> 
+fix_and_print_message(Type, EntityName, Format, Data) -> 
 	FormatToTest = if 
 		is_list(Format) ->
 			Format;
@@ -114,12 +126,12 @@ fix_and_print_message(Type, PID, Format, Data) ->
 	Tildes = countTilde(FormatToTest, 0),
 	if 
 		Tildes > 0 ->
-			printMessage(Type, PID, Format, Data);
+			printMessage(Type, EntityName, Format, Data);
 		true ->
 			printMessage(Type, Format, Data, none)
 	end.
 
-printMessage(Type, PID, Format, Data) ->
+printMessage(Type, EntityName, Format, Data) ->
 	CanPrint = if 
 		Type == "Debug" ->
 			if ?PRINT_DEBUG_ENABLE -> 
@@ -132,13 +144,13 @@ printMessage(Type, PID, Format, Data) ->
 	end,
 	if 
 		CanPrint == ok ->
-			printMessageConsole(Type, PID, Format, Data);
+			printMessageConsole(Type, EntityName, Format, Data);
 		true -> 
 			ok
 	end.
 
-printMessageConsole(Type, PID, Format, Data) ->
-	if 	PID == "" -> 
+printMessageConsole(Type, EntityName, Format, Data) ->
+	if 	EntityName == "" -> 
 		   	if 
 				Data == none -> 
 					io:format("[~p] ~p ~n", [Type, Format]);
@@ -159,19 +171,19 @@ printMessageConsole(Type, PID, Format, Data) ->
 		true -> 
 			if 
 				Data == none -> 
-					io:format("[~p] {~w} - ~p ~n", [Type, PID, Format]);
+					io:format("[~p] {~p} - ~p ~n", [Type, EntityName, Format]);
 				true ->	
 					if 
 						is_list(Data) -> 
 							Tildes = countTilde(Format, 0),
 							if 
 								Tildes > 1 ->
-									io:format("[~p] {~w} - "++Format++"~n", [Type, PID] ++ Data);
+									io:format("[~p] {~p} - "++Format++"~n", [Type, EntityName] ++ Data);
 								true ->
-									io:format("[~p] {~w} - "++Format++"~n", [Type, PID, Data])
+									io:format("[~p] {~p} - "++Format++"~n", [Type, EntityName, Data])
 							end;
 						true -> 
-							io:format("[~p] {~w} - "++Format++"~n", [Type, PID] ++ [Data])
+							io:format("[~p] {~p} - "++Format++"~n", [Type, EntityName] ++ [Data])
 					end
 			end	   
 	end.

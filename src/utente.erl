@@ -13,12 +13,12 @@
 -include("records.hrl").
 -define(DEBUGPRINT_USER, true).
 
-callback_mode() -> [state_functions].
+callback_mode() -> [state_functions, state_enter].
 
--record(user, {
+-record(userState, {
 			   pidApp,
-			   name
-  				}).
+			   name,
+			   pidEnv}).
 
 %% ====================================================================
 %% API functions
@@ -45,11 +45,12 @@ start(InitData) ->
 	Pid.
 
 init(InitData) ->
-	{InitialPos, PidGpsServer, Name} = InitData,
+	{InitialPos, PidGpsServer, Name, PidEnv} = InitData,
 	InitDataApp = {InitialPos, PidGpsServer, self()},
 	PidApp = appUtente:start(InitDataApp),
-	State = #user{pidApp = PidApp,
-				  name = Name},
+	State = #userState{pidApp = PidApp,
+				  name = Name,
+				  pidEnv = PidEnv},
 	{ok, idle, State}.
 
 handle_common(cast, {die}, _OldState, State) ->
@@ -61,41 +62,57 @@ handle_common(cast, {dieSoft}, OldState, State) ->
 	   true ->
 		   keep_state_and_data
 	end.
-       
+
+idle(enter, _OldState, _State) -> keep_state_and_data;
+
 idle(cast, {send_request, Request}, State) ->
 	{From, To} = Request,
-	print_user_message(self(), "I'm a new user, i'm going from [~p] to [~p]", [From, To]),
-	appUtente:sendRequest(State#user.pidApp, Request),
+	print_user_message(State#userState.name, "I'm a new user, i'm going from [~p] to [~p]", [From, To]),
+	appUtente:sendRequest(State#userState.pidApp, Request),
 	{next_state,waitingService,State};
 
 ?HANDLE_COMMON.
+
+
+waitingService(enter, _OldState, _State) -> keep_state_and_data;
 	
 waitingService(cast, {gotElectionData, Data}, State) ->
 	PID_Car = Data#election_result_to_user.id_car_winner,
 	TimeToWait = Data#election_result_to_user.time_to_wait,
-	print_user_message(self(), "Taxi ~w is serving me with ~w time to wait", [PID_Car, TimeToWait]),
+	print_user_message(State#userState.name, "Taxi ~w is serving me with ~w time to wait", [PID_Car, TimeToWait]),
 	{next_state, waiting_car,State};
+
 
 ?HANDLE_COMMON.
 
+waiting_car(enter, _OldState, _State) -> keep_state_and_data;
+
 waiting_car(cast, {arrivedUserPosition, PID_Car}, State) ->
-	print_user_message(self(), "Taxi ~w is arrived in my position!", PID_Car),
+	print_user_message(State#userState.name, "Taxi ~w is arrived in my position!", PID_Car),
 	{next_state, moving, State};
 
 ?HANDLE_COMMON.
 
+moving(enter, _OldState, _State) -> keep_state_and_data;
+
 moving(cast, {arrivedTargetPosition, Dest}, State) ->
-	print_user_message(self(), "I'm arrived in my target position [~p], goodbye!", Dest),
+	print_user_message(State#userState.name, "I'm arrived in my target position [~p]", Dest),
+	{next_state, ending, State};
+
+?HANDLE_COMMON.
+
+ending(enter, _OldState, State) ->
+	print_user_message(State#userState.name, "Mr. Stark, I don't feel so good."),
+	environment:removeUser(State#userState.pidEnv, self()),
 	killEntities(State);
 
 ?HANDLE_COMMON.
-	
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
 
 killEntities(State) ->
-	PidAdd = State#user.pidApp,
+	PidAdd = State#userState.pidApp,
 	gen_statem:cast(PidAdd, {die}),
 	gen_statem:stop(self()).
 
