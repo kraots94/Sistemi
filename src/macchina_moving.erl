@@ -26,6 +26,7 @@ callback_mode() -> [state_functions,state_enter].
 				tick_counter,
 				tick_counterBat,
 				pidListener,
+				nameListener,
 				tappe, %lista di tappe da percorrere
 				pathCol, %lista di tappe verso la colonnina
 				currentUser = none,
@@ -40,13 +41,14 @@ callback_mode() -> [state_functions,state_enter].
 %% API functions
 %% ====================================================================
 
-%InitData = {InitialPos, PidListener}
+%InitData = {InitialPos, PidListener, Name}
 start(InitData) ->
-	{InitialPos, PidListener} = InitData,
+	{InitialPos, PidListener, Name} = InitData,
 	State = #movingCarState {
 					tick_counter = 0,
 					tick_counterBat = 0,
 					pidListener = PidListener,
+					nameListener = Name,
 					tappe = [],
 					pathCol = [],
 					currentUser = none,
@@ -274,7 +276,7 @@ moving(internal, move, State) ->
 	TappeAttuali = State#movingCarState.tappe,
 	TappaAttuale = hd(TappeAttuali),
 	
-	PidListener = State#movingCarState.pidListener,
+	NameListener = State#movingCarState.nameListener,
 	DataToPrint = [State#movingCarState.currentPos, TappaAttuale#tappa.node_name],
 
 	Time = TappaAttuale#tappa.t,
@@ -291,7 +293,7 @@ moving(internal, move, State) ->
 												tappe=NuoveTappe},
 			{keep_state, UpdatedState};
 		true -> %tempo = 0 , quindi ho raggiunto nodo nuovo
-			print_debug_message(PidListener, "Teleporting from [~p] to [~p]", DataToPrint),
+			print_debug_message(NameListener, "Teleporting from [~p] to [~p]", DataToPrint),
 			TipoNodoAttuale = TappaAttuale#tappa.type,
 			PersonaAttuale = TappaAttuale#tappa.user,
 			NewState = calculateNewState(State, TappaAttuale, TappeAttuali),
@@ -502,6 +504,7 @@ arrivedInUserPosition(UserPid, S) ->
 
 arrivedInTargetPosition(UserPid, S) ->
 	ListenerPid = S#movingCarState.pidListener,
+	gen_statem:cast(ListenerPid, {noMoreCarrying}),
 	macchina_ascoltatore:sendToEsternalAutomata(ListenerPid, UserPid, arrivedTargetPosition).
 
 checkColumnHere(State, Battery) ->
@@ -526,7 +529,7 @@ checkColumnHere(State, Battery) ->
 	end.
 
 printDebug(S, ToPrint) ->
-	if ?DEBUGPRINT_MOVING -> utilities:print_debug_message(S#movingCarState.pidListener, [?TILDE_CHAR] ++ "p", ToPrint);
+	if ?DEBUGPRINT_MOVING -> utilities:print_debug_message(S#movingCarState.nameListener, [?TILDE_CHAR] ++ "p", ToPrint);
 	   true -> foo
 	end.
 

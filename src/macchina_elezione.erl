@@ -19,6 +19,7 @@ callback_mode() -> [state_functions, state_enter].
 
 -record(electionState, {
 				pidCar,
+				nameCar,
 				pidMovingCar,
 				pidGps,
 				pidAppUser,
@@ -41,10 +42,11 @@ callback_mode() -> [state_functions, state_enter].
 %% API functions
 %% ====================================================================
 
-start(PidMacchina, PidMovingCar, Pid_Gps_Car, City_Map) ->
+start(PidMacchina, NomeMacchina, PidMovingCar, Pid_Gps_Car, City_Map) ->
 	State = #electionState {
 							pidAppUser = none,
 							pidCar = PidMacchina,
+							nameCar = NomeMacchina,
 							pidMovingCar = PidMovingCar,
 							pidGps = Pid_Gps_Car,
 							parent = none,
@@ -106,7 +108,7 @@ idle(cast, {beginElection, Data}, S) ->
 	PID_GPS = S#electionState.pidGps,
 	CloserCars = getDataFromAutomata(PID_GPS, {self(), getNearCars}),
 
-	print_debug_message(Self_Pid, "I have to begin Election For {~w}", Pid_App_User),
+	print_debug_message(S#electionState.nameCar, "I have to begin Election For {~w}", Pid_App_User),
 
 	{My_Election_Cost, S1} = manage_self_cost(S, CurrentRequest),
 
@@ -298,13 +300,16 @@ initiator_final_state(enter, _OldState ,S) ->
 			};
 		true -> 
 			WinnerData = hd(Winner_Partecipant),
+			Request = {S#electionState.currentRequest#user_request.from, 
+						S#electionState.currentRequest#user_request.to},
 			#election_result_to_car{
 				id_winner = WinnerData#electionCostData.pid_source,
 				id_app_user = S#electionState.pidAppUser,
-				request = {S#user_request.from, S#user_request.to}
+				request = Request
 			}
 	end,
 	S1 = manage_winner_data(Winner_Data, S),
+%	timer:sleep(1000000),
 	sendToListener({election_results, [Winner_Data]}, S1),
 	{next_state, initiator_final_state, S1};
 
@@ -353,7 +358,7 @@ manage_self_cost(S, CurrentRequest) ->
 			Battery_Avaiable = Current_Battery_Level - Current_Cost_To_Last_Target,
 			CityData = {City_Graph, City_Nodes},
 		
-			{CC, CRDT, Can_Win, QueueCar} = calculateSelfCost(Points, Battery_Avaiable, CityData, Self_Pid),
+			{CC, CRDT, Can_Win, QueueCar} = calculateSelfCost(Points, Battery_Avaiable, CityData, S#electionState.nameCar),
 			Final_CC = CC + Current_Cost_To_Last_Target,
 			Out_Data = if 
 				Can_Win == i_can_win  -> 
@@ -388,7 +393,7 @@ manage_winner_data(Winner_Data, S) ->
 		ID_Winner == -1 -> 
 			S;
 		My_Pid == ID_Winner ->
-			print_debug_message(My_Pid, "I Won", none),
+			print_debug_message(S#electionState.nameCar, "I Won", none),
 			ID_APP_User = Winner_Data#election_result_to_car.id_app_user,
 			% creo i record per la coda partendo dalle queue già calcolate in fase begin / partecipate
 			Queues = S#electionState.queueToManage,
@@ -462,27 +467,27 @@ loopReceive() ->
 %% Cost functions
 %% ====================================================================
 
-calculateSelfCost(Points, Battery_Avaiable, CityData, Self_Pid) -> 
+calculateSelfCost(Points, Battery_Avaiable, CityData, Self_Name) -> 
 	{P1, P2, P3, P4} = Points,
 	{Cost_P1_P2, Queue_P1_P2} = calculate_path(CityData, {P1, P2}),
 	RemainingCharge_P2 = Battery_Avaiable - Cost_P1_P2,
 	Out_Results = if  
 		RemainingCharge_P2 < 0 -> 	
-			print_debug_message(Self_Pid, "I have no battery for User Position", none),
+			print_debug_message(Self_Name, "I have no battery for User Position", none),
 			{-1, -1, i_can_not_win, []};		
 		true -> 					
 			{Cost_P2_P3, Queue_P2_P3} = calculate_path(CityData, {P2, P3}),
 			RemainingCharge_P3 =  RemainingCharge_P2 - Cost_P2_P3,
 			if  
 				RemainingCharge_P3 < 0 -> 	
-					print_debug_message(Self_Pid, "I have no battery for Target Position", none),
+					print_debug_message(Self_Name, "I have no battery for Target Position", none),
 					{-1, -1, i_can_not_win, []};
 				true -> 					
 					{Cost_P3_P4, Queue_P3_P4} = calculate_path(CityData, {P3, P4}),
 					RemainingCharge_P4 = RemainingCharge_P3 -Cost_P3_P4,
 					if  
 						RemainingCharge_P4 < 0 -> 
-							print_debug_message(Self_Pid, "I have no battery for Column Position", none),
+							print_debug_message(Self_Name, "I have no battery for Column Position", none),
 							{-1, -1, i_can_not_win, []};
 						true ->	
 							CC = Cost_P1_P2,

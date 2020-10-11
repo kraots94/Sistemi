@@ -23,13 +23,12 @@ callback_mode() -> [state_functions].
 							pidClock,
 							pidAppUser,
 							usersInQueue,
-							userCarrying,
-							nome}). %lista di record del tipo {Pid, Pos, Destination}
+							userCarrying,%lista di record del tipo {Pid, Pos, Destination}
+							name}). 
 
 -record(userInQueue , {pid,
 					   position,
-					   target}
-	   ).
+					   target}).
 
 -define(TICKS_TO_CHARGE, 3).
 
@@ -80,14 +79,13 @@ die(ListenerdPid) ->
 %% ====================================================================
 
 init(InitData) -> 
-	print_debug_message(self(), "Spawning Car with data: ~w", InitData),
 	{InitialPos, PidGpsServer, City_Map, Name} = InitData,
 	%creo pid delle entita' associate
-	PidGpsModule = gps_module:start_gps_module(initDataGpsModule(PidGpsServer,InitialPos)), %start gps module (and register)
-	PidMoving = macchina_moving:start({InitialPos,self()}),
-	PidBattery  = macchina_batteria:start(PidMoving),
-	PidElection = macchina_elezione:start(self(),PidMoving,PidGpsModule,City_Map),
-	PidClock = tick_server:start_clock([self(),PidMoving,PidBattery,PidElection]),
+	PidGpsModule = gps_module:start_gps_module(initDataGpsModule(PidGpsServer,InitialPos, Name)), %start gps module (and register)
+	PidMoving = macchina_moving:start({InitialPos, self(), Name}),
+	PidBattery  = macchina_batteria:start({PidMoving, Name}),
+	PidElection = macchina_elezione:start(self(), Name, PidMoving,PidGpsModule,City_Map),
+	PidClock = tick_server:start_clock([self(), PidMoving,PidBattery,PidElection]),
 	State = #taxiListenerState {
 					pidMoving   = PidMoving,
 					pidBattery  = PidBattery,
@@ -97,9 +95,9 @@ init(InitData) ->
 					pidAppUser = -1,
 					usersInQueue = [],
 					userCarrying = none,
-					nome = Name
+					name = Name
 			},
-	print_car_message(self(), "Car ready in position [~p]", InitialPos),
+	print_car_message(State#taxiListenerState.name, "Car ready in position [~p]", InitialPos),
 	{ok, idle, State}.
 
 handle_common({call,From}, {areYouKillable}, OldState, State) ->
@@ -112,42 +110,60 @@ handle_common({call,From}, {areYouKillable}, OldState, State) ->
 handle_common(cast, {die}, _OldState, State) ->
 	killEntities(State);
 
-handle_common(cast, {crash}, _OldState, State) ->
-	PidMoving = State#taxiListenerState.pidMoving,
-	gen_statem:cast(PidMoving, {crash}),
+handle_common(cast, {crash}, OldState, State) ->
+	if 
+		OldState == listen_election -> 
+			io:format("DIOBOE non dovevo essere qua~n");
+		true ->
+			print_car_message(State#taxiListenerState.name, "I am broken, now i notify my users and waiting for fix"),
+			PidMoving = State#taxiListenerState.pidMoving,
+			io:format("Have to notify users~n"),
+			%TODO notify clients
+			gen_statem:cast(PidMoving, {crash})
+	end,
 	keep_state_and_data;
 
 handle_common(cast, {fixed}, _OldState, State) ->
+	print_car_message(State#taxiListenerState.name, "I am fixed, now i can serve again"),
 	PidMoving = State#taxiListenerState.pidMoving,
 	gen_statem:cast(PidMoving, {fixed}),
 	keep_state_and_data.
 
 handle_common(cast, {carrying, UserPid}, State) ->
-	{keep_state, State#taxiListenerState{userCarrying = UserPid}}.
-	
-%roba che deve uscire, controllo se sto facendo uscire posizione e se è posizione di quello che sto trasportando
-idle(cast, {to_outside, {Target, Data}}, Stato) ->
-	if is_tuple(Data) -> %è un dato del tipo "newNodeReached"
-		   ListUsersInQueue = Stato#taxiListenerState.usersInQueue,
-		   {_First, Position} = Data,
-			NewList = if 
-				(Target == Stato#taxiListenerState.userCarrying) -> %è un cambio posizione del tipo che trasporto
-	 				OldRecord = hd(ListUsersInQueue),
-					NewRecord = OldRecord#userInQueue{position = Position},
-					[NewRecord] ++ tl(ListUsersInQueue);
-				true ->
-			    	ListUsersInQueue
-				end,
-		   gen_statem:cast(Target, Data),
-		   {keep_state, Stato#taxiListenerState{usersInQueue = NewList}};
-		true -> 
-			gen_statem:cast(Target, Data),
-			keep_state_and_data
-	end;
-	
+	{keep_state, State#taxiListenerState{userCarrying = UserPid}};
+
+handle_common(cast, {noMoreCarrying}, State) ->
+	ActualUsersInQueue = State#taxiListenerState.usersInQueue,
+	{keep_state, State#taxiListenerState{userCarrying = none, usersInQueue = tl(ActualUsersInQueue)}}.
+
 %ricezione del tick
 idle(info, {_From, tick}, _Stato) ->
 	keep_state_and_data; %per ora non fare nulla
+
+idle(cast, {to_outside, {Target, Data}}, Stato) ->
+	FinalTuple = if 
+		is_tuple(Data) -> 
+			{First, Second} = Data,
+			if 
+				First == newNodeReached ->
+					ListUsersInQueue = Stato#taxiListenerState.usersInQueue,
+					NewList = if 
+						(Target == Stato#taxiListenerState.userCarrying) -> %è un cambio posizione del tipo che trasporto
+							OldRecord = hd(ListUsersInQueue),
+							NewRecord = OldRecord#userInQueue{position = Second},
+							[NewRecord] ++ tl(ListUsersInQueue);
+						true ->
+							ListUsersInQueue
+					end,
+					{keep_state, Stato#taxiListenerState{usersInQueue = NewList}};
+				true ->
+					keep_state_and_data
+			end;
+		true -> 
+			keep_state_and_data
+	end,
+	gen_statem:cast(Target, Data),
+	FinalTuple;
 
 %macchina vuole aggiornare posizione
 idle(cast, {updatePosition, CurrentPosition}, Stato) ->
@@ -191,9 +207,30 @@ listen_election(cast, {election_data, Data}, Stato) ->
 	keep_state_and_data;
 
 % data out of this car
-listen_election(cast, {to_outside, {Target, Data}}, _Stato) ->
+listen_election(cast, {to_outside, {Target, Data}}, Stato) ->
+	FinalTuple = if 
+		is_tuple(Data) -> 
+			{First, Second} = Data,
+			if 
+				First == newNodeReached ->
+					ListUsersInQueue = Stato#taxiListenerState.usersInQueue,
+					NewList = if 
+						(Target == Stato#taxiListenerState.userCarrying) -> %è un cambio posizione del tipo che trasporto
+							OldRecord = hd(ListUsersInQueue),
+							NewRecord = OldRecord#userInQueue{position = Second},
+							[NewRecord] ++ tl(ListUsersInQueue);
+						true ->
+							ListUsersInQueue
+					end,
+					{keep_state, Stato#taxiListenerState{usersInQueue = NewList}};
+				true ->
+					keep_state_and_data
+			end;
+		true -> 
+			keep_state_and_data
+	end,
 	gen_statem:cast(Target, Data),
-	keep_state_and_data;
+	FinalTuple;
 
 listen_election(cast, {beginElection, Data}, _Stato) ->
 	{_From, _To, PidAppUser} = Data,
@@ -238,20 +275,20 @@ listen_election(cast, {election_results, Data}, Stato) ->
 	end,
 	{next_state, idle, NewState};
 
+listen_election(cast, OtherEvents, Stato) ->
+	io:format("Evento posticipato: ~w", [OtherEvents]),
+	{keep_state, Stato, [postpone]};
+
 ?HANDLE_COMMON.
-
-
-%listen_election(cast, OtherEvents, Stato) ->
-%	postpone
-
 
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
 
-initDataGpsModule(PidGpsServer,InitialPosition) ->
+initDataGpsModule(PidGpsServer,InitialPosition, Name) ->
 	#dataInitGPSModule{
 		pid_entity = self(), 
+		name_entity = Name,
 		type = car, 
 		pid_server_gps = PidGpsServer,
 		starting_pos = InitialPosition, 

@@ -24,6 +24,7 @@ callback_mode() -> [state_functions, state_enter].
 						pidGPSModule,
 						pidCarServing,
 						pidUser,
+						nameUser,
 						currentPos,
 						currentDestination,
 						request,
@@ -60,12 +61,13 @@ sendRequestNoElection(UserPid, Request) ->
 %% Automata Functions
 %% ====================================================================
 init(InitData) ->
-	{InitialPos, PidGpsServer, PidUser} = InitData,
+	{InitialPos, PidGpsServer, PidUser, Name} = InitData,
 	PidGpsModule = gps_module:start_gps_module(
-					initDataGpsModule(PidGpsServer,InitialPos)), %start gps module (and register)
+					initDataGpsModule(PidGpsServer,InitialPos, Name)), %start gps module (and register)
 	State = #appUserState{
 		pidGPSModule = PidGpsModule, 
 		pidUser = PidUser,
+		nameUser = Name,
 		currentPos = InitialPos,
 		currentDestination = none,
 		request = none,
@@ -109,17 +111,17 @@ waiting_election(enter, _OldState, _Stato) ->
 	keep_state_and_data;
 
 waiting_election(state_timeout, noReply, Stato) -> %non ho ricevuto risposta dentro al timer
-	print_user_message(Stato#appUserState.pidUser, "App_User - no reply from taxi, going back to begin election"),
+	print_user_message(Stato#appUserState.nameUser, "App_User - no reply from taxi, going back to begin election"),
  	Request = Stato#appUserState.request, %prendo la request
 	{next_state, idle, Stato, [{next_event,internal,{send_request,Request}}]};
 	
 waiting_election(cast, {winner, Data}, Stato) -> 
 	IdCarWinner = Data#election_result_to_user.id_car_winner,
 	if IdCarWinner == -1 -> %non c'è un vincitore, devo riprovare fra un po' di tempo
-			print_user_message(Stato#appUserState.pidUser, "App_User - No taxi has won election running election."), 
+			print_user_message(Stato#appUserState.nameUser, "App_User - No taxi has won election running election."), 
 			Request = Stato#appUserState.request, %prendo la request
 			wait_random_time(),
-			print_user_message(Stato#appUserState.pidUser, "App_User - Waited random time, going back to begin election"),
+			print_user_message(Stato#appUserState.nameUser, "App_User - Waited random time, going back to begin election"),
 			{next_state, idle, Stato, [{next_event,internal,{send_request,Request}}]};
 	true -> %hooray vincitore trovato
 			sendToUser({gotElectionData,Data},Stato),
@@ -127,10 +129,10 @@ waiting_election(cast, {winner, Data}, Stato) ->
 	end;
 
 waiting_election(cast, {already_running_election_wait}, Stato) -> 
-	print_user_message(Stato#appUserState.pidUser, "App_User - Nearest Taxi is already running election."), 
+	print_user_message(Stato#appUserState.nameUser, "App_User - Nearest Taxi is already running election."), 
 	Request = Stato#appUserState.request, %prendo la request
 	wait_random_time(), %aspetto un tempo random 
-	print_user_message(Stato#appUserState.pidUser, "App_User - Waited random time, going back to begin election"),
+	print_user_message(Stato#appUserState.nameUser, "App_User - Waited random time, going back to begin election"),
 	{next_state, idle, Stato, [{next_event,internal,{send_request,Request}}]}.
 
 %waitin_car_queue(cast, {changeDest, _NewDest}, _State) ->
@@ -206,7 +208,7 @@ sendRequestToTaxi(Request, State) ->
 	NearestCar = findTaxi(State),
 	if NearestCar == none ->  %nessuna macchina nei paraggi
 		   	wait_random_time(),
-			print_user_message(State#appUserState.pidUser, "App_User - Waited random time, no one near, going back to begin election"),
+			print_user_message(State#appUserState.nameUser, "App_User - Waited random time, no one near, going back to begin election"),
 			{next_state, idle, State, [{next_event,internal,{send_request,Request}}]};
 	   true ->
 		   gen_statem:cast(NearestCar, {beginElection, CorrectRequest}),
@@ -214,14 +216,15 @@ sendRequestToTaxi(Request, State) ->
 	end.
 	
 
-initDataGpsModule(PidGpsServer, InitialPosition) ->
+initDataGpsModule(PidGpsServer, InitialPosition, Name) ->
 	#dataInitGPSModule{
 		pid_entity = self(), 
 		type = user, 
 		pid_server_gps = PidGpsServer,
 		starting_pos = InitialPosition, 
 		signal_power = ?GPS_MODULE_POWER, 
-		map_side = ?MAP_SIDE}.
+		map_side = ?MAP_SIDE,
+		name_entity = Name}.
 
 printDebug(ToPrint) ->
 	if ?DEBUGPRINT_APP -> print_debug_message(self(), [?TILDE_CHAR] ++ "p", ToPrint);

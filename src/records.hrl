@@ -11,17 +11,12 @@
 
 % dati di inizializzazione del modulo gps
 -record(dataInitGPSModule, {pid_entity, 
+							name_entity,
 							type, 
 							pid_server_gps,
 							starting_pos, 
 							signal_power, 
 							map_side}).
-
--record(batteryState, {pidCar,
-					  sameBatteryCounter,
-					  tick_counter,
-					  columnPathEnabled,
-					  notifiedChargedBat}).
 
 -record(dataElectionBegin,{
 	request,

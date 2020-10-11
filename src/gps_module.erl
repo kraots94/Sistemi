@@ -12,6 +12,7 @@
                         print_debug_message/3]).
 -export([setPosition/2, deleteLocationTracks/1]).
 -record(gpsModuleState, {pid_entity, 
+                        name_entity,
                         pid_gps_server, 
                         entity_type, 
                         current_position, 
@@ -56,9 +57,11 @@ init(StartingData) ->
     Start_Pos = StartingData#dataInitGPSModule.starting_pos,
     Power = StartingData#dataInitGPSModule.signal_power,
     Pid_Entity = StartingData#dataInitGPSModule.pid_entity,
+    Name_Entity =  StartingData#dataInitGPSModule.name_entity,
     Map_Side = StartingData#dataInitGPSModule.map_side,
 	S = #gpsModuleState {
         pid_entity = Pid_Entity,
+        name_entity = Name_Entity,
         pid_gps_server = Pid_S, 
         entity_type = Type, 
         current_position = Start_Pos, 
@@ -91,7 +94,7 @@ loop(S) ->
             send_message(Pid_Entity, S#gpsModuleState.current_position),
             loop(S);
         {printState} ->  
-            print_debug_message(S#gpsModuleState.pid_entity, "GPS Module State: ~w", S),
+            print_debug_message(S#gpsModuleState.name_entity, "GPS Module State: ~w", S),
             loop(S);
         {removeEntity} ->  % Calling this means to remove entry in gps server and kill this module instance
             Pid_S = S#gpsModuleState.pid_gps_server,

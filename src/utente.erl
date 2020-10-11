@@ -46,7 +46,7 @@ start(InitData) ->
 
 init(InitData) ->
 	{InitialPos, PidGpsServer, Name, PidEnv} = InitData,
-	InitDataApp = {InitialPos, PidGpsServer, self()},
+	InitDataApp = {InitialPos, PidGpsServer, self(), Name},
 	PidApp = appUtente:start(InitDataApp),
 	State = #userState{pidApp = PidApp,
 				  name = Name,
@@ -57,10 +57,10 @@ handle_common(cast, {die}, _OldState, State) ->
 	killEntities(State);
 
 handle_common(cast, {dieSoft}, OldState, State) ->
-	if OldState == idle ->
-		killEntities(State);
-	   true ->
-		   keep_state_and_data
+	if 	OldState == idle ->
+			killEntities(State);
+	   	true ->
+		   	keep_state_and_data
 	end.
 
 idle(enter, _OldState, _State) -> keep_state_and_data;

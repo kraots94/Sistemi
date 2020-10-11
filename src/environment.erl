@@ -44,7 +44,7 @@
 %% ====================================================================
 -export([start_link/0, end_environment/1, triggerEvent/2,
 		enableAutoEvents/1, disableAutoEvents/1, printGpsState/1, 
-		printSelfState/1, spawnCars/2, spawnUsers/2, removeCar/2, removeUser/2,
+		printSelfState/1, spawnCars/2, spawnUsers/2, spawnCar/2, spawnUser/3, removeCar/2, removeUser/2,
 		triggerChangeDestUser/2, triggerChangeDestUser/3, triggerCarCrash/2, 
 		triggerFixCar/2, triggerCarRemove/2, printCars/1, printUsers/1]).
 
@@ -177,7 +177,7 @@ loop(State) ->
 					State;
 				true -> 
 					{ok, Pid} = Out,
-					handle_event(State, 3, {Pid, NewTarget})
+					handle_event(State, 3, {hd(Pid), NewTarget})
 			end,
 			loop(NewState);		
 
@@ -188,8 +188,8 @@ loop(State) ->
 					print_environment_message(self(), "Car with Name [~p] does not exists", [Target]),
 					State;
 				true -> 
-					{ok, Target} = Out,
-					handle_event(State, 4, {Target})
+					{ok, TargetPid} = Out,
+					handle_event(State, 4, {hd(TargetPid)})
 			end,
 			loop(NewState);				
 		
@@ -200,8 +200,8 @@ loop(State) ->
 					print_environment_message(self(), "Car with Name [~p] does not exists", [Target]),
 					State;
 				true -> 
-					{ok, Target} = Out,
-					handle_event(State,5, {Target})
+					{ok, TargetPid} = Out,
+					handle_event(State, 5, {hd(TargetPid)})
 			end,
 			loop(NewState);		
 
@@ -212,8 +212,8 @@ loop(State) ->
 					print_environment_message(self(), "Car with Name [~p] does not exists", [Target]),
 					State;
 				true -> 
-					{ok, Target} = Out,
-					handle_event(State, 10, {Target})
+					{ok, TargetPid} = Out,
+					handle_event(State, 10, {hd(TargetPid)})
 			end,
 			loop(NewState);	
 
@@ -237,7 +237,7 @@ loop(State) ->
 			loop(State);
 		{spawn, car, StartingPos} -> 
 			Nodes = State#environmentState.city#city.nodes,
-			StartingPosID = nodes_util:getID(StartingPos, Nodes),
+			StartingPosID = nodes_util:getNodeID(StartingPos, Nodes),
 			NewState = if 
 				StartingPosID == -1 ->
 					print_environment_message(self(), "Node with name {~p} does not exist", StartingPos),
@@ -247,7 +247,23 @@ loop(State) ->
 			end,
 			loop(NewState);
 		{spawn, user, From, To} ->
-			loop(generate_single_car(State, {From, To}));
+			Nodes = State#environmentState.city#city.nodes,
+			FromPosID = nodes_util:getNodeID(From, Nodes),
+			ToPosID = nodes_util:getNodeID(To, Nodes),
+			NewState = if 
+				FromPosID == -1 ->
+					print_environment_message(self(), "Node with name {~p} does not exist", From),
+					State;
+				ToPosID == -1 ->
+					print_environment_message(self(), "Node with name {~p} does not exist", To),
+					State;
+				FromPosID == ToPosID ->
+					print_environment_message(self(), "Request for user must be between different nodes"),
+					State;
+				true ->
+					generate_single_user(State, {From, To})
+			end,
+			loop(NewState);
 		{spawn, cars, N} ->
 			print_debug_message(self(), "Have to spawn ~w cars", N),
 			NewState = generate_multiple_cars(State, N),
@@ -406,8 +422,7 @@ event_car_crash(S, Data) ->
 				true ->
 					New_crashed_cars = [Car_To_Crash] ++ CrashedCars,
 					New_total_cars_crashed = Total_Crashed + 1,
-					%TODO Write here code to notify car
-
+					macchina_ascoltatore:crash(Car_To_Crash),
 					print_environment_message(self(), "Car with pid {~w} has punctured rubber of the car!", Car_To_Crash),
 					S#environmentState{
 						cars_crashed = New_crashed_cars,
@@ -442,8 +457,7 @@ event_fix_car(S, Target) ->
 				true ->
 					New_crashed_cars = lists:delete(Car_To_Fix, CrashedCars),
 					New_total_cars_crashed = Total_Crashed - 1,
-					%TODO Write here code to notify car
-				
+					macchina_ascoltatore:fixCar(Car_To_Fix),
 					print_environment_message(self(), "Car with pid {~w} has been fixed!", Car_To_Fix),
 					S#environmentState{
 						cars_crashed = New_crashed_cars,
@@ -537,7 +551,8 @@ generate_taxi(State, Pos) ->
 	PidGpsServer = State#environmentState.pid_gps_server,
 	City_Map = State#environmentState.city,
 	TaxiName = getUpdatedTaxiName(State),
-	PidTaxi = macchina_ascoltatore:start({StartingPos, PidGpsServer, City_Map, TaxiName}),
+	InitData = {StartingPos, PidGpsServer, City_Map, TaxiName},
+	PidTaxi = macchina_ascoltatore:start(InitData),
 	{TaxiName, PidTaxi}.
 
 generate_user(State, Request) ->
@@ -551,7 +566,7 @@ generate_user(State, Request) ->
 	PidGpsServer = State#environmentState.pid_gps_server,
 	UserName = getUpdatedUserName(State),
 	PidUtente = utente:start({From, PidGpsServer, UserName, self()}),
-	utente:sendRequest(PidUtente, Request),
+	utente:sendRequest(PidUtente, GeneratedRequest),
 	{UserName, PidUtente}.
 
 kill_car(Pid, ForceKill) ->
@@ -675,8 +690,8 @@ killEntities([H | T], KillFunc, ForceKill) ->
 
 generate_entities(State, _Data, 0, _GenerateFunc, _UpdateNameFunct, Outs) -> {State, Outs};
 generate_entities(State, Data, N, GenerateFunc, UpdateNameFunct, Outs) -> 
-	Out = GenerateFunc(State),
-	NewS = UpdateNameFunct(State, Data),
+	Out = GenerateFunc(State, Data),
+	NewS = UpdateNameFunct(State),
 	New_Outs = [Out] ++ Outs,
 	generate_entities(NewS, Data, N-1, GenerateFunc, UpdateNameFunct, New_Outs).
 
