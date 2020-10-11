@@ -11,7 +11,7 @@
 						print_user_message/3]).
 -include("globals.hrl").
 -include("records.hrl").
--define(DEBUGPRINT_USER, true).
+-define(DEBUGPRINT_USER, false).
 
 callback_mode() -> [state_functions, state_enter].
 
@@ -39,7 +39,7 @@ dieSoft(UserPid) ->
 %% ====================================================================
 %% Automata Functions
 %% ====================================================================
-%InitData = {InitialPos: String, PidGpsServer, Name: String}
+%InitData = {InitialPos: String, PidGpsServer, Name: String, PidEnv}
 start(InitData) ->
 	{ok, Pid} = gen_statem:start_link(?MODULE,InitData, []),
 	Pid.

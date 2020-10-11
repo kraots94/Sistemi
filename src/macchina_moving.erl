@@ -11,7 +11,7 @@
 						print_car_message/1,
 						print_car_message/2,
 						print_car_message/3]).
--define(DEBUGPRINT_MOVING, true).
+-define(DEBUGPRINT_MOVING, false).
 -define(TICKS_TO_CHARGE, 3).
 -define(TICKS_TO_MOVING, 1).
 
@@ -148,7 +148,7 @@ handle_common({call,From}, {getTimeToUser}, OldState, State) ->
 	TimeToUser = State#movingCarState.timeToUser,
 	{next_state, OldState, State, [{reply,From,TimeToUser}]};
 
-handle_common(cast, {crash},_OldState, State) ->
+handle_common(cast, {crash}, _OldState, State) ->
 	%avviso listener che avvisi utenti ...
 	% Prepare data for special election -> [Battery, [{pid, from, to}, ...]] vengono inviati a ascoltatore e si arrangia lui
 	{next_state, crash, State#movingCarState{tappe = [], currentUser = none,

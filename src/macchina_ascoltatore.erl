@@ -15,6 +15,7 @@
 						generate_random_number/1]).
 
 callback_mode() -> [state_functions].
+-define(DEBUGPRINT_LISTENER, false).
 
 -record(taxiListenerState, {pidMoving,
 							pidBattery,
@@ -22,8 +23,8 @@ callback_mode() -> [state_functions].
 							pidGps,
 							pidClock,
 							pidAppUser,
-							usersInQueue,
-							userCarrying,%lista di record del tipo {Pid, Pos, Destination}
+							usersInQueue, %lista di record del tipo {Pid, Pos, Destination}
+							userCarrying,
 							name}). 
 
 -record(userInQueue , {pid,
@@ -48,7 +49,6 @@ beginElection(Pid) ->
 updatePosition(ListenerPid, Position) ->
 	gen_statem:cast(ListenerPid, {updatePosition, Position}).
 
-%already to use in other automata
 sendToEsternalAutomata(ListenerPid, Target, Data) ->
 	gen_statem:cast(ListenerPid, {to_outside, {Target, Data}}).
 
@@ -127,19 +127,21 @@ handle_common(cast, {fixed}, _OldState, State) ->
 	print_car_message(State#taxiListenerState.name, "I am fixed, now i can serve again"),
 	PidMoving = State#taxiListenerState.pidMoving,
 	gen_statem:cast(PidMoving, {fixed}),
-	keep_state_and_data.
+	keep_state_and_data;
 
-handle_common(cast, {carrying, UserPid}, State) ->
+handle_common(cast, {carrying, UserPid}, _OldState, State) ->
 	{keep_state, State#taxiListenerState{userCarrying = UserPid}};
 
-handle_common(cast, {noMoreCarrying}, State) ->
+handle_common(cast, {noMoreCarrying}, _OldState, State) ->
 	ActualUsersInQueue = State#taxiListenerState.usersInQueue,
-	{keep_state, State#taxiListenerState{userCarrying = none, usersInQueue = tl(ActualUsersInQueue)}}.
+	printDebug("tolto"),
+	{keep_state, State#taxiListenerState{userCarrying = none}}.
 
 %ricezione del tick
 idle(info, {_From, tick}, _Stato) ->
 	keep_state_and_data; %per ora non fare nulla
 
+% data out of this car
 idle(cast, {to_outside, {Target, Data}}, Stato) ->
 	FinalTuple = if 
 		is_tuple(Data) -> 
@@ -150,11 +152,16 @@ idle(cast, {to_outside, {Target, Data}}, Stato) ->
 					NewList = if 
 						(Target == Stato#taxiListenerState.userCarrying) -> %è un cambio posizione del tipo che trasporto
 							OldRecord = hd(ListUsersInQueue),
-							NewRecord = OldRecord#userInQueue{position = Second},
-							[NewRecord] ++ tl(ListUsersInQueue);
+							if OldRecord#userInQueue.target == Second -> tl(ListUsersInQueue);
+							   true ->
+								   NewRecord = OldRecord#userInQueue{position = Second},
+								   [NewRecord] ++ tl(ListUsersInQueue)
+							end;
 						true ->
 							ListUsersInQueue
 					end,
+					printDebug("SITUAZIONE CODAAAAAAAAAAAAAAAAAA"),
+					printDebug(NewList),
 					{keep_state, Stato#taxiListenerState{usersInQueue = NewList}};
 				true ->
 					keep_state_and_data
@@ -217,8 +224,11 @@ listen_election(cast, {to_outside, {Target, Data}}, Stato) ->
 					NewList = if 
 						(Target == Stato#taxiListenerState.userCarrying) -> %è un cambio posizione del tipo che trasporto
 							OldRecord = hd(ListUsersInQueue),
-							NewRecord = OldRecord#userInQueue{position = Second},
-							[NewRecord] ++ tl(ListUsersInQueue);
+							if OldRecord#userInQueue.target == Second -> tl(ListUsersInQueue);
+							   true ->
+								   NewRecord = OldRecord#userInQueue{position = Second},
+								   [NewRecord] ++ tl(ListUsersInQueue)
+							end;
 						true ->
 							ListUsersInQueue
 					end,
@@ -323,5 +333,10 @@ calculateNewListQueuedUsers(State, ElectionData) ->
 							 position = From,
 						     target = To},
 	OldList ++ [NewRecord].
+
+printDebug(ToPrint) ->
+	if ?DEBUGPRINT_LISTENER -> print_debug_message(self(), [?TILDE_CHAR] ++ "p", ToPrint);
+	   true -> not_printed
+	end.
 
 

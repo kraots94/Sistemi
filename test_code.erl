@@ -69,13 +69,13 @@ Mappa = city_map:init_city(),
 PidCar1 = macchina_ascoltatore:start({"as",PID_GPS_SERVER, Mappa, "C1"}),
 PidCar2 = macchina_ascoltatore:start({"ax",PID_GPS_SERVER, Mappa, "C2"}),
 PidCar3 = macchina_ascoltatore:start({"ac",PID_GPS_SERVER, Mappa, "C3"}),
-PidUser1 = utente:start({"aq", PID_GPS_SERVER, "U1"}),
-PidUser2 = utente:start({"au", PID_GPS_SERVER, "U2"}),
+PidUser1 = utente:start({"aq", PID_GPS_SERVER, "U1", 0}),
+PidUser2 = utente:start({"au", PID_GPS_SERVER, "U2", 0}),
 utente:sendRequest(PidUser1, {"aq", "au"}),
 
 utente:sendRequest(PidUser2, {"au", "ba"}).
 
-PidUser3 = utente:start({"az", PID_GPS_SERVER, "U4"}),
+PidUser3 = utente:start({"az", PID_GPS_SERVER, "U4", 0}),
 
 
 utente:sendRequest(PidUser3, {"az","aa"}).
