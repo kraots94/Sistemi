@@ -6,7 +6,7 @@
 -record(city, {total_nodes, total_edges, city_graph, nodes, column_positions}).
 
 -record(user_request,{from, to}).
--record(election_result_to_car,{id_winner, id_app_user}).
+-record(election_result_to_car,{id_winner, id_app_user, request}).
 -record(election_result_to_user,{id_car_winner, time_to_wait}).
 
 % dati di inizializzazione del modulo gps

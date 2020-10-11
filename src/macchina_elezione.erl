@@ -114,6 +114,7 @@ idle(cast, {beginElection, Data}, S) ->
 		flag_initiator = true,
 		carsInvited = CloserCars,
 		pidAppUser = Pid_App_User,
+		currentRequest = CurrentRequest,
 		my_election_cost = My_Election_Cost
 	},
 
@@ -148,7 +149,8 @@ idle(cast, {partecipateElection, Data}, S) ->
 	CloserCars = lists:delete(Parent_Pid, CloserCars_All),
 
 	{My_Election_Cost, S1} = manage_self_cost(S, CurrentRequest),
-	S2 = S1#electionState{currentRequest = CurrentRequest,
+	S2 = S1#electionState{
+		currentRequest = CurrentRequest,
 		parent = Parent_Pid,
 		carsInvited = CloserCars,
 		my_election_cost = My_Election_Cost
@@ -291,13 +293,15 @@ initiator_final_state(enter, _OldState ,S) ->
 		Winner_Partecipant =:= [] -> 	
 			#election_result_to_car{
 				id_winner = -1,
-				id_app_user = -1
+				id_app_user = -1,
+				request = {}
 			};
 		true -> 
 			WinnerData = hd(Winner_Partecipant),
 			#election_result_to_car{
 				id_winner = WinnerData#electionCostData.pid_source,
-				id_app_user = S#electionState.pidAppUser
+				id_app_user = S#electionState.pidAppUser,
+				request = {S#user_request.from, S#user_request.to}
 			}
 	end,
 	S1 = manage_winner_data(Winner_Data, S),
