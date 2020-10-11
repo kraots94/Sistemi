@@ -12,8 +12,9 @@
 
 callback_mode() -> [state_functions].
 -define(TICKS_CHECK_BATTERY, 1).
--define(TICKS_TOGOSOLARCHARGE, 7).
+-define(TICKS_TOGOSOLARCHARGE, 20).
 
+-define(DEBUGPRINT_BATTERY, true).
 %
 %% ====================================================================
 %% API functions
@@ -107,3 +108,8 @@ check_battery(internal, activateSolarCharge, Stato) ->
 	keep_state_and_data;
 	
 ?HANDLE_COMMON.
+  
+printDebug(ToPrint) ->
+	if ?DEBUGPRINT_BATTERY -> utilities:print_debug_message(self(), [?TILDE_CHAR] ++ "p", ToPrint);
+	   true -> foo
+	end.

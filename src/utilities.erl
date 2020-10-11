@@ -4,7 +4,7 @@
 
 -module(utilities).
 -include("globals.hrl").
--define(PRINT_DEBUG_ENABLE, false).
+-define(PRINT_DEBUG_ENABLE, true).
 %% ====================================================================
 %% API functions
 %% ====================================================================

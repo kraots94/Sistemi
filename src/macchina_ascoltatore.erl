@@ -21,7 +21,8 @@ callback_mode() -> [state_functions].
 							pidElection,
 							pidGps,
 							pidClock,
-							pidAppUser}).
+							pidAppUser,
+							nome}).
 
 -define(TICKS_TO_CHARGE, 3).
 
@@ -30,7 +31,7 @@ callback_mode() -> [state_functions].
 %% API functions
 %% ====================================================================
 
-%si crea con {"nodo iniziale", PID_GPS_Server, mappa}
+%si crea con {nodo iniziale:stringa, PID_GPS_Server, mappa, nome:stringa}
 start(InitData) ->
 	{ok, Pid} = gen_statem:start_link(?MODULE,InitData, []),
 	Pid.
@@ -42,8 +43,14 @@ updatePosition(ListenerPid, Position) ->
 	gen_statem:cast(ListenerPid, {updatePosition, Position}).
 
 %already to use in other automata
-sendToEsternalAutomata(ListenerdPid, Target, Data) ->
-	gen_statem:cast(ListenerdPid, {to_outside, {Target, Data}}).
+sendToEsternalAutomata(ListenerPid, Target, Data) ->
+	gen_statem:cast(ListenerPid, {to_outside, {Target, Data}}).
+
+crash(ListenerPid) ->
+	gen_statem:cast(ListenerPid, {crash}).
+
+fixCar(ListenerPid) ->
+	gen_statem:cast(ListenerPid, {fixed}).
 
 areYouKillable(Pid) ->
 	gen_statem:call(Pid, {areYouKillable}).
@@ -67,7 +74,7 @@ die(ListenerdPid) ->
 
 init(InitData) -> 
 	print_debug_message(self(), "Spawning Car with data: ~w", InitData),
-	{InitialPos, PidGpsServer, City_Map} = InitData,
+	{InitialPos, PidGpsServer, City_Map, Name} = InitData,
 	%creo pid delle entita' associate
 	PidGpsModule = gps_module:start_gps_module(initDataGpsModule(PidGpsServer,InitialPos)), %start gps module (and register)
 	PidMoving = macchina_moving:start({InitialPos,self()}),
@@ -80,7 +87,8 @@ init(InitData) ->
 					pidElection = PidElection,
 					pidGps = PidGpsModule,
 					pidClock = PidClock,
-					pidAppUser = -1
+					pidAppUser = -1,
+					nome = Name
 			},
 	print_car_message(self(), "Car ready in position [~p]", InitialPos),
 	{ok, idle, State}.
@@ -93,8 +101,18 @@ handle_common({call,From}, {areYouKillable}, OldState, State) ->
 	end;
 
 handle_common(cast, {die}, _OldState, State) ->
-	killEntities(State).
+	killEntities(State);
 
+handle_common(cast, {crash}, _OldState, State) ->
+	PidMoving = State#taxiListenerState.pidMoving,
+	gen_statem:cast(PidMoving, {crash}),
+	keep_state_and_data;
+
+handle_common(cast, {fixed}, _OldState, State) ->
+	PidMoving = State#taxiListenerState.pidMoving,
+	gen_statem:cast(PidMoving, {fixed}),
+	keep_state_and_data.
+	
 %roba che deve uscire
 idle(cast, {to_outside, {Target, Data}}, _Stato) ->
 	gen_statem:cast(Target, Data),

@@ -337,28 +337,31 @@ manage_self_cost(S, CurrentRequest) ->
 	To = CurrentRequest#user_request.to,
 	{Current_Cost_To_Last_Target, 
 		Current_Last_Target, 
-		Current_Battery_Level} = macchina_moving:getDataElection(S#electionState.pidMovingCar),
-	
-	City_Graph = S#electionState.cityMap#city.city_graph,
-	City_Nodes = S#electionState.cityMap#city.nodes,
-	City_Cols = S#electionState.cityMap#city.column_positions,
-	NearestCol = get_nearest_col(To, City_Nodes, City_Cols),	
-	Points = {Current_Last_Target, From, To, NearestCol},
-	Battery_Avaiable = Current_Battery_Level - Current_Cost_To_Last_Target,
-	CityData = {City_Graph, City_Nodes},
-
-	{CC, CRDT, Can_Win, QueueCar} = calculateSelfCost(Points, Battery_Avaiable, CityData, Self_Pid),
-	Final_CC = CC + Current_Cost_To_Last_Target,
-	My_Election_Cost = if 
-		Can_Win == i_can_win  -> 
-				S1 = S#electionState{queueToManage = QueueCar},
-				ElectionCosts = create_election_cost_data(Self_Pid, {Final_CC, CRDT}),
-				[ElectionCosts];
-		true -> 
-			S1 = S,
-			[]
-	end,
-	{My_Election_Cost, S1}.
+		Current_Battery_Level,
+		CanPartecipate} = macchina_moving:getDataElection(S#electionState.pidMovingCar),
+	if 
+		CanPartecipate == ok ->
+			City_Graph = S#electionState.cityMap#city.city_graph,
+			City_Nodes = S#electionState.cityMap#city.nodes,
+			City_Cols = S#electionState.cityMap#city.column_positions,
+			NearestCol = get_nearest_col(To, City_Nodes, City_Cols),	
+			Points = {Current_Last_Target, From, To, NearestCol},
+			Battery_Avaiable = Current_Battery_Level - Current_Cost_To_Last_Target,
+			CityData = {City_Graph, City_Nodes},
+		
+			{CC, CRDT, Can_Win, QueueCar} = calculateSelfCost(Points, Battery_Avaiable, CityData, Self_Pid),
+			Final_CC = CC + Current_Cost_To_Last_Target,
+			Out_Data = if 
+				Can_Win == i_can_win  -> 
+						ElectionCosts = create_election_cost_data(Self_Pid, {Final_CC, CRDT}),
+						{[ElectionCosts], S#electionState{queueToManage = QueueCar}};
+				true -> 
+					   {[], S}
+			end,
+			Out_Data;
+		true ->
+			{[], S}
+	end.
 
 create_election_cost_data(Pid, {Cost_Client, Charge_After_Client}) ->
 	Results = #electionCostData{

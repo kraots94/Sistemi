@@ -16,7 +16,8 @@
 callback_mode() -> [state_functions].
 
 -record(user, {
-			   pidApp
+			   pidApp,
+			   name
   				}).
 
 %% ====================================================================
@@ -26,7 +27,7 @@ callback_mode() -> [state_functions].
 receiveFromApp(PidUser, Data) ->
 	gen_statem:cast(PidUser, Data).
 
-sendRequest (PidUser, Request) ->
+sendRequest(PidUser, Request) ->
 	gen_statem:cast(PidUser, {send_request,Request}).
 
 die(UserPid) ->
@@ -38,16 +39,17 @@ dieSoft(UserPid) ->
 %% ====================================================================
 %% Automata Functions
 %% ====================================================================
-
+%InitData = {InitialPos: String, PidGpsServer, Name: String}
 start(InitData) ->
 	{ok, Pid} = gen_statem:start_link(?MODULE,InitData, []),
 	Pid.
 
 init(InitData) ->
-	{InitialPos, PidGpsServer} = InitData,
+	{InitialPos, PidGpsServer, Name} = InitData,
 	InitDataApp = {InitialPos, PidGpsServer, self()},
 	PidApp = appUtente:start(InitDataApp),
-	State = #user{pidApp = PidApp},
+	State = #user{pidApp = PidApp,
+				  name = Name},
 	{ok, idle, State}.
 
 handle_common(cast, {die}, _OldState, State) ->

@@ -11,7 +11,7 @@
 						print_car_message/1,
 						print_car_message/2,
 						print_car_message/3]).
--define(DEBUGPRINT_MOVING, false).
+-define(DEBUGPRINT_MOVING, true).
 -define(TICKS_TO_CHARGE, 3).
 -define(TICKS_TO_MOVING, 1).
 
@@ -93,6 +93,7 @@ areYouKillable(Pid) ->
 fullBattery(Pid) ->
 	gen_statem:cast(Pid, {charged}).
 
+
 %% ====================================================================
 %% Automata Functions
 %% ====================================================================
@@ -140,9 +141,16 @@ handle_common({call,From}, {getBattery}, OldState, State) ->
 	Battery = State#movingCarState.batteryLevel,
 	{next_state, OldState, State, [{reply,From,Battery}]};
 
+%chiamato da listener per dire a utente tempo rimanente
 handle_common({call,From}, {getTimeToUser}, OldState, State) ->
 	TimeToUser = State#movingCarState.timeToUser,
 	{next_state, OldState, State, [{reply,From,TimeToUser}]};
+
+handle_common(cast, {crash},_OldState, State) ->
+	%avviso listener che avvisi utenti ...
+	% Prepare data for special election -> [Battery, [{pid, from, to}, ...]] vengono inviati a ascoltatore e si arrangia lui
+	{next_state, crash, State#movingCarState{tappe = [], currentUser = none,
+											timeToUser = 0, costToLastDestination = 0}};
 
 %la ricezione della queue con elezione fatta
 %Queue = {costi,Tappe}
@@ -162,8 +170,8 @@ handle_common(cast, {updateQueue, Queue}, _OldState, State) ->
 %gestione del tick
 handle_common(info, {_From, tick}, OldState, State) ->
 	if 
-		OldState == idle -> 
-			keep_state_and_data; %in idle ignora il tick
+		(OldState == idle ) or (OldState == crash) -> 
+			keep_state_and_data; %in idle e crash ignora il tick
 	  	(OldState == charging) or (OldState == solarCharging) ->					
 			ActualTickCounter = State#movingCarState.tick_counterBat,
 			NewCounter = ActualTickCounter + 1,
@@ -198,7 +206,7 @@ idle({call,From}, {getDataElection}, State) ->
 	Cost_To_last_Target = 0,
 	Current_Target = State#movingCarState.currentPos,
 	Battery_level = State#movingCarState.batteryLevel,
-	Packet = {Cost_To_last_Target, Current_Target, Battery_level},
+	Packet = {Cost_To_last_Target, Current_Target, Battery_level ,ok},
 	{keep_state, State, [{reply,From,Packet}]};
 
 idle(cast, {activateSolCharge}, State) ->
@@ -235,7 +243,7 @@ solarCharging({call,From}, {getDataElection}, State) ->
 	Cost_To_last_Target = 0,
 	Current_Target =  State#movingCarState.currentPos,
 	Battery_level = State#movingCarState.batteryLevel,
-	Packet = {Cost_To_last_Target, Current_Target, Battery_level},
+	Packet = {Cost_To_last_Target, Current_Target, Battery_level, ok},
 	{keep_state, State, [{reply,From,Packet}]};
 
 ?HANDLE_COMMON.
@@ -317,14 +325,15 @@ moving({call,From}, {getDataElection}, State) ->
 	Cost_To_last_Target = State#movingCarState.costToLastDestination,
 	Current_Target = State#movingCarState.lastDestination,
 	Battery_level = State#movingCarState.batteryLevel,
-	Packet = {Cost_To_last_Target, Current_Target, Battery_level},
+	Packet = {Cost_To_last_Target, Current_Target, Battery_level, ok},
 	{keep_state, State, [{reply,From,Packet}]};
 
-moving(cast, {crash}, State) ->
-	% Prepare data for special election -> [Battery, [{pid, from, to}, ...]] vengono inviati a ascoltatore e si arrangia lui
-	{next_state, crash, State#movingCarState{tappe = [], currentUser = none}};
-	?HANDLE_COMMON.
+moving(cast, {charged}, State) ->
+	printDebug(State, "charged in moving"),
+	keep_state_and_data;
 
+?HANDLE_COMMON.
+	
 movingToCharge(enter, _OldState, _State) ->
 	keep_state_and_data;
 
@@ -332,7 +341,7 @@ movingToCharge({call,From}, {getDataElection}, State) ->
 	Cost_To_last_Target = State#movingCarState.costToLastDestination,
 	Current_Target =  State#movingCarState.lastDestination,
 	Battery_level = State#movingCarState.batteryLevel,
-	Packet = {Cost_To_last_Target, Current_Target, Battery_level},
+	Packet = {Cost_To_last_Target, Current_Target, Battery_level, ok},
 	{keep_state, State, [{reply,From,Packet}]};
 
 %similar to moving
@@ -395,18 +404,31 @@ charging({call,From}, {getDataElection}, State) ->
 	Cost_To_last_Target = 0,
 	Current_Target =  State#movingCarState.currentPos,
 	Battery_level = State#movingCarState.batteryLevel,
-	Packet = {Cost_To_last_Target, Current_Target, Battery_level},
+	Packet = {Cost_To_last_Target, Current_Target, Battery_level, ok},
 	{keep_state, State, [{reply,From,Packet}]};
 
 charging(cast, {charged}, State) ->
 	printDebug(State, "finito di caricare, sono al massimo"),
-	{next_state, idle, State#movingCarState{batteryLevel = ?BATTERY_LEVEL_MAX}};
+	{next_state, idle, State#movingCarState{batteryLevel = ?BATTERY_LEVEL_MAX, mustCharge = false}};
 
 ?HANDLE_COMMON.
   
-crash(enter, _OldState, _State) ->
-	exit(crash);
+crash(enter, _OldState, State) ->
+	printDebug(State, "sono crashato!"),
+	keep_state_and_data;
 
+crash({call,From}, {getDataElection}, State) ->
+	Cost_To_last_Target = 0,
+	Current_Target =  none,
+	Battery_level = none,
+	Packet = {Cost_To_last_Target, Current_Target, Battery_level, not_ok},
+	{keep_state, State, [{reply,From,Packet}]};
+
+crash(cast, {fixed}, State) ->
+	printDebug(State, "sono stato riparato!"),
+	{next_state, idle, State};
+	
+	
 %definire getDataElection, tick rcv
 ?HANDLE_COMMON.
 %% ====================================================================
@@ -491,14 +513,14 @@ checkColumnHere(State, Battery) ->
 			NewState = State#movingCarState{
 							pathCol = [], 
 							costToLastDestination = 0,
-							batteryLevel = Battery, 
-							mustCharge = false},
+							batteryLevel = Battery
+							},
 			{next_state, charging, NewState};
 		true ->
 			printDebug(State, "Sono in moving verso la colonnina"),
 			NewState = State#movingCarState{batteryLevel = Battery, 
-											costToLastDestination = 0, 
-											mustCharge = false},
+											costToLastDestination = 0
+											},
 			{next_state, movingToCharge, NewState}
 	end.
 
