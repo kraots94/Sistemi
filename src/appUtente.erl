@@ -1,6 +1,7 @@
 -module(appUtente).
--compile(export_all).
 -behaviour(gen_statem).
+-export([start/1, sendRequest/2, updatePosition/2, changeDestination/2, sendRequestNoElection/2]).
+-export([callback_mode/0, init/1, idle/3, waiting_election/3, waiting_car/3, waiting_car_queued/3, moving/3]).
 -import('send', [send_message/2, send_message/3]).
 -import('utilities', [println/1, println/2, 
 						print_debug_message/1, 
@@ -106,6 +107,7 @@ handle_common({call,From},{getPos}, OldState, State) ->
 handle_common({call,From}, {changeDest, NewTarget}, OldState, State) ->
 	{_Start, To} = State#appUserState.request,
 	CurrentPosition = State#appUserState.currentPos,
+	printDebugList([From]),
 	{Reply, NewState} = if 
 		(NewTarget /= To) and (NewTarget /= CurrentPosition) ->
 			if 
@@ -211,9 +213,6 @@ waiting_car(cast, arrivedUserPosition, State) ->
 	
 ?HANDLE_COMMON.
 
-%waiting_car(cast, {changeDest, _NewDest}, _Position) ->
-%	%invio evento cambio dest...
-%	keep_state_and_data.
 
 moving(enter, _OldState, _Stato) -> keep_state_and_data;
 
@@ -231,10 +230,6 @@ moving(cast, {crash}, Stato) ->
 moving(cast, arrivedTargetPosition, State) ->
 	sendToUser({arrivedTargetPosition, State#appUserState.currentPos}, State),
 	{next_state, idle, State};
-
-%moving(cast, {changeDest, _NewDest}, _State) ->
-%	%invio evento cambio dest...
-%	keep_state_and_data;
 	
 
 ?HANDLE_COMMON.
@@ -249,9 +244,6 @@ sendPosToGps(CurrentPosition,S) ->
 sendToUser(Data, S) ->
 	PidUser = S#appUserState.pidUser,
 	utente:receiveFromApp(PidUser, Data).
-
-deletePosGps(S) ->
-	gps_module:deleteLocationTracks(S#appUserState.pidGPSModule).
 
 %controllo validità richiesta e in caso negativo errore
 checkValidityRequest(UserPos, Request) ->
@@ -276,6 +268,7 @@ findTaxi(State) ->
 	end.
 
 sendRequestToTaxi(Request, State) ->
+	printDebug("Request"),
 	{From, To} = Request,
 	CorrectRequest = {From, To, self()},
 	NearestCar = findTaxi(State),

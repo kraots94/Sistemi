@@ -1,5 +1,4 @@
 -module(macchina_batteria).
--compile(export_all).
 -behaviour(gen_statem).
 -include("globals.hrl").
 -include("records.hrl").
@@ -9,6 +8,9 @@
 						print_car_message/1,
 						print_car_message/2,
 						print_car_message/3]).
+
+-export([start/1]).
+-export([callback_mode/0, init/1, check_battery/3]).
 
 callback_mode() -> [state_functions].
 -define(TICKS_CHECK_BATTERY, 1).
@@ -44,6 +46,7 @@ start({Pid_Moving, Name}) ->
 %% ====================================================================
 
 init(State) ->
+	printDebug("Init battery"),
 	{ok, check_battery, State}.
 			
 handle_common(info, {_From, tick}, _OldState, State) ->

@@ -1,5 +1,4 @@
 -module(macchina_moving).
--compile(export_all).
 -behaviour(gen_statem).
 -include("records.hrl").
 -include("globals.hrl").
@@ -14,7 +13,12 @@
 -define(DEBUGPRINT_MOVING, false).
 -define(TICKS_TO_CHARGE, 3).
 -define(TICKS_TO_MOVING, 1).
-
+-export([start/1, crash/1, areYouStationary/1, areYouDoingSolarCharge/1, 
+		getBatteryLevel/1, getPosition/1, getDataElection/1, getTimeToUser/1,
+		enablePathCharge/1, activateSolarCharge/1, updateQueue/3, areYouKillable/1,
+		fullBattery/1]).
+-export([callback_mode/0, init/1, idle/3, solarCharging/3, 
+		moving/3, movingToCharge/3, charging/3, crash/3]).
 
 callback_mode() -> [state_functions,state_enter].
 %getDataElection, deve tornare {Cost_To_last_Target, Current_Target, Battery_Level} , Current_Target = pos attuale se fermo, dest se moving, next node se vai verso colonnina (stringa)

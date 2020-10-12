@@ -1,5 +1,4 @@
 -module(macchina_elezione).
--compile(export_all).
 -import('send', [send_message/2, send_message/3]).
 -import('utilities', [print_debug_message/1, 
 						print_debug_message/2, 
@@ -9,6 +8,9 @@
 						print_car_message/3]).
 -import('city_map', [get_nearest_col/3, calculate_path/2, create_records/5]).
 -behaviour(gen_statem).
+-export([start/5]).
+-export([callback_mode/0, init/1, idle/3, running_election/3, 
+		initiator_final_state/3, waiting_final_results/3]).
 -include("records.hrl").
 -include("globals.hrl").
 
@@ -69,22 +71,7 @@ start(PidMacchina, NomeMacchina, PidMovingCar, Pid_Gps_Car, City_Map) ->
 
 	{ok, Pid} = gen_statem:start_link(?MODULE,State, []),
 	Pid.
-	
-resetState(S) ->
-	S#electionState {
-					pidAppUser = none,
-					parent = none,
-					carsInvited = [],
-					total_cars_invited = 0,
-					childrenPartecipate = [],
-					total_children_partecipate = 0,
-					childrenCosts = [],
-					currentRequest = {},
-					flag_initiator = false,
-					my_election_cost = [],
-					queueToManage = [],
-					dataToSendPartecipate = none,
-					totalCosts = []}.
+
 %% ====================================================================
 %% Automata Functions
 %% ====================================================================
@@ -332,6 +319,22 @@ waiting_final_results(cast, {invite_result, _Data}, S) ->
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
+
+resetState(S) ->
+	S#electionState {
+					pidAppUser = none,
+					parent = none,
+					carsInvited = [],
+					total_cars_invited = 0,
+					childrenPartecipate = [],
+					total_children_partecipate = 0,
+					childrenCosts = [],
+					currentRequest = {},
+					flag_initiator = false,
+					my_election_cost = [],
+					queueToManage = [],
+					dataToSendPartecipate = none,
+					totalCosts = []}.
 
 %% If car can win returns his costs inside a list, otherwise empty list []
 manage_self_cost(S, CurrentRequest) ->
