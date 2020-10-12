@@ -62,8 +62,6 @@ changeDestination(App_Pid, NewTarget) ->
 sendRequestNoElection(App_Pid, Request) ->
 	gen_statem:cast(App_Pid, {send_requestNoElection, Request}).
 
-
-
 %% ====================================================================
 %% Automata Functions
 %% ====================================================================

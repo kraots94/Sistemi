@@ -13,6 +13,10 @@ Essendo un'architettura peer to peer, non è necessaria alcuna piattaforma a par
 \section{Generazione dell'ambiente virtuale}
 Il problema della modellazione di una città è stato risolto con un grafo pesato connesso non orientato: si assume che se due nodi sono connessi è perché vi è una strada tra di essi ed è bidirezionale. Il peso indica quanto costa attraversarla. 
 
+\subsection{Entità presenti}
+\subsection{Automi}
+Per l'implementazione degli automi è stata utilizzato il behavior erlang "gen\_statem", il quale semplifica la costruzione di macchine a stati finiti guidate da eventi. Questo behavior è un framework con numerose primitive riguardanti questi costrutti: invio e ricezione di eventi sincroni o asincroni, impostazione di timer e molto altro. Gli schemi degli automi mostrati in ... sono stati implementati in modo relativamente veloce potendosi concentrare quasi esclusivamente sulla logica del loro funzionamento piuttosto che sui dettagli implementativi, nascosti appunto dal suddetto framework. 
+Qui di seguito si riporta un link alla documentazione ufficiale del framework: ...
 Si immagina che i diversi nodi siano posizionati all'interno di un piano cartesiano, pertanto possiedono delle coordinate che ne indicano la posizione. Questo permette di capire la distanza tra di essi e quindi se diverse entità riescono a comunicare tra di loro.
 
 \subsection{Componenti del grafo}
@@ -23,6 +27,32 @@ Ogni nodo del grafo possiede quattro proprietà:
 	\item Coordinate X e Y: definiscono la posizione del nodo all'interno del piano cartesiano rappresentante la città.
 \end{itemize}
 
+Gli automi implementati rispettano fedelmente gli schemi mostrati ..., fatta eccezione per alcune mancanze e piccole modifiche che verranno ora elencate
+
+\begin{itemize}
+	\item Negli schemi progettuali si mostrava come la comunicazione fra automi interni a un'automobile non avvenisse mai in modo diretto, infatti l'ascoltatore del mezzo si comportava da proxy fra i due automi. Questa scelta progettuale è stata rivista in fase di implementazione, infatti si è ritenuto più veloce permettere una comunicazione diretta, ottenendo anche un codice più snello, pulito e dal comportamento più chiaro. 
+	La comunicazione fra un automa interno al veicolo e un automa esterno, come per esempio fra l'automa dell'elezione e l'applicazione utente, avviene tuttavia usando l'ascoltatore come proxy, il quale infatti è l'interfaccia col mondo esterno per un veicolo. Questo ha permesso di diminuire le dipendeze fra i diversi automi: un automa esterno al mezzo deve conoscere soltanto l'ascoltatore per poter comunicare con il veicolo e tutte le sue istanze.
+	\item come descritto sopra in ... non è stato aggiunto il cambiamento della topologia cittadina, pertanto gli automi non presentano gli eventi correlati.
+	\item Negli schemi progettuali erano stati inseriti molti stati che non presentano una controparte nel codice, questi erano stati definiti in fase di progettazione per chiarire le idee sui comportamenti degli automi, o per rendere gli schemi più espressivi, ma non si è ritenuto utile o conveniente inserirli nella loro implementazione. Il comportamento degli automi non è stato tuttavia intaccato dall'eliminazione di questi stati. 
+	\item Similmente agli stati, alcuni eventi riportati negli schemi progettuali non presentano una controparte "esatta" negli automi, nel senso che i nomi di questi eventi sono stati ridefiniti in fase implementativa trovando alternative più espressive o, in generale, migliori per le esigenze del codice. Anche in questo caso il comportamento non è stato intaccato ed è possibile trovare un isomorfirmo fra i nomi degli eventi inseriti negli schemi e quelli inseriti nel codice.
+\end{itemize}
+
+\subsubsection{Struttura generale}
+I diversi automi implementati presentano tutti uno stato interno, inteso come una propria memoria che varia durante l'esecuzione, ed è importante non confondersi con lo stato della macchina a stati finiti, la similitudine fra i due termini si presta a diversi fraintendimenti e d'ora in poi si userà il termine "memoria" per indicare lo stato con questa accezione. La memoria di ogni automa è stata modellata definendo un record specifico, il quale aggrega tutti i dati necessari.
+ 
+Il codice dei diversi automi è organizzato con una struttura molto simile che si può schematizzare in queste 4 sezioni:
+
+\begin{enumerate}
+	\item Codice per l'importazione di metodi da moduli esterni,importazioni di costanti definite esternamente, esportazione di metodi, definizione di costanti utilizzate solo localmente.
+	\item definizione del record specifico per l'automa: secondo quanto detto ne modella la sua memoria.
+	\item elenco dell'API dell'automa: inteso come le funzionalità della sua interfaccia, esportate per essere usate da altri automi.
+	\item funzioni dell'automa: ricalcano gli stati dell'automa e le possibili possibili comportamenti a seguito della ricezione dei vari eventi, la logica dell'automa è raccolta in questa sezione
+	\item funzioni interne: usate localmente.
+\end{enumerate}
+
+dwdqdw
+
+\subsection{Fornitori di servizi}
 Per quanto riguarda gli archi, essi posseggono tre proprietà:
 \begin{itemize}
 	\item ID\_Nodo\_1 - ID\_Nodo\_2: indica quali nodi collega.
