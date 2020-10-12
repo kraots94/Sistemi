@@ -76,7 +76,7 @@ init(InitData) ->
 		nameUser = Name,
 		currentPos = InitialPos,
 		currentDestination = none,
-		request = none,
+		request = {},
 		pidCarServing = none,
 		nameCarServing = "",
 		taxiIsServingMe = false
@@ -104,14 +104,14 @@ handle_common({call,From},{getPos}, OldState, State) ->
 	{next_state, OldState, State, [{reply,From,CurrentPos}]};
   		   
 handle_common({call,From}, {changeDest, NewTarget}, OldState, State) ->
-	{From, To} = State#appUserState.request,
+	{_Start, To} = State#appUserState.request,
 	CurrentPosition = State#appUserState.currentPos,
 	{Reply, NewState} = if 
 		(NewTarget /= To) and (NewTarget /= CurrentPosition) ->
 			if 
 				(OldState == waiting_car) or (OldState == moving) ->
 					PidCar = State#appUserState.pidCarServing,
-					Res = macchina_ascoltatore:changeDestination(PidCar, {CurrentPosition, NewTarget}),
+					Res = macchina_ascoltatore:changeDestination(PidCar, {CurrentPosition, NewTarget, self()}),
 					if  Res == changed_path ->
 							{changed_path, State#appUserState{request = {CurrentPosition, NewTarget}}};
 						true -> 
@@ -185,7 +185,9 @@ waiting_car_queued(cast, {crash}, Stato) ->
 	print_user_message(Stato#appUserState.nameUser, "App_User - Car Crashed"),
 	wait_random_time(),
 	print_user_message(Stato#appUserState.nameUser, "App_User - Waited random time after car crashed, going back to begin election"),
-	{next_state, idle, Stato, [{next_event,internal,{send_request,Request}}]}.
+	{next_state, idle, Stato, [{next_event,internal,{send_request,Request}}]};
+
+?HANDLE_COMMON.
 
 waiting_car(enter, _OldState, _Stato) -> keep_state_and_data;
 

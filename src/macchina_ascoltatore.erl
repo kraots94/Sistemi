@@ -156,6 +156,7 @@ idle(cast, {to_outside, {Target, Data}}, Stato) ->
 			if 
 				First == newNodeReached ->
 					ListUsersInQueue = Stato#taxiListenerState.usersInQueue,
+					io:format("queue: ~p~n",[ListUsersInQueue]),
 					NewList = if 
 						(Target == Stato#taxiListenerState.userCarrying) -> %è un cambio posizione del tipo che trasporto
 							OldRecord = hd(ListUsersInQueue),
@@ -206,27 +207,37 @@ idle({call, From}, {changeDestination, Request}, Stato) ->
 	UsersInQueue = Stato#taxiListenerState.usersInQueue,
 	if 
 		length(UsersInQueue) == 1 -> %and implicitamente chi chiede è quello servito, altrimento non sarebbe arrivato qua
+			io:format("posso"),
 			Self_Name =  Stato#taxiListenerState.name,
-			{From, To} = Request,
+			{Start, To, AppPid} = Request,
 			PidMoving = Stato#taxiListenerState.pidMoving,
 			BatteryLevel = macchina_moving:getBatteryLevel(PidMoving),
 			CurrentPos = macchina_moving:getPosition(PidMoving),
 			City_Map = Stato#taxiListenerState.city,
+			Graph_City = City_Map#city.city_graph,
 			City_Nodes = City_Map#city.nodes,
 			City_Cols = City_Map#city.column_positions,			
 			NearestCol = get_nearest_col(To, City_Nodes, City_Cols),	
-			Points = {CurrentPos, From, To, NearestCol},
-			{CC, _CRDT, Feasible, QueueCar} = calculateFeasible(Points, BatteryLevel, City_Map, Self_Name),
+			Points = {CurrentPos, Start, To, NearestCol},
+			io:format([?TILDE_CHAR] ++ "w "++[?TILDE_CHAR]++"n", [Points]),
+
+			{_CC, _CRDT, Feasible, QueueCar} = calculateFeasible(Points, BatteryLevel, {Graph_City, City_Nodes}, Self_Name),
 			if 
 				Feasible == i_can_win ->
 					{Queue_P1_P2, Queue_P2_P3, Queue_P3_P4} = QueueCar,
-					OutRecords = create_records(From, City_Nodes, Queue_P1_P2, Queue_P2_P3, Queue_P3_P4),
+					OutRecords = create_records(AppPid, City_Nodes, Queue_P1_P2, Queue_P2_P3, Queue_P3_P4),
 					macchina_moving:updateQueue(PidMoving, OutRecords, replace),
-					{keep_state, [{reply, From, changed_path}]};
+					OldListQueuedUsers = Stato#taxiListenerState.usersInQueue,
+					OldRecord = hd(OldListQueuedUsers),
+					NewRecord = OldRecord#userInQueue{target = To},
+					NewListQueuedUsers = [NewRecord] ++ tl(OldListQueuedUsers),
+					{keep_state, Stato#taxiListenerState{usersInQueue = NewListQueuedUsers}, [{reply, From, changed_path}]};
 				true ->
+					io:format("non posso"),
 					{keep_state, [{reply, From, cannot_change_path}]}
 			end;
 		true ->
+			io:format("non posso"),
 			{keep_state, [{reply, From, cannot_change_path}]}
 	end;
 
@@ -341,6 +352,10 @@ listen_election(cast, {election_results, Data}, Stato) ->
 	{next_state, idle, NewState};
 
 listen_election(cast, OtherEvents, Stato) ->
+	io:format("Evento posticipato: ~w", [OtherEvents]),
+	{keep_state, Stato, [postpone]};
+
+listen_election({call,From}, OtherEvents, Stato) ->
 	io:format("Evento posticipato: ~w", [OtherEvents]),
 	{keep_state, Stato, [postpone]};
 

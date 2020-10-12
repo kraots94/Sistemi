@@ -68,9 +68,9 @@ handle_common(cast, {dieSoft}, OldState, State) ->
 
 %app ha preso il crash, fatto ripartire elezione e io ora devo aspettare nuovi risultati
 handle_common(cast, {crash} , _OldState, State) ->
-	{next_state, waitingService, State}.
+	{next_state, waitingService, State};
 
-handle_common(cast, {changeDest, _NewTarget}, _State) ->
+handle_common(cast, {changeDest, _NewTarget}, _OldState, _State) ->
 	keep_state_and_data.
 
 idle(enter, _OldState, _State) -> keep_state_and_data;
@@ -91,7 +91,6 @@ waitingService(cast, {gotElectionData, Data}, State) ->
 	TimeToWait = Data#election_result_to_user.time_to_wait,
 	print_user_message(State#userState.name, "Taxi [~p] is serving me with ~w time to wait", [NameCar, TimeToWait]),
 	{next_state, waiting_car,State};
-
 
 ?HANDLE_COMMON.
 
@@ -135,7 +134,7 @@ moving(cast, {arrivedTargetPosition, Dest}, State) ->
 
 ending(enter, _OldState, State) ->
 	print_user_message(State#userState.name, "Mr. Stark, I don't feel so good."),
-	environment:removeUser(State#userState.pidEnv, self()),
+	%environment:removeUser(State#userState.pidEnv, self()),
 	killEntities(State);
 
 ?HANDLE_COMMON.

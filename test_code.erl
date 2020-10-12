@@ -79,3 +79,31 @@ PidUser3 = utente:start({"az", PID_GPS_SERVER, "U4", 0}),
 
 
 utente:sendRequest(PidUser3, {"az","aa"}).
+
+%cambio dest, metto richiesta lontana dal nodo partenza
+make:all(),
+f(),
+PID_GPS_SERVER = gps_server:start_gps_server(nodes_util:load_nodes()),
+Mappa = city_map:init_city(),
+PidCar1 = macchina_ascoltatore:start({"as",PID_GPS_SERVER, Mappa, "C1"}),
+PidUser1 = utente:start({"aq", PID_GPS_SERVER, "U1", 0}),
+utente:sendRequest(PidUser1, {"aq", "ay"}),
+
+utente:changeDestination(PidUser1, "az").
+
+
+
+
+make:all(),
+f(),
+PID_GPS_SERVER = gps_server:start_gps_server(nodes_util:load_nodes()),
+Mappa = city_map:init_city(),
+PidCar1 = macchina_ascoltatore:start({"as",PID_GPS_SERVER, Mappa, "C1"}),
+PidUser1 = utente:start({"aq", PID_GPS_SERVER, "U1", 0}),
+PidUser2 = utente:start({"au", PID_GPS_SERVER, "U2", 0}).
+
+utente:sendRequest(PidUser1, {"aq", "au"}),
+
+utente:sendRequest(PidUser2, {"au", "ba"}).
+
+utente:changeDestination(PidUser1, "az").

@@ -191,8 +191,16 @@ handle_common(cast, {updateQueue, Queue, Mode}, _OldState, State) ->
 			Time_To_User_Pos = Cost_1,
 			CostToLastDest = Cost_1 + Cost_2,
 			NewTappe = TappeTarget,
+			%controllo se prima tappa indica che sono già da  utente, in tal caso devo toglierla
+			PrimaTappa = hd(NewTappe),
+			TipoPrimaTappa = PrimaTappa#tappa.type,
+			TempoPrimaTappa = PrimaTappa#tappa.t,
+			TappeFinali = 
+				if (TipoPrimaTappa == user_start) and (TempoPrimaTappa == 0) -> tl(NewTappe);
+					true -> NewTappe
+				end,
 			print_car_message(CarName, "Car Stops for client: ~p | Total Time for client: ~w", [Path, CostToLastDest]),
-			State#movingCarState{tappe = NewTappe, 
+			State#movingCarState{tappe = TappeFinali, 
 								pathCol = TappeColumn, 
 								lastDestination = LastDestination, 
 								costToLastDestination = CostToLastDest, 
@@ -205,7 +213,7 @@ handle_common(cast, {updateQueue, Queue, Mode}, _OldState, State) ->
 %gestione del tick
 handle_common(info, {_From, tick}, OldState, State) ->
 	if 
-		(OldState == idle ) or (OldState == crash) -> 
+		(OldState == idle) or (OldState == crash) -> 
 			keep_state_and_data; %in idle e crash ignora il tick
 	  	(OldState == charging) or (OldState == solarCharging) ->					
 			ActualTickCounter = State#movingCarState.tick_counterBat,
