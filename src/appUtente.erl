@@ -1,6 +1,6 @@
 -module(appUtente).
 -behaviour(gen_statem).
--export([start/1, sendRequest/2, updatePosition/2, changeDestination/2, sendRequestNoElection/2]).
+-export([start/1, sendRequest/2, updatePosition/2, changeDestination/2]).
 -export([callback_mode/0, init/1, idle/3, waiting_election/3, waiting_car/3, waiting_car_queued/3, moving/3]).
 -import('send', [send_message/2, send_message/3]).
 -import('utilities', [println/1, println/2, 
@@ -13,35 +13,45 @@
 						generate_random_number/2]).
 -include("globals.hrl").
 -include("records.hrl").
--define(DEBUGPRINT_APP, false).
--define(TIME_TO_WAIT_REPLY, 3000).
+-define(DEBUGPRINT_APP, false).		%flag che indica abilitazione printing dei messsaggi di Debug
+-define(TIME_TO_WAIT_REPLY, 3000).  %tempo massimo per aspettare risposte dal servizio dopo aver inviato richiesta,
+									%se dopo tale tempo non è stata ricevuta una risposta verrà reiterata una nuova richiesta 
 
-% time is in milliseconds
+%range di tempo di attesa da aspettare prima di reiterare una richiesta di servizio
 -define(MIN_RANDOM_TIME_WAIT, 2000).
 -define(MAX_RANDOM_TIME_WAIT, 4000).
 
-callback_mode() -> [state_functions, state_enter].
+
 -record(appUserState, {
-						pidGPSModule,
-						pidCarServing,
-						nameCarServing,
-						pidUser,
-						nameUser,
-						currentPos,
-						currentDestination,
-						request,
-						taxiIsServingMe
+						pidGPSModule,		%pid del modulo GPS associato al dispositivo
+						pidCarServing,  	%pid del taxi che sta servendo utente
+						pidUser,	    	%pid dell'utente associato a quest'app
+						nameCarServing, 	%nome del taxi che sta servendo app
+						nameUser,			%il nome dell'utente associato a quest'app
+						currentPos,	   		%la posizione corrente dell'utente associato
+						currentDestination, %la destinazione corrente dell'utente associato
+						request,  			%l'ultima richiesta effettuata dall'utente associato
+						taxiIsServingMe     %flag che indica se il taxi sta servendo me (ossia se sono la persona in coda alla sua lista di utenti)
 					}).
+
+callback_mode() -> [state_functions, state_enter].
 %% ====================================================================
 %% API functions
 %% ====================================================================
 
-%InitData = {InitialPos, PidGpsServer, PidUser}
+%costruttore
+%@param InitData = {PosizioneIniziale :: string, PidGpsServer :: Pid, PidLinkedUser :: Pid}
 start(InitData) ->
 	{ok, Pid} = gen_statem:start_link(?MODULE,InitData, []),
 	Pid.
 
-%Request è tipo = {"a", "b"}.
+%Invio della richiesta di spostamento
+%usato da @automata utente
+%@param App_Pid :: Pid, app a cui richiedere il servizio
+%@param Request :: Tuple, contiene richiesta di spostamento, formattata come {From :: String, To :: String}
+%@return atomo 'from_pos_not_user_pos' se richiesta errata ossia partenza non combacia con posizione utente
+%			   'from_and_dest_same' se richiesta errata ossia la partenza combacia con l'arrivo
+%			   'valid' richiesta corretta
 sendRequest (App_Pid, Request) ->
 	UserPos = gen_statem:call(App_Pid, {getPos}),
 	Out = checkValidityRequest(UserPos, Request),
@@ -52,15 +62,22 @@ sendRequest (App_Pid, Request) ->
 			Out
 	end.
 
+%aggiornamento della posizione dell'utente dopo lo spostamento della macchina che lo sta servendo
+%usato da @automata macchina_ascoltatore
+%@param App_Pid :: Pid, app alla quale aggiornare la posizione 
+%@param NewNode :: String, Nuovo nodo raggiunto
 updatePosition(App_Pid, NewNode) ->
 	gen_statem:cast(App_Pid, {newNodeReached, NewNode}).
 
+%cambiamento destinazione 
+%usato da @automata utente
+%@param App_Pid :: Pid, app alla quale inviare richiesta del cambio di destinazione
+%@param NewTarget :: String, nuovo nodo destinazione richiesto
+%@return atomo 'user_in_car_queue' se impossibile cambiare destinazione per utente in coda,
+%		 atomo 'not_enough_battery' se richiesta non è gestibile dalla macchina che serve l'utente
+%		 atomo 'changed_path' se la richiesta è stata accettata e presa in carico
 changeDestination(App_Pid, NewTarget) ->
 	gen_statem:call(App_Pid, {changeDest, NewTarget}).
-
-%send to nearest req without election (debugging)
-sendRequestNoElection(App_Pid, Request) ->
-	gen_statem:cast(App_Pid, {send_requestNoElection, Request}).
 
 %% ====================================================================
 %% Automata Functions
@@ -82,7 +99,11 @@ init(InitData) ->
 	}, 
 	{ok, idle, State}.
 
-%ricezione del cambiamento posizione auto che mi serve
+%% ====================================================================
+%% handle_common functions - eventi globali
+%% ====================================================================
+
+%ricezione del cambiamento posizione dall'auto che mi serve
 handle_common(cast, {newNodeReached, NewNode}, OldState, State) ->
 	NewState = if 
 		OldState == moving -> %ricevuto mentre sono in moving, la mia posizione cambia!
@@ -93,15 +114,18 @@ handle_common(cast, {newNodeReached, NewNode}, OldState, State) ->
 	end,
 	{keep_state, NewState};
 
+%ricezione del comando di terminazione
 handle_common(cast, {die}, _OldState, State) ->
 	PidGpsModule = State#appUserState.pidGPSModule,
 	gps_module:end_gps_module(PidGpsModule),
 	gen_statem:stop(self());
 
+%richiesta di ottenere posizione attuale 
 handle_common({call,From},{getPos}, OldState, State) ->
 	CurrentPos = State#appUserState.currentPos,
 	{next_state, OldState, State, [{reply,From,CurrentPos}]};
   		   
+%ricezione del cambio destinazione
 handle_common({call,From}, {changeDest, NewTarget}, OldState, State) ->
 	{_Start, To} = State#appUserState.request,
 	CurrentPosition = State#appUserState.currentPos,
@@ -139,11 +163,13 @@ waiting_election(enter, _OldState, _Stato) ->
 	%richiesta inviata, aspetto risultati
 	keep_state_and_data;
 
-waiting_election(state_timeout, noReply, Stato) -> %non ho ricevuto risposta dentro al timer
+%non ho ricevuto risposta dentro al timer
+waiting_election(state_timeout, noReply, Stato) ->
 	print_user_message(Stato#appUserState.nameUser, "App_User - no reply from taxi, going back to begin election"),
  	Request = Stato#appUserState.request, %prendo la request
 	{next_state, idle, Stato, [{next_event,internal,{send_request,Request}}]};
 	
+%ottenimento dati dall'elezione, inviati da ascoltatore taxi
 waiting_election(cast, {winner, Data}, Stato) -> 
 	IdCarWinner = Data#election_result_to_user.id_car_winner,
 	if IdCarWinner == -1 -> %non c'è un vincitore, devo riprovare fra un po' di tempo
@@ -159,6 +185,7 @@ waiting_election(cast, {winner, Data}, Stato) ->
 														nameCarServing = NameCar}}
 	end;
 
+%auto a cui ho inviato richiesta è occupata, sta eseguendo altra elezione 
 waiting_election(cast, {already_running_election_wait}, Stato) -> 
 	print_user_message(Stato#appUserState.nameUser, "App_User - Nearest Taxi is already running election."), 
 	Request = Stato#appUserState.request, %prendo la request
@@ -243,7 +270,7 @@ sendToUser(Data, S) ->
 	PidUser = S#appUserState.pidUser,
 	utente:receiveFromApp(PidUser, Data).
 
-%controllo validità richiesta e in caso negativo errore
+%controllo validità richiesta e in caso negativo torna atomo appropriato
 checkValidityRequest(UserPos, Request) ->
 	{From, To} = Request,
 	if From /= UserPos -> 
@@ -257,7 +284,7 @@ checkValidityRequest(UserPos, Request) ->
 			end
 	end.
 
-%trova il taxi piu' vicino, se non presente torna none
+%trova il taxi piu' vicino, se non presente torna 'none'
 findTaxi(State) ->
 	send_message(State#appUserState.pidGPSModule, {getNearestCar}),
 	receive 

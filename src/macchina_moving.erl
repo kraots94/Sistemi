@@ -10,9 +10,9 @@
 						print_car_message/1,
 						print_car_message/2,
 						print_car_message/3]).
--define(DEBUGPRINT_MOVING, false).
--define(TICKS_TO_CHARGE, 3).
--define(TICKS_TO_MOVING, 1).
+-define(DEBUGPRINT_MOVING, false). %flag che indica abilitazione printing dei messsaggi di Debug
+-define(TICKS_TO_CHARGE, 3). %numero di tick da consumare per caricare la batteria 
+-define(TICKS_TO_MOVING, 1). %numero di tick da consumare per effettuare uno spostamento
 -export([start/1, crash/1, areYouStationary/1, areYouDoingSolarCharge/1, 
 		getBatteryLevel/1, getPosition/1, getDataElection/1, getTimeToUser/1,
 		enablePathCharge/1, activateSolarCharge/1, updateQueue/3, areYouKillable/1,
@@ -21,31 +21,29 @@
 		moving/3, movingToCharge/3, charging/3, crash/3]).
 
 callback_mode() -> [state_functions,state_enter].
-%getDataElection, deve tornare {Cost_To_last_Target, Current_Target, Battery_Level} , Current_Target = pos attuale se fermo, dest se moving, next node se vai verso colonnina (stringa)
-%diminuizione batteria a ogni tick, e anche cost to last target.
-%Current_Target = next node se stai andando verso colonnina
 
-%stato macchina in movimento:
 -record(movingCarState, {
-				tick_counter,
-				tick_counterBat,
-				pidListener,
-				nameListener,
-				tappe, %lista di tappe da percorrere
-				pathCol, %lista di tappe verso la colonnina
-				currentUser = none,
-				currentPos,
-				batteryLevel, %decrementa a ogni tick
-				mustCharge, %flag che dice se devo o meno andare a caricare (seguire tappe colonnina)
-				lastDestination, %nodo dell'ultimo target
+				tick_counter,    	   %contatore dei tick generico
+				tick_counterBat, 	   %contatore dei tick per la ricarica del mezzo
+				pidListener,     	   %pid dell'automa  ascoltatore associato
+				nameListener,    	   %nome di questo mezzo
+				tappe, 			 	   %lista di record di tipo 'tappa', rappresenta le tappe che questo mezzo deve percorrere
+				pathCol, 		 	   %lista di record di tipo 'tappa', rappresenta le tappe per raggiungere una colonnina che questo mezzo potrebbe dover percorrere
+				currentUser = none,    %utente corrente 
+				currentPos, 	 	   %posizione attuale del mezzo
+				batteryLevel, 	 	   %batteria del mezzo
+				mustCharge,            %flag che dice se devo o meno andare a caricare (seguire il 'pathCol'), settato da automa batteria
+				lastDestination, 	   %nodo dell'ultima destinazione di questo mezzo
 				costToLastDestination, %tempo per arrivare al target, decrementa a ogni tick
-				timeToUser}). 
+				timeToUser}). 		   %tempro rimanente per raggiungere il prossimo utente
 
 %% ====================================================================
 %% API functions
 %% ====================================================================
 
-%InitData = {InitialPos, PidListener, Name}
+
+%costruttore
+%@param InitData = {PosizioneIniziale :: string, PidListener :: Pid, Nome:: String}
 start(InitData) ->
 	{InitialPos, PidListener, Name} = InitData,
 	State = #movingCarState {
@@ -65,40 +63,69 @@ start(InitData) ->
 	{ok, Pid} = gen_statem:start_link(?MODULE,State, []),
 	Pid.
 
+%incidente del veicolo
+%usato da @automata macchina_ascoltatore
 crash(Pid) ->
 	gen_statem:cast(Pid, {crash}).
 
-%NB: questo torna la risposta al chiamante, se imposti timer e non c'è risposta invece la chiamata fallisce
+%----------------------GETTERS METHOS---------------------------------------%
+%segue una lunga serie di metodi getters usati da altri automi interni, per i quali definirò un contratto più compatto
+%@return true if mezzo è fermo, false altrimenti
+%usato da @automata macchina_batteria per i fini della ricarica solare
 areYouStationary(Pid) ->
 	gen_statem:call(Pid, {areYouStationary}).
 
+%@return true se mezzo è in ricarica solare, false altrimenti
+%usato da @automata macchina_batteria 
 areYouDoingSolarCharge(Pid) ->
 	gen_statem:call(Pid, {doingSolarCharge}).
 
+%@return livello della batteria del mezzo
+%usato da @automata macchina_batteria
 getBatteryLevel(Pid) ->
 	gen_statem:call(Pid, {getBattery}).
 
+%@return posizione attuale del mezzo
+%usato da @automata elezione
 getPosition(Pid) ->
 	gen_statem:call(Pid, {getPosition}).
 
+%@return livello della batteria del mezzo
+%usato da @automata elezione per ottenere i dati necessari a trovare il vincitore (batteria, costo al prossimo target, etc.)
 getDataElection(Pid) ->
 	gen_statem:call(Pid, {getDataElection}).
 
+%@return tempo per raggiungere il target
+%usato da @automata ascoltatore per notificare utente del tempo rimanente per essere servito
 getTimeToUser(Pid) ->
 	gen_statem:call(Pid, {getTimeToUser}).
 
+%----------------------GETTERS METHOS END---------------------------------------%
+
+%abilitazione path verso colonnina ricarica
+%usato da @automata batteria 
 enablePathCharge(Pid) ->
 	gen_statem:cast(Pid, {goToCharge}).
 
+%abilitazione della ricarica solare
+%usato da @automata batteria
 activateSolarCharge(Pid) ->
 	gen_statem:cast(Pid, {activateSolCharge}).
 
+%aggiornamento queue delle tappe del mezzo
+%usato da @automata macchina_ascoltatore dopo aver vinto un elezione oppure dopo aver verificato che un cambio destinazione è fattibile
+%@param Queue :: List of record 'tappe', tappe da percorrere
+%@param Mode :: atomo 'append' o 'replace', indica se le tappe vanno accodate all'attuale queue oppure rimpiazzate
 updateQueue(Pid, Queue, Mode) ->
 	gen_statem:cast(Pid, {updateQueue, Queue, Mode}).
 
+%richiesta per sapere se questo automa è terminabile, ossia eliminabile completamente dal servizio
+%usato da @automata macchina_ascoltatore
 areYouKillable(Pid) ->
 	gen_statem:call(Pid, {areYouKillable}).
 
+%notifica di raggiungimento livello massimo batteria, per smettere di caricare il mezzo
+%usato da @automata macchina_batteria
 fullBattery(Pid) ->
 	gen_statem:cast(Pid, {charged}).
 
@@ -109,6 +136,10 @@ fullBattery(Pid) ->
 
 init(State) ->
 	{ok, idle, State}.
+
+%% ====================================================================
+%% handle_common functions - eventi globali
+%% ====================================================================
 
 handle_common({call,From}, {areYouKillable}, OldState, State) ->
 	if 

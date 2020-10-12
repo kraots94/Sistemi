@@ -1,6 +1,3 @@
-%% @author Agnul
-%% @doc @todo Add description to macchina_ascoltatore.
-
 -module(macchina_ascoltatore).
 -behaviour(gen_statem).
 -include("records.hrl").
@@ -20,53 +17,74 @@
 
 callback_mode() -> [state_functions].
 
--define(DEBUGPRINT_LISTENER, false).
--define(MAX_TIME_ELECTION, 3000).
+-define(DEBUGPRINT_LISTENER, false). %flag che indica abilitazione printing dei messsaggi di Debug
+-define(MAX_TIME_ELECTION, 3000).    %tempo massimo di attesa per ricevere dall'automa elezione una risposta dopo aver iniziato un'elezione
 
--record(taxiListenerState, {pidMoving,
-							pidBattery,
-							pidElection,
-							pidGps,
-							pidClock,
-							pidAppRequestingService,
-							usersInQueue, %lista di record del tipo {Pid, Pos, Destination}
-							userCarrying,
-							name,
-							city}). 
+-record(taxiListenerState, {pidMoving, 				 %pid automa macchina_moving associato
+							pidBattery,				 %pid automa macchina_batteria associato
+							pidElection,  		     %pid automa macchina_elezione associato
+							pidGps,					 %pid modulo gps associato
+							pidClock,				 %pid generatore Tick associato
+							pidAppRequestingService, %pid App che ha appena fatto richiesta del servizio
+							usersInQueue,	         %lista di record di tipo 'userInQueue', rappresenta gli utenti in coda e le loro richieste
+							userCarrying,            %nome dell'utente che sto trasportando con questo veicolo
+							name,					 %nome di questo veicolo
+							city}). 				 %mappa della città, usata per i calcoli percorsi etc.
 
--record(userInQueue , {pid,
-					   position,
-					   target}).
-
-
+%rappresenta istanza di utente nella queue taxi con la sua posizione e la sua destinazione attuale
+-record(userInQueue , {pid,       %pid utente 
+					   position,  %posizione dell'utente
+					   target}).  %destinazione attuale dell'utente
 
 %% ====================================================================
 %% API functions
 %% ====================================================================
 
-%si crea con {nodo iniziale:stringa, PID_GPS_Server, mappa, nome:stringa}
+%costruttore
+%@param InitData = {PosizioneIniziale :: string, PidGpsServer :: Pid, mappa :: Digraph, nome:: String}
 start(InitData) ->
 	{ok, Pid} = gen_statem:start_link(?MODULE,InitData, []),
 	Pid.
 
+%Richiesta del servizio da parte di un'applicazione
+%usato da @automata appUtente
+%@param Pid :: Pid, pid dell'ascoltatore a cui viene richiesto inizio elezione
 beginElection(Pid) ->
-	gen_statem:call(Pid, {beginElectionUser}).
+	gen_statem:cast(Pid, {beginElectionUser}).
 
+%aggiornamento della posizione dopo raggiungimento nuovo nodo, comunicazione con modulo gps per aggiornamento 
+%usato da @automata macchina_moving
+%@param Position :: String, nuova posizione raggiunta
 updatePosition(ListenerPid, Position) ->
 	gen_statem:cast(ListenerPid, {updatePosition, Position}).
 	
+%richiesta di cambio destinazione da uno degli utenti in coda
+%usato da @automata appUtente
+%@param Request :: Tuple, contiene la nuova richiesta dell'utente 
+%@return atomo 'user_in_car_queue' se impossibile cambiare destinazione per utente in coda,
+%		 atomo 'not_enough_battery' se richiesta non è gestibile dalla macchina che serve l'utente
+%		 atomo 'changed_path' se la richiesta è stata accettata e presa in carico
 changeDestination(ListenerPid, Request) ->
 	gen_statem:call(ListenerPid, {changeDestination, Request}).
 
+%invio dati da automi interni al veicolo ad automi esterni
+%usato da @automata macchina_moving, elezione
+%@param Target :: Pid, automa ricevente del dato
+%@param Data :: Whatever, dato da inviare all'automa esterno
 sendToEsternalAutomata(ListenerPid, Target, Data) ->
 	gen_statem:cast(ListenerPid, {to_outside, {Target, Data}}).
 
+%incidente del veicolo, propagato agli automi interni
+%usato da environment
 crash(ListenerPid) ->
 	gen_statem:cast(ListenerPid, {crash}).
 
+%riparazione della macchina che aveva fatto precedentemente un incidente
 fixCar(ListenerPid) ->
 	gen_statem:cast(ListenerPid, {fixed}).
 
+%richiesta per sapere se questo automa è terminabile, ossia eliminabile completamente dal servizio
+%usato da enviornment
 areYouKillable(Pid) ->
 	gen_statem:call(Pid, {areYouKillable}).
 
@@ -245,6 +263,7 @@ idle(_WhateverType, _WhateverEvent, _WhateverState) ->
 listen_election(info, {_From, tick}, _Stato) ->
 	keep_state_and_data; 
 
+%timeout sul tempo elezione 
 listen_election(state_timeout, noReplyElectionInit, Stato) ->
 	PidElection = Stato#taxiListenerState.pidElection,
 	gen_statem:stop(PidElection),
@@ -267,12 +286,11 @@ listen_election(state_timeout, noReplyElectionPartecipate, Stato) ->
 
 %rimbalzo roba elezione a automa elettore
 listen_election(cast, {election_data, Data}, Stato) ->	
-	%print_debug_message(self(), "Listener - election_data - ~w", [Data]),
 	PidElezione = Stato#taxiListenerState.pidElection,
 	gen_statem:cast(PidElezione, Data),
 	keep_state_and_data;
 
-% data out of this car
+%dati da inviare esternamente
 listen_election(cast, {to_outside, {Target, Data}}, Stato) ->
 	FinalTuple = if 
 		is_tuple(Data) -> 
@@ -301,16 +319,19 @@ listen_election(cast, {to_outside, {Target, Data}}, Stato) ->
 	gen_statem:cast(Target, Data),
 	FinalTuple;
 
+%ricezione di inizio elezione da una applicazione 
 listen_election(cast, {beginElection, Data}, _Stato) ->
 	{_From, _To, PidAppUser} = Data,
 	gen_statem:cast(PidAppUser, {already_running_election_wait}),
 	keep_state_and_data;
 
+%ricezione di una partecipazione all'elezione da altro taxi
 listen_election(cast, {partecipateElection, Data}, _Stato) ->
 	PidSender = Data#dataElectionPartecipate.pidParent,
 	gen_statem:cast(PidSender, {election_data, {invite_result, {self(), i_can_not_join}}}),
 	keep_state_and_data;
 
+%ricezione di dati sull'elezione
 listen_election(cast, {election_results, Data}, Stato) ->
 	PidElezione = Stato#taxiListenerState.pidElection,
 	{DataToUse, Is_Initiator} = if 
@@ -346,7 +367,7 @@ listen_election(cast, {election_results, Data}, Stato) ->
 	end,
 	{next_state, idle, NewState};
 
-%tutti altri eventi posticipali
+%posticipazine di tutti gli altri eventi 
 listen_election(_WhateverType, _WhateverEvent, WhateverState) ->
 	{keep_state, WhateverState, [postpone]}.
 
@@ -372,6 +393,7 @@ notify_user_no_taxi(PID) ->
 	},
 	gen_statem:cast(Pid_User, {winner, DataToUser}).
 
+%uccisione di tutti i figli, tutti gli automi sottostanti a questo
 killEntities(State) ->
 	PidMov = State#taxiListenerState.pidMoving,
 	PidBattery =  State#taxiListenerState.pidBattery,
@@ -399,7 +421,7 @@ printDebug(ToPrint) ->
 	   true -> not_printed
 	end.
 
-
+%calcolo fattibilità di un percorso (usato per valutare cambio destinazione)
 calculateFeasible(Points, Battery_Avaiable, CityData, Self_Name) -> 
 	{P1, P2, P3, P4} = Points,
 	{Cost_P1_P2, Queue_P1_P2} = calculate_path(CityData, {P1, P2}),

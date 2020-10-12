@@ -17,12 +17,12 @@ callback_mode() -> [state_functions].
 -define(TICKS_TOGOSOLARCHARGE, 20).
 
 -define(DEBUGPRINT_BATTERY, true).
--record(batteryState, {pidCar,
-					  sameBatteryCounter,
-					  tick_counter,
-					  columnPathEnabled,
-					  notifiedChargedBat,
-					  nameCar}).
+-record(batteryState, {pidCar,				%pid macchina associata
+					  sameBatteryCounter,   %contatore che conta per quanto tempo non c'è stato cambiamento alla batteria, per la ricarica solare
+					  tick_counter,         %contatore generico tei tick
+					  columnPathEnabled,    %flag che indica se è stato abilitato il path verso la colonnina al mezzo
+					  notifiedChargedBat,   %flag che indica se è stato notificato il mezzo riguardo al termine della carica
+					  nameCar}).			%il nome di questo mezzo
 
 %
 %% ====================================================================
