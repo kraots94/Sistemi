@@ -422,8 +422,10 @@ event_car_crash(S, Data) ->
 				true ->
 					New_crashed_cars = [Car_To_Crash] ++ CrashedCars,
 					New_total_cars_crashed = Total_Crashed + 1,
+					Dict_Cars = S#environmentState.car_pids,
+					CarName =  getNameFromDict(Car_To_Crash, Dict_Cars),
 					macchina_ascoltatore:crash(Car_To_Crash),
-					print_environment_message(self(), "Car with pid {~w} has punctured rubber of the car!", Car_To_Crash),
+					print_environment_message(self(), "Car with name {~p} has punctured rubber of the car!", CarName),
 					S#environmentState{
 						cars_crashed = New_crashed_cars,
 						total_cars_crashed = New_total_cars_crashed
@@ -459,7 +461,9 @@ event_fix_car(S, Data) ->
 					New_crashed_cars = lists:delete(Car_To_Fix, CrashedCars),
 					New_total_cars_crashed = Total_Crashed - 1,
 					macchina_ascoltatore:fixCar(Car_To_Fix),
-					print_environment_message(self(), "Car with pid {~w} has been fixed!", Car_To_Fix),
+					Dict_Cars = S#environmentState.car_pids,
+					CarName =  getNameFromDict(Car_To_Fix, Dict_Cars),
+					print_environment_message(self(), "Car with name {~p} has been fixed!", CarName),
 					S#environmentState{
 						cars_crashed = New_crashed_cars,
 						total_cars_crashed = New_total_cars_crashed
@@ -482,7 +486,9 @@ event_remove_car(S, Data) ->
 					if 	
 						Pid_Removed /= -1 ->
 							removeCarFromEnvironment(Pid_Removed, S),
-							print_environment_message(self(), "Car with pid {~w} has been removed!", Pid_Removed);
+							Dict_Cars = S#environmentState.car_pids,
+							CarName =  getNameFromDict(Pid_Removed, Dict_Cars),
+							print_environment_message(self(), "Car with name {~p} has been removed!", CarName);
 						true ->
 							print_debug_message(self(), "Event kill car not occurred because not found car in idle"),
 							S
@@ -494,7 +500,9 @@ event_remove_car(S, Data) ->
 							Out = kill_car(Target, false),
 							if 	Out == killed ->
 								removeCarFromEnvironment(Target, S),
-								print_environment_message(self(), "Car with pid {~w} has been removed!", Target);
+								Dict_Cars = S#environmentState.car_pids,
+								CarName =  getNameFromDict(Target, Dict_Cars),
+								print_environment_message(self(), "Car with name {~p} has been removed!", CarName);
 							true ->
 								print_environment_message(self(), "Event kill car not occurred because car was not in idle"),
 								S
@@ -625,7 +633,7 @@ kill_user(Pid, ForceKill) ->
 		Out == killed ->
 			print_debug_message(self(), "User with PID {~w} removed", Pid);
 		true ->
-			print_debug_message(self(), "User with PID {~w} removed", Pid)
+			print_debug_message(self(), "User with PID {~w} not removed", Pid)
 	end,
 	Out.
 
@@ -670,6 +678,19 @@ updateRefs([H | T], Pids_Dict, Pids_List) ->
 
 getPidFromDict(Name, Dict) ->
 	dict:find(Name, Dict).
+
+getNameFromDict(Pid, Dict) ->
+	FilterFunc = fun({_Key, Val}) ->
+		Pid_Key = hd(Val),
+		Pid == Pid_Key
+	end,
+	OutList = lists:filter(FilterFunc, dict:to_list(Dict)),
+	if OutList == [] -> 
+			not_found_key;
+		true -> 
+			{Key, _Val} = hd(OutList),
+			Key
+	end.
 
 searchCarNotCrashed(_S, _CrashedCars, false, Result) -> Result; 
 searchCarNotCrashed(S, CrashedCars, true, _Result) -> 
