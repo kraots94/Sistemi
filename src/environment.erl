@@ -173,11 +173,18 @@ loop(State) ->
 			Out = getPidFromDict(UserName, State#environmentState.user_pids),
 			NewState = if
 				Out == error -> 
-					print_environment_message(self(), "User with Name [~p] does not exists", [UserName]),
+					print_environment_message(self(), "User with Name ~p does not exists", [UserName]),
 					State;
 				true -> 
 					{ok, Pid} = Out,
-					handle_event(State, 3, {hd(Pid), NewTarget})
+					Nodes = State#environmentState.city#city.nodes,
+					NewTargetID = nodes_util:getNodeID(NewTarget, Nodes),
+					if 
+						NewTargetID == -1 -> 
+							print_environment_message(self(), "Node with name {~p} does not exist", NewTarget);
+						true ->
+							handle_event(State, 3, {hd(Pid), NewTarget})
+					end
 			end,
 			loop(NewState);		
 
@@ -185,7 +192,7 @@ loop(State) ->
 			Out = getPidFromDict(Target, State#environmentState.car_pids),
 			NewState = if
 				Out == error -> 
-					print_environment_message(self(), "Car with Name [~p] does not exists", [Target]),
+					print_environment_message(self(), "Car with Name ~p does not exists", [Target]),
 					State;
 				true -> 
 					{ok, TargetPid} = Out,
@@ -197,7 +204,7 @@ loop(State) ->
 			Out = getPidFromDict(Target, State#environmentState.car_pids),
 			NewState = if
 				Out == error -> 
-					print_environment_message(self(), "Car with Name [~p] does not exists", [Target]),
+					print_environment_message(self(), "Car with Name ~p does not exists", [Target]),
 					State;
 				true -> 
 					{ok, TargetPid} = Out,
@@ -209,7 +216,7 @@ loop(State) ->
 			Out = getPidFromDict(Target, State#environmentState.car_pids),
 			NewState = if
 				Out == error -> 
-					print_environment_message(self(), "Car with Name [~p] does not exists", [Target]),
+					print_environment_message(self(), "Car with Name ~p does not exists", [Target]),
 					State;
 				true -> 
 					{ok, TargetPid} = Out,
@@ -384,14 +391,7 @@ event_user_change_target(S, Data) ->
 					{User, PassedDest}
 			end
 	end,
-
- 	UserChangedDest = changeDestUser(TargetUser, NewDest),
-	if 
-		UserChangedDest == changed ->
-			print_environment_message(self(), "User {~w} has now new target [~p]", [TargetUser, NewDest]);
-		true ->
-			print_environment_message(self(), "User {~w} has not changed his destination to [~p]", [TargetUser, NewDest])
-	end,
+	changeDestUser(TargetUser, NewDest),
 	S.
 
 event_car_crash(S, Data) ->
@@ -431,7 +431,8 @@ event_car_crash(S, Data) ->
 			end
 	end.
 
-event_fix_car(S, Target) ->
+event_fix_car(S, Data) ->
+	{Target} = Data,
 	Total_Crashed = S#environmentState.total_cars_crashed,
 	if
 		Total_Crashed == 0 ->
@@ -466,7 +467,8 @@ event_fix_car(S, Target) ->
 			end
 	end.
 
-event_remove_car(S, Target) ->
+event_remove_car(S, Data) ->
+	{Target} = Data,
 	Total_Cars = S#environmentState.total_cars,
 	if 
 		Total_Cars == 0 ->
@@ -627,9 +629,8 @@ kill_user(Pid, ForceKill) ->
 	end,
 	Out.
 
-changeDestUser(_Pid, _NewDest) ->
-	%TODO check if user can change ad make it real
-	changed.
+changeDestUser(Pid, NewDest) ->
+	utente:changeDestination(Pid, NewDest).
 
 % uccide l'orologio e gli automi delle macchine / utenti
 terminate(State) ->

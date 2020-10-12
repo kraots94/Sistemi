@@ -13,16 +13,17 @@
 -include("globals.hrl").
 -include("records.hrl").
 -define(DEBUGPRINT_APP, false).
--define(TIMETOWAITREPLY, ?TICKTIME * 2).
+-define(TIME_TO_WAIT_REPLY, 3000).
 
 % time is in milliseconds
--define(MIN_RANDOM_TIME_WAIT, ?TICKTIME * 2).
--define(MAX_RANDOM_TIME_WAIT, ?TICKTIME * 4).
+-define(MIN_RANDOM_TIME_WAIT, 2000).
+-define(MAX_RANDOM_TIME_WAIT, 4000).
 
 callback_mode() -> [state_functions, state_enter].
 -record(appUserState, {
 						pidGPSModule,
 						pidCarServing,
+						nameCarServing,
 						pidUser,
 						nameUser,
 						currentPos,
@@ -50,12 +51,17 @@ sendRequest (App_Pid, Request) ->
 			Out
 	end.
 
-updatePosition(UserPid, NewNode) ->
-	gen_statem:cast(UserPid, {newNodeReached, NewNode}).
+updatePosition(App_Pid, NewNode) ->
+	gen_statem:cast(App_Pid, {newNodeReached, NewNode}).
+
+changeDestination(App_Pid, NewTarget) ->
+	gen_statem:call(App_Pid, {changeDest, NewTarget}).
 
 %send to nearest req without election (debugging)
-sendRequestNoElection(UserPid, Request) ->
-	gen_statem:cast(UserPid, {send_requestNoElection, Request}).
+sendRequestNoElection(App_Pid, Request) ->
+	gen_statem:cast(App_Pid, {send_requestNoElection, Request}).
+
+
 
 %% ====================================================================
 %% Automata Functions
@@ -72,6 +78,7 @@ init(InitData) ->
 		currentDestination = none,
 		request = none,
 		pidCarServing = none,
+		nameCarServing = "",
 		taxiIsServingMe = false
 	}, 
 	{ok, idle, State}.
@@ -94,8 +101,30 @@ handle_common(cast, {die}, _OldState, State) ->
 
 handle_common({call,From},{getPos}, OldState, State) ->
 	CurrentPos = State#appUserState.currentPos,
-	{next_state, OldState, State, [{reply,From,CurrentPos}]}.
+	{next_state, OldState, State, [{reply,From,CurrentPos}]};
   		   
+handle_common({call,From}, {changeDest, NewTarget}, OldState, State) ->
+	{From, To} = State#appUserState.request,
+	CurrentPosition = State#appUserState.currentPos,
+	{Reply, NewState} = if 
+		(NewTarget /= To) and (NewTarget /= CurrentPosition) ->
+			if 
+				(OldState == waiting_car) or (OldState == moving) ->
+					PidCar = State#appUserState.pidCarServing,
+					Res = macchina_ascoltatore:changeDestination(PidCar, {CurrentPosition, NewTarget}),
+					if  Res == changed_path ->
+							{changed_path, State#appUserState{request = {CurrentPosition, NewTarget}}};
+						true -> 
+							{cannot_change_path, State}
+					end;
+				true ->
+				    {cannot_change_path, State}
+			end;
+		true ->
+			{cannot_change_path, State}
+	end,
+	{next_state, OldState, NewState, [{reply, From, Reply}]}.		
+		
 idle(enter, _OldState, _Stato) -> keep_state_and_data;
  
 idle(internal,{send_request, Request}, State) ->
@@ -124,8 +153,10 @@ waiting_election(cast, {winner, Data}, Stato) ->
 			print_user_message(Stato#appUserState.nameUser, "App_User - Waited random time, going back to begin election"),
 			{next_state, idle, Stato, [{next_event,internal,{send_request,Request}}]};
 	true -> %hooray vincitore trovato
+			NameCar = Data#election_result_to_user.name_car,
 			sendToUser({gotElectionData,Data},Stato),
-			{next_state, waiting_car, Stato#appUserState{pidCarServing = IdCarWinner}}
+			{next_state, waiting_car_queued, Stato#appUserState{pidCarServing = IdCarWinner,
+														nameCarServing = NameCar}}
 	end;
 
 waiting_election(cast, {already_running_election_wait}, Stato) -> 
@@ -135,17 +166,45 @@ waiting_election(cast, {already_running_election_wait}, Stato) ->
 	print_user_message(Stato#appUserState.nameUser, "App_User - Waited random time, going back to begin election"),
 	{next_state, idle, Stato, [{next_event,internal,{send_request,Request}}]}.
 
-%waitin_car_queue(cast, {changeDest, _NewDest}, _State) ->
-%	%invio evento non puoi cambiare path...
-%	keep_state_and_data.
+
+waiting_car_queued(enter, _OldState, _Stato) -> keep_state_and_data;
+
+waiting_car_queued(cast, {changeDest, _NewDest}, _State) ->
+	%invio evento non puoi cambiare path...
+	keep_state_and_data;
+
+waiting_car_queued(cast, taxiServingYou, State) ->
+	{next_state, waiting_car, State};
+
+waiting_car_queued(cast, {crash}, Stato) ->
+	CurrentPos = Stato#appUserState.currentPos,
+	{_From, To} = Stato#appUserState.request,
+	Request = {CurrentPos,To},
+	UserPid = Stato#appUserState.pidUser,
+	gen_statem:cast(UserPid, {crash}),
+	print_user_message(Stato#appUserState.nameUser, "App_User - Car Crashed"),
+	wait_random_time(),
+	print_user_message(Stato#appUserState.nameUser, "App_User - Waited random time after car crashed, going back to begin election"),
+	{next_state, idle, Stato, [{next_event,internal,{send_request,Request}}]}.
 
 waiting_car(enter, _OldState, _Stato) -> keep_state_and_data;
+
+waiting_car(cast, {crash}, Stato) ->
+	CurrentPos = Stato#appUserState.currentPos,
+	{_From, To} = Stato#appUserState.request,
+	Request = {CurrentPos,To},
+	UserPid = Stato#appUserState.pidUser,
+	gen_statem:cast(UserPid, {crash}),
+	print_user_message(Stato#appUserState.nameUser, "App_User - Car Crashed"),
+	wait_random_time(),
+	print_user_message(Stato#appUserState.nameUser, "App_User - Waited random time after car crashed, going back to begin election"),
+	{next_state, idle, Stato, [{next_event,internal,{send_request,Request}}]};
 
 waiting_car(cast, taxiServingYou, State) ->
 	{keep_state, State#appUserState{taxiIsServingMe = true}};
 
 waiting_car(cast, arrivedUserPosition, State) ->
-	sendToUser({arrivedUserPosition, State#appUserState.pidCarServing}, State),
+	sendToUser({arrivedUserPosition, State#appUserState.nameCarServing}, State),
 	{next_state, moving, State};
 	
 ?HANDLE_COMMON.
@@ -155,6 +214,17 @@ waiting_car(cast, arrivedUserPosition, State) ->
 %	keep_state_and_data.
 
 moving(enter, _OldState, _Stato) -> keep_state_and_data;
+
+moving(cast, {crash}, Stato) ->
+	CurrentPos = Stato#appUserState.currentPos,
+	{_From, To} = Stato#appUserState.request,
+	Request = {CurrentPos,To},
+	UserPid = Stato#appUserState.pidUser,
+	gen_statem:cast(UserPid, {crash}),
+	print_user_message(Stato#appUserState.nameUser, "App_User - Car Crashed"),
+	wait_random_time(),
+	print_user_message(Stato#appUserState.nameUser, "App_User - Waited random time after car crashed, going back to begin election"),
+	{next_state, idle, Stato, [{next_event,internal,{send_request,Request}}]};
 
 moving(cast, arrivedTargetPosition, State) ->
 	sendToUser({arrivedTargetPosition, State#appUserState.currentPos}, State),
@@ -212,7 +282,7 @@ sendRequestToTaxi(Request, State) ->
 			{next_state, idle, State, [{next_event,internal,{send_request,Request}}]};
 	   true ->
 		   gen_statem:cast(NearestCar, {beginElection, CorrectRequest}),
-		   {next_state, waiting_election, State#appUserState{request = Request}, [{state_timeout,?TIMETOWAITREPLY,noReply}]}
+		   {next_state, waiting_election, State#appUserState{request = Request}, [{state_timeout,?TIME_TO_WAIT_REPLY,noReply}]}
 	end.
 	
 

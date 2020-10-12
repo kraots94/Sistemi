@@ -36,6 +36,9 @@ die(UserPid) ->
 dieSoft(UserPid) ->
 	gen_statem:cast(UserPid, {dieSoft}).
 
+changeDestination(UserPid, NewTarget) ->
+	gen_statem:cast(UserPid, {changeDest, NewTarget}).
+
 %% ====================================================================
 %% Automata Functions
 %% ====================================================================
@@ -61,7 +64,14 @@ handle_common(cast, {dieSoft}, OldState, State) ->
 			killEntities(State);
 	   	true ->
 		   	keep_state_and_data
-	end.
+	end;
+
+%app ha preso il crash, fatto ripartire elezione e io ora devo aspettare nuovi risultati
+handle_common(cast, {crash} , _OldState, State) ->
+	{next_state, waitingService, State}.
+
+handle_common(cast, {changeDest, _NewTarget}, _State) ->
+	keep_state_and_data.
 
 idle(enter, _OldState, _State) -> keep_state_and_data;
 
@@ -73,13 +83,13 @@ idle(cast, {send_request, Request}, State) ->
 
 ?HANDLE_COMMON.
 
-
 waitingService(enter, _OldState, _State) -> keep_state_and_data;
 	
+
 waitingService(cast, {gotElectionData, Data}, State) ->
-	PID_Car = Data#election_result_to_user.id_car_winner,
+	NameCar = Data#election_result_to_user.name_car,
 	TimeToWait = Data#election_result_to_user.time_to_wait,
-	print_user_message(State#userState.name, "Taxi ~w is serving me with ~w time to wait", [PID_Car, TimeToWait]),
+	print_user_message(State#userState.name, "Taxi [~p] is serving me with ~w time to wait", [NameCar, TimeToWait]),
 	{next_state, waiting_car,State};
 
 
@@ -87,13 +97,35 @@ waitingService(cast, {gotElectionData, Data}, State) ->
 
 waiting_car(enter, _OldState, _State) -> keep_state_and_data;
 
-waiting_car(cast, {arrivedUserPosition, PID_Car}, State) ->
-	print_user_message(State#userState.name, "Taxi ~w is arrived in my position!", PID_Car),
+waiting_car(cast, {arrivedUserPosition, NameCar}, State) ->
+	print_user_message(State#userState.name, "Taxi [~p] is arrived in my position!", NameCar),
 	{next_state, moving, State};
+
+waiting_car(cast, {changeDest, NewTarget}, State) ->
+	PidApp = State#userState.pidApp,
+	Reply = appUtente:changeDestination(PidApp, NewTarget),
+	if 
+		Reply == cannot_change_path -> 
+			print_user_message(State#userState.name, "I can not change my target position");
+	   	true -> 
+			print_user_message(State#userState.name, "I'm successfully changed my target position to [~p]", NewTarget)
+	end,
+	keep_state_and_data;
 
 ?HANDLE_COMMON.
 
 moving(enter, _OldState, _State) -> keep_state_and_data;
+
+moving(cast, {changeDest, NewTarget}, State) ->
+	PidApp = State#userState.pidApp,
+	Reply = appUtente:changeDestination(PidApp, NewTarget),
+	if 
+		Reply == cannot_change_path -> 
+			print_user_message(State#userState.name, "I can not change my target position");
+	   	true -> 
+			print_user_message(State#userState.name, "I'm successfully changed my target position to [~p]", NewTarget)
+	end,
+	keep_state_and_data;
 
 moving(cast, {arrivedTargetPosition, Dest}, State) ->
 	print_user_message(State#userState.name, "I'm arrived in my target position [~p]", Dest),

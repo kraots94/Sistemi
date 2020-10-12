@@ -96,13 +96,14 @@ check_battery(internal, checkThresholds, Stato) ->
 			Notified = Stato#batteryState.notifiedChargedBat,
 			NewState = if 
 				(BatteryLevel < ?BATTERY_LEVEL_LOW) and not(AlreadyEnabledColPath) ->
-					print_debug_message(Stato#batteryState.nameCar, "Battery - Level under minimum value"),
+					print_car_message(Stato#batteryState.nameCar, "Battery - Level under minimum value"),
 					macchina_moving:enablePathCharge(PidAttachedCar), %macchina accoda tappe colonnina e poi va in stato ricarica...
 					Stato#batteryState{columnPathEnabled = true};
 				(BatteryLevel > ?BATTERY_LEVEL_LOW) and AlreadyEnabledColPath ->
+					print_car_message(Stato#batteryState.nameCar, "Battery - Level over minimum"),
 					Stato#batteryState{columnPathEnabled = false, notifiedChargedBat = false};
 				(BatteryLevel > ?BATTERY_LEVEL_MAX) and not(Notified)-> 
-					print_debug_message(Stato#batteryState.nameCar, "Battery - Level over maximum value"),
+					print_car_message(Stato#batteryState.nameCar, "Battery - Level maximum"),
 					macchina_moving:fullBattery(PidAttachedCar), %...e questo lo fa tornare in idle
 					Stato#batteryState{notifiedChargedBat = true};
 				true -> Stato

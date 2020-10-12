@@ -12,6 +12,9 @@
 -include("records.hrl").
 -include("globals.hrl").
 
+-define(MAX_HOPS_ELECTION, 2).
+-define(TIMEOUT_HOP, 500).
+
 callback_mode() -> [state_functions, state_enter].
 
 -record(carPartecipate, {refCar, costsCar, sentResults}).
@@ -125,10 +128,10 @@ idle(cast, {beginElection, Data}, S) ->
 			S3 = S2#electionState{totalCosts = My_Election_Cost},
 			{next_state, initiator_final_state, S3};
 		true ->  			
-			DataPartecipate = create_data_partecipate(Self_Pid, CurrentRequest, ?MAX_HOPES_ELECTION),
+			DataPartecipate = create_data_partecipate(Self_Pid, CurrentRequest, ?MAX_HOPS_ELECTION),
 			%invio partecipateElection ai vicini
 			S3 = S2#electionState{dataToSendPartecipate = DataPartecipate},
-			{next_state, running_election, S3} 
+			{next_state, running_election, S3, [{state_timeout,?TIMEOUT_HOP * (?MAX_HOPS_ELECTION + 1), timoutRunningElection}]} 
 	end;
 
 idle(cast, {partecipateElection, Data}, S) ->
@@ -168,13 +171,13 @@ idle(cast, {partecipateElection, Data}, S) ->
 			%invio partecipateElection ai vicini
 			DataPartecipate = create_data_partecipate(Self_Pid, CurrentRequest, CurrentTTL - 1),
 			S3 = S2#electionState{dataToSendPartecipate = DataPartecipate},
-			{next_state, running_election, S3} 
+			{next_state, running_election, S3, [{state_timeout,?TIMEOUT_HOP * CurrentTTL, timoutRunningElection}]} 
 	end;
 	
 idle({call,From}, {sendMovingQueue}, S) ->   
 	QueueData = S#electionState.car_moving_queue_data,
 	PidMovingCar = S#electionState.pidMovingCar,
-	macchina_moving:updateQueue(PidMovingCar, QueueData),
+	macchina_moving:updateQueue(PidMovingCar, QueueData, append),
 	%resest stat
 	S1 =  S#electionState{car_moving_queue_data = none},
 	{keep_state, S1, [{reply,From,finished}]}.	
@@ -189,7 +192,10 @@ running_election (enter, _OldState, S) ->
 	
 running_election(info, {_From, tick}, _Stato) ->
 	keep_state_and_data; %per ora non fare nulla
-	
+
+running_election(state_timeout, timoutRunningElection, Stato) -> 
+	manage_end_running_election(Stato);
+
 running_election(cast, {invite_result, Data}, S) -> 
 	_Self_Pid = S#electionState.pidCar,
 	{PID_Car, Partecipate} = Data,
@@ -268,19 +274,7 @@ calculate_next_state_running_election(S) ->
 	MissingAnswers = lists:filter(FuncFilter, Partecipans),
 	if  
 		(MissingAnswers =:= []) and (InvitedCars =:= []) -> 
-			ChildrenCosts = packChildrenCosts(Partecipans),
-			My_Election_Cost = S#electionState.my_election_cost,
-			TotalCosts = My_Election_Cost ++ ChildrenCosts,
-
-			if 
-				S#electionState.flag_initiator -> 
-					S1 = S#electionState{totalCosts = TotalCosts},
-					{next_state, initiator_final_state, S1};
-				true -> 					
-					Winner_Result = findBestResult(TotalCosts),
-					sendMessageElection(S#electionState.parent, {costs_results, {S#electionState.pidCar, Winner_Result}}, S),
-					{next_state, waiting_final_results, S} 
-			end;
+			manage_end_running_election(S);
 		true -> 
 			{next_state, running_election, S}	
 	end.
@@ -370,6 +364,21 @@ manage_self_cost(S, CurrentRequest) ->
 			Out_Data;
 		true ->
 			{[], S}
+	end.
+
+manage_end_running_election(S) ->
+	Partecipans = S#electionState.childrenPartecipate,
+	ChildrenCosts = packChildrenCosts(Partecipans),
+	My_Election_Cost = S#electionState.my_election_cost,
+	TotalCosts = My_Election_Cost ++ ChildrenCosts,
+	if 
+		S#electionState.flag_initiator -> 
+			S1 = S#electionState{totalCosts = TotalCosts},
+			{next_state, initiator_final_state, S1};
+		true -> 					
+			Winner_Result = findBestResult(TotalCosts),
+			sendMessageElection(S#electionState.parent, {costs_results, {S#electionState.pidCar, Winner_Result}}, S),
+			{next_state, waiting_final_results, S} 
 	end.
 
 create_election_cost_data(Pid, {Cost_Client, Charge_After_Client}) ->

@@ -17,7 +17,5 @@
 -define(GPS_MODULE_POWER, 50).
 -define(MAP_SIDE, 100).
 
--define(MAX_HOPES_ELECTION, 2).
-
 -define(BATTERY_LEVEL_LOW, 95).
 -define(BATTERY_LEVEL_MAX, 100).

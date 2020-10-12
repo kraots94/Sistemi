@@ -13,25 +13,27 @@
 						print_car_message/2,
 						print_car_message/3, 
 						generate_random_number/1]).
+-import('city_map', [calculate_path/2, get_nearest_col/3, create_records/5]).
 
 callback_mode() -> [state_functions].
 -define(DEBUGPRINT_LISTENER, false).
+-define(MAX_TIME_ELECTION, 3000).
 
 -record(taxiListenerState, {pidMoving,
 							pidBattery,
 							pidElection,
 							pidGps,
 							pidClock,
-							pidAppUser,
+							pidAppRequestingService,
 							usersInQueue, %lista di record del tipo {Pid, Pos, Destination}
 							userCarrying,
-							name}). 
+							name,
+							city}). 
 
 -record(userInQueue , {pid,
 					   position,
 					   target}).
 
--define(TICKS_TO_CHARGE, 3).
 
 
 %% ====================================================================
@@ -48,6 +50,9 @@ beginElection(Pid) ->
 
 updatePosition(ListenerPid, Position) ->
 	gen_statem:cast(ListenerPid, {updatePosition, Position}).
+	
+changeDestination(ListenerPid, Request) ->
+	gen_statem:call(ListenerPid, {changeDestination, Request}).
 
 sendToEsternalAutomata(ListenerPid, Target, Data) ->
 	gen_statem:cast(ListenerPid, {to_outside, {Target, Data}}).
@@ -92,10 +97,11 @@ init(InitData) ->
 					pidElection = PidElection,
 					pidGps = PidGpsModule,
 					pidClock = PidClock,
-					pidAppUser = -1,
+					pidAppRequestingService = -1,
 					usersInQueue = [],
-					userCarrying = none,
-					name = Name
+					userCarrying = "",
+					name = Name,
+					city = City_Map
 			},
 	print_car_message(State#taxiListenerState.name, "Car ready in position [~p]", InitialPos),
 	{ok, idle, State}.
@@ -113,15 +119,18 @@ handle_common(cast, {die}, _OldState, State) ->
 handle_common(cast, {crash}, OldState, State) ->
 	if 
 		OldState == listen_election -> 
-			io:format("DIOBOE non dovevo essere qua~n");
+			io:format("Non dovevo essere qua~n");
 		true ->
 			print_car_message(State#taxiListenerState.name, "I am broken, now i notify my users and waiting for fix"),
 			PidMoving = State#taxiListenerState.pidMoving,
-			io:format("Have to notify users~n"),
-			%TODO notify clients
+			ListClients = State#taxiListenerState.usersInQueue,
+			lists:foreach(fun(User) -> 
+				AppUserPid = User#userInQueue.pid,
+				gen_statem:cast(AppUserPid ,{crash})
+			end, ListClients),
 			gen_statem:cast(PidMoving, {crash})
 	end,
-	keep_state_and_data;
+	{next_state, idle, State#taxiListenerState{usersInQueue = [], userCarrying = ""}};
 
 handle_common(cast, {fixed}, _OldState, State) ->
 	print_car_message(State#taxiListenerState.name, "I am fixed, now i can serve again"),
@@ -133,8 +142,6 @@ handle_common(cast, {carrying, UserPid}, _OldState, State) ->
 	{keep_state, State#taxiListenerState{userCarrying = UserPid}};
 
 handle_common(cast, {noMoreCarrying}, _OldState, State) ->
-	ActualUsersInQueue = State#taxiListenerState.usersInQueue,
-	printDebug("tolto"),
 	{keep_state, State#taxiListenerState{userCarrying = none}}.
 
 %ricezione del tick
@@ -160,8 +167,6 @@ idle(cast, {to_outside, {Target, Data}}, Stato) ->
 						true ->
 							ListUsersInQueue
 					end,
-					printDebug("SITUAZIONE CODAAAAAAAAAAAAAAAAAA"),
-					printDebug(NewList),
 					{keep_state, Stato#taxiListenerState{usersInQueue = NewList}};
 				true ->
 					keep_state_and_data
@@ -187,15 +192,43 @@ idle(cast, {beginElection, Data}, Stato) ->
 	NewData = #dataElectionBegin{request = Request, pidAppUser = PidAppUser},
 	PidElezione = Stato#taxiListenerState.pidElection,
 	gen_statem:cast(PidElezione, {beginElection,NewData}),
-	S1 = Stato#taxiListenerState{pidAppUser = PidAppUser},
-	{next_state, listen_election, S1};
+	S1 = Stato#taxiListenerState{pidAppRequestingService = PidAppUser},
+	{next_state, listen_election, S1, [{state_timeout, ?MAX_TIME_ELECTION, noReplyElectionInit}]};
 
 %partecipate election ricevuto da altra macchina
 idle(cast, {partecipateElection, Data}, Stato) ->
 	print_debug_message(self(), "Request to partecipate election:  ~w", Data),
 	PidElezione = Stato#taxiListenerState.pidElection,
 	gen_statem:cast(PidElezione, {partecipateElection, Data}),
-	{next_state, listen_election, Stato};
+	{next_state, listen_election, Stato, [{state_timeout, ?MAX_TIME_ELECTION, noReplyElectionPartecipate}]};
+
+idle({call, From}, {changeDestination, Request}, Stato) ->
+	UsersInQueue = Stato#taxiListenerState.usersInQueue,
+	if 
+		length(UsersInQueue) == 1 -> %and implicitamente chi chiede è quello servito, altrimento non sarebbe arrivato qua
+			Self_Name =  Stato#taxiListenerState.name,
+			{From, To} = Request,
+			PidMoving = Stato#taxiListenerState.pidMoving,
+			BatteryLevel = macchina_moving:getBatteryLevel(PidMoving),
+			CurrentPos = macchina_moving:getPosition(PidMoving),
+			City_Map = Stato#taxiListenerState.city,
+			City_Nodes = City_Map#city.nodes,
+			City_Cols = City_Map#city.column_positions,			
+			NearestCol = get_nearest_col(To, City_Nodes, City_Cols),	
+			Points = {CurrentPos, From, To, NearestCol},
+			{CC, _CRDT, Feasible, QueueCar} = calculateFeasible(Points, BatteryLevel, City_Map, Self_Name),
+			if 
+				Feasible == i_can_win ->
+					{Queue_P1_P2, Queue_P2_P3, Queue_P3_P4} = QueueCar,
+					OutRecords = create_records(From, City_Nodes, Queue_P1_P2, Queue_P2_P3, Queue_P3_P4),
+					macchina_moving:updateQueue(PidMoving, OutRecords, replace),
+					{keep_state, [{reply, From, changed_path}]};
+				true ->
+					{keep_state, [{reply, From, cannot_change_path}]}
+			end;
+		true ->
+			{keep_state, [{reply, From, cannot_change_path}]}
+	end;
 
 ?HANDLE_COMMON.
 
@@ -205,6 +238,26 @@ idle(cast, {partecipateElection, Data}, Stato) ->
 
 listen_election(info, {_From, tick}, _Stato) ->
 	keep_state_and_data; %per ora non fare nulla
+
+listen_election(state_timeout, noReplyElectionInit, Stato) ->
+	PidElection = Stato#taxiListenerState.pidElection,
+	gen_statem:stop(PidElection),
+	Name = Stato#taxiListenerState.name,
+	PidMoving = Stato#taxiListenerState.pidMoving,
+	PidGpsModule = Stato#taxiListenerState.pidGps,
+	City_Map = Stato#taxiListenerState.city,
+	NewPidElection = macchina_elezione:start(self(), Name, PidMoving,PidGpsModule,City_Map),
+	{next_state, idle, Stato#taxiListenerState{pidElection = NewPidElection}};
+
+listen_election(state_timeout, noReplyElectionPartecipate, Stato) ->
+	PidElection = Stato#taxiListenerState.pidElection,
+	gen_statem:stop(PidElection),
+	Name = Stato#taxiListenerState.name,
+	PidMoving = Stato#taxiListenerState.pidMoving,
+	PidGpsModule = Stato#taxiListenerState.pidGps,
+	City_Map = Stato#taxiListenerState.city,
+	NewPidElection = macchina_elezione:start(self(), Name, PidMoving,PidGpsModule,City_Map),
+	{next_state, idle, Stato#taxiListenerState{pidElection = NewPidElection}};
 
 %rimbalzo roba elezione a automa elettore
 listen_election(cast, {election_data, Data}, Stato) ->	
@@ -266,7 +319,7 @@ listen_election(cast, {election_results, Data}, Stato) ->
 	Pid_Car = DataToUse#election_result_to_car.id_winner,
 	NewState = if 
 		(Pid_Car == -1) and (Is_Initiator) -> % Avviso l'utente se non c'è un vincitore
-			notify_user_no_taxi(Stato#taxiListenerState.pidAppUser),
+			notify_user_no_taxi(Stato#taxiListenerState.pidAppRequestingService),
 			Stato;
 		Pid_Car == self() -> 
 			print_debug_message(self(), "I have won election"),
@@ -274,8 +327,10 @@ listen_election(cast, {election_results, Data}, Stato) ->
 			PidMoving = Stato#taxiListenerState.pidMoving,
 			Pid_User = DataToUse#election_result_to_car.id_app_user,
 			TimeToUser = macchina_moving:getTimeToUser(PidMoving),
+			Name = Stato#taxiListenerState.name,
 			DataToUser = #election_result_to_user{
 				id_car_winner = Pid_Car, 
+				name_car = Name,
 				time_to_wait = TimeToUser
 			},
 			NewListQueuedUsers = calculateNewListQueuedUsers(Stato, DataToUse),
@@ -340,3 +395,34 @@ printDebug(ToPrint) ->
 	end.
 
 
+calculateFeasible(Points, Battery_Avaiable, CityData, Self_Name) -> 
+	{P1, P2, P3, P4} = Points,
+	{Cost_P1_P2, Queue_P1_P2} = calculate_path(CityData, {P1, P2}),
+	RemainingCharge_P2 = Battery_Avaiable - Cost_P1_P2,
+	Out_Results = if  
+		RemainingCharge_P2 < 0 -> 	
+			print_debug_message(Self_Name, "I have no battery for User Position", none),
+			{-1, -1, i_can_not_win, []};		
+		true -> 					
+			{Cost_P2_P3, Queue_P2_P3} = calculate_path(CityData, {P2, P3}),
+			RemainingCharge_P3 =  RemainingCharge_P2 - Cost_P2_P3,
+			if  
+				RemainingCharge_P3 < 0 -> 	
+					print_debug_message(Self_Name, "I have no battery for Target Position", none),
+					{-1, -1, i_can_not_win, []};
+				true -> 					
+					{Cost_P3_P4, Queue_P3_P4} = calculate_path(CityData, {P3, P4}),
+					RemainingCharge_P4 = RemainingCharge_P3 -Cost_P3_P4,
+					if  
+						RemainingCharge_P4 < 0 -> 
+							print_debug_message(Self_Name, "I have no battery for Column Position", none),
+							{-1, -1, i_can_not_win, []};
+						true ->	
+							CC = Cost_P1_P2,
+							CRDT = Battery_Avaiable - Cost_P1_P2 - Cost_P2_P3,
+							QueueCar = {{Cost_P1_P2, Queue_P1_P2}, {Cost_P2_P3, Queue_P2_P3}, {Cost_P3_P4, Queue_P3_P4}},
+							{CC, CRDT, i_can_win, QueueCar}
+					end
+			end
+	end,
+	Out_Results.

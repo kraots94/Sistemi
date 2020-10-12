@@ -7,7 +7,7 @@
 
 -record(user_request,{from, to}).
 -record(election_result_to_car,{id_winner, id_app_user, request}).
--record(election_result_to_user,{id_car_winner, time_to_wait}).
+-record(election_result_to_user,{id_car_winner, time_to_wait, name_car}).
 
 % dati di inizializzazione del modulo gps
 -record(dataInitGPSModule, {pid_entity, 

@@ -74,6 +74,9 @@ areYouDoingSolarCharge(Pid) ->
 getBatteryLevel(Pid) ->
 	gen_statem:call(Pid, {getBattery}).
 
+getPosition(Pid) ->
+	gen_statem:call(Pid, {getPosition}).
+
 getDataElection(Pid) ->
 	gen_statem:call(Pid, {getDataElection}).
 
@@ -86,8 +89,8 @@ enablePathCharge(Pid) ->
 activateSolarCharge(Pid) ->
 	gen_statem:cast(Pid, {activateSolCharge}).
 
-updateQueue(Pid, Queue) ->
-	gen_statem:cast(Pid, {updateQueue, Queue}).
+updateQueue(Pid, Queue, Mode) ->
+	gen_statem:cast(Pid, {updateQueue, Queue, Mode}).
 
 areYouKillable(Pid) ->
 	gen_statem:call(Pid, {areYouKillable}).
@@ -118,6 +121,11 @@ handle_common(cast, {goToCharge}, OldState, State) ->
 			keep_state_and_data;
 		true ->
 			printDebug(State, "aggiorno tappe aggiungendo patch carica"), %nb: l'aggiunta del path è implicito settando il flag
+			TappeColonnina = State#movingCarState.pathCol,
+			Path = getPathFromCarStops(TappeColonnina),
+			CarName = State#movingCarState.nameListener,
+			print_car_message(CarName, "Low battery, enable path to charging: ~p", Path),
+
 			{keep_state, State#movingCarState{mustCharge = true}}
 	end;
 
@@ -143,6 +151,10 @@ handle_common({call,From}, {getBattery}, OldState, State) ->
 	Battery = State#movingCarState.batteryLevel,
 	{next_state, OldState, State, [{reply,From,Battery}]};
 
+handle_common({call,From}, {getPosition}, OldState, State) ->
+	Position = State#movingCarState.currentPos,
+	{next_state, OldState, State, [{reply,From,Position}]};
+
 %chiamato da listener per dire a utente tempo rimanente
 handle_common({call,From}, {getTimeToUser}, OldState, State) ->
 	TimeToUser = State#movingCarState.timeToUser,
@@ -156,19 +168,40 @@ handle_common(cast, {crash}, _OldState, State) ->
 
 %la ricezione della queue con elezione fatta
 %Queue = {costi,Tappe}
-handle_common(cast, {updateQueue, Queue}, _OldState, State) ->
+% Mode -> append, replace
+handle_common(cast, {updateQueue, Queue, Mode}, _OldState, State) ->
+	CarName = State#movingCarState.nameListener,
 	printDebug(State,"Data Received:"),
 	printDebug(State, Queue),
 	{{Cost_1, Cost_2, _Cost_3}, TappeTarget, TappeColumn} = Queue,
-	Time_To_User_Pos = State#movingCarState.costToLastDestination + Cost_1,
-	CostToLastDest = State#movingCarState.costToLastDestination + Cost_1 + Cost_2,
+	Path = getPathFromCarStops(TappeTarget),
 	LastDestination = calculateLastDestination(TappeTarget),
-	NewTappe = State#movingCarState.tappe ++ TappeTarget,
-	{next_state, moving, State#movingCarState{tappe=NewTappe, 
-											pathCol = TappeColumn, 
-											lastDestination = LastDestination, 
-											costToLastDestination = CostToLastDest, 
-											timeToUser = Time_To_User_Pos}};
+	NewState = if 
+		Mode == append ->
+			Time_To_User_Pos = State#movingCarState.costToLastDestination + Cost_1,
+			CostToLastDest = State#movingCarState.costToLastDestination + Cost_1 + Cost_2,
+			NewTappe = State#movingCarState.tappe ++ TappeTarget,
+			print_car_message(CarName, "Car Stops for client: ~p | Total Time for client: ~w", [Path, CostToLastDest]),
+			State#movingCarState{tappe=NewTappe, 
+								pathCol = TappeColumn, 
+								lastDestination = LastDestination, 
+								costToLastDestination = CostToLastDest, 
+								timeToUser = Time_To_User_Pos};
+		Mode == replace ->
+			Time_To_User_Pos = Cost_1,
+			CostToLastDest = Cost_1 + Cost_2,
+			NewTappe = TappeTarget,
+			print_car_message(CarName, "Car Stops for client: ~p | Total Time for client: ~w", [Path, CostToLastDest]),
+			State#movingCarState{tappe = NewTappe, 
+								pathCol = TappeColumn, 
+								lastDestination = LastDestination, 
+								costToLastDestination = CostToLastDest, 
+								timeToUser = Time_To_User_Pos};
+		true -> printDebug(State,"Can not update queue, Mode not supported"),
+			State
+	end,
+
+	{next_state, moving, NewState};
 %gestione del tick
 handle_common(info, {_From, tick}, OldState, State) ->
 	if 
@@ -394,7 +427,9 @@ movingToCharge(internal, move, State) ->
 ?HANDLE_COMMON.
   
 charging(enter, _OldState, State) ->
-	printDebug(State, "sto caricando"),
+	ListenerName = State#movingCarState.nameListener,
+	BatteryLevel = State#movingCarState.batteryLevel,
+	print_car_message(ListenerName, "I'm in charging column position, recharging. Current level: ~w", BatteryLevel),
 	keep_state_and_data;
 
 charging(internal,charge, State) ->
@@ -416,8 +451,8 @@ charging(cast, {charged}, State) ->
 ?HANDLE_COMMON.
   
 crash(enter, _OldState, State) ->
-	printDebug(State, "sono crashato!"),
-	keep_state_and_data;
+	print_debug_message(State#movingCarState.nameListener, "Accident happen!"),
+	{keep_state, State#movingCarState{tappe = [],currentUser = none, costToLastDestination = 0, timeToUser = 0}};
 
 crash({call,From}, {getDataElection}, State) ->
 	Cost_To_last_Target = 0,
@@ -427,10 +462,8 @@ crash({call,From}, {getDataElection}, State) ->
 	{keep_state, State, [{reply,From,Packet}]};
 
 crash(cast, {fixed}, State) ->
-	printDebug(State, "sono stato riparato!"),
+	print_debug_message(State#movingCarState.nameListener, "Fixed Problem!"),
 	{next_state, idle, State};
-	
-	
 
 ?HANDLE_COMMON.
 %% ====================================================================
@@ -536,3 +569,10 @@ printDebug(S, ToPrint) ->
 printState(State) ->
 	printDebug(State,State).
 	
+getPathFromCarStops(Tappe) ->
+	MapFunc = fun(T) ->
+		Node_name = T#tappa.node_name,
+		Node_name
+	end,
+	OutList = lists:map(MapFunc, Tappe),
+	OutList.
