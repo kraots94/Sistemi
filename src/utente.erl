@@ -1,5 +1,4 @@
 -module(utente).
--compile(export_all).
 -behaviour(gen_statem).
 -import('send', [send_message/2, send_message/3]).
 -import('utilities', [println/1, println/2, 
@@ -11,6 +10,8 @@
 						print_user_message/3]).
 -include("globals.hrl").
 -include("records.hrl").
+-export([receiveFromApp/2, sendRequest/2, die/1, dieSoft/1, changeDestination/2]).
+-export([start/1, init/1, idle/3, waitingService/3, waiting_car/3, moving/3, ending/3, callback_mode/0]).
 -define(DEBUGPRINT_USER, false).
 
 callback_mode() -> [state_functions, state_enter].
@@ -104,10 +105,10 @@ waiting_car(cast, {changeDest, NewTarget}, State) ->
 	PidApp = State#userState.pidApp,
 	Reply = appUtente:changeDestination(PidApp, NewTarget),
 	if 
-		Reply == cannot_change_path -> 
-			print_user_message(State#userState.name, "I can not change my target position");
-	   	true -> 
-			print_user_message(State#userState.name, "I'm successfully changed my target position to [~p]", NewTarget)
+		Reply == changed_path -> 
+			print_user_message(State#userState.name, "I'm successfully changed my target position to [~p]", NewTarget);
+		true -> 
+			print_user_message(State#userState.name, "I can not change my target position. Error: ~p", Reply)
 	end,
 	keep_state_and_data;
 
@@ -119,10 +120,10 @@ moving(cast, {changeDest, NewTarget}, State) ->
 	PidApp = State#userState.pidApp,
 	Reply = appUtente:changeDestination(PidApp, NewTarget),
 	if 
-		Reply == cannot_change_path -> 
-			print_user_message(State#userState.name, "I can not change my target position");
-	   	true -> 
-			print_user_message(State#userState.name, "I'm successfully changed my target position to [~p]", NewTarget)
+		Reply == changed_path -> 
+			print_user_message(State#userState.name, "I'm successfully changed my target position to [~p]", NewTarget);
+		true -> 
+			print_user_message(State#userState.name, "I can not change my target position. Error: ~p", Reply)
 	end,
 	keep_state_and_data;
 
@@ -133,8 +134,9 @@ moving(cast, {arrivedTargetPosition, Dest}, State) ->
 ?HANDLE_COMMON.
 
 ending(enter, _OldState, State) ->
-	print_user_message(State#userState.name, "Mr. Stark, I don't feel so good."),
-	%environment:removeUser(State#userState.pidEnv, self()),
+	printDebug("Killing entities connected"),
+	print_user_message(State#userState.name, "I made my trip, goodbye."),
+	environment:removeUser(State#userState.pidEnv, self()),
 	killEntities(State);
 
 ?HANDLE_COMMON.

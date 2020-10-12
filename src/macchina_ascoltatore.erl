@@ -2,7 +2,6 @@
 %% @doc @todo Add description to macchina_ascoltatore.
 
 -module(macchina_ascoltatore).
--compile(export_all).
 -behaviour(gen_statem).
 -include("records.hrl").
 -include("globals.hrl").
@@ -14,8 +13,13 @@
 						print_car_message/3, 
 						generate_random_number/1]).
 -import('city_map', [calculate_path/2, get_nearest_col/3, create_records/5]).
+-export([start/1, beginElection/1, updatePosition/2, changeDestination/2,
+		sendToEsternalAutomata/3, crash/1, fixCar/1, areYouKillable/1,
+		die/1, dieSoft/1]).
+-export([callback_mode/0, init/1, idle/3, listen_election/3]).
 
 callback_mode() -> [state_functions].
+
 -define(DEBUGPRINT_LISTENER, false).
 -define(MAX_TIME_ELECTION, 3000).
 
@@ -383,6 +387,7 @@ killEntities(State) ->
 	gen_statem:stop(PidMov),gen_statem:stop(PidBattery),gen_statem:stop(PidElection), %ammazzo automi
 	gps_module:end_gps_module(PidGps), tick_server:end_clock(PidClock), %ammazzo server
 	print_debug_message(self(), "All linked entities killed"),
+	printDebug("Killed"),
 	gen_statem:stop(self()).
 
 calculateNewListQueuedUsers(State, ElectionData) ->
