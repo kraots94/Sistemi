@@ -6,16 +6,24 @@
 
 Il linguaggio scelto per l'implementazione del progetto è Erlang. Esso è stato selezionato per i seguenti motivi: fornisce nativamente il supporto alla gestione di messaggi e scambio di essi tra diverse entità; permette di creare in poche righe di codice diversi beam a cui poter richiedere dei servizi; grazie alla libreria gen\_statem è possibile creare facilmente gli automi.
 
-In questo progetto non utilizzate piattaforme esterne di alcun genere, si assume che l'autenticazione tra utente e applicazione per il servizio sia già stata effettuata.
+In questo progetto non utilizzate piattaforme esterne di alcun genere poiché si assume che l'autenticazione tra utente e applicazione per il servizio sia già stata effettuata.
 
 Essendo un'architettura peer to peer, non è necessaria alcuna piattaforma a parte l'autenticazione cliente - servizio.
 
-\subsection{Generazione dell'ambiente virtuale}
+\section{Generazione dell'ambiente virtuale}
+Il problema della modellazione di una città è stato risolto con un grafo pesato connesso non orientato: si assume che se due nodi sono connessi è perché vi è una strada tra di essi ed è bidirezionale. Il peso indica quanto costa attraversarla. 
 
 \subsection{Entità presenti}
 \subsection{Automi}
 Per l'implementazione degli automi è stata utilizzato il behavior erlang "gen\_statem", il quale semplifica la costruzione di macchine a stati finiti guidate da eventi. Questo behavior è un framework con numerose primitive riguardanti questi costrutti: invio e ricezione di eventi sincroni o asincroni, impostazione di timer e molto altro. Gli schemi degli automi mostrati in ... sono stati implementati in modo relativamente veloce potendosi concentrare quasi esclusivamente sulla logica del loro funzionamento piuttosto che sui dettagli implementativi, nascosti appunto dal suddetto framework. 
 Qui di seguito si riporta un link alla documentazione ufficiale del framework: ...
+\subsection{Componenti del grafo}
+Ogni nodo del grafo possiede quattro proprietà:
+\begin{itemize}
+	\item attributo nome: generato del tipo ``aa'', ``ab'', ``ac'', ... incrementale per ogni nodo.
+	\item attributo id: numero incrementale per ogni nodo a partire da 0. Utilizzato per la definizione del grafo della città.
+	\item Coordinate X e Y: definiscono la posizione del nodo all'interno del piano cartesiano rappresentante la città.
+\end{itemize}
 
 Gli automi implementati rispettano fedelmente gli schemi mostrati ..., fatta eccezione per alcune mancanze e piccole modifiche che verranno ora elencate
 
@@ -43,10 +51,61 @@ Il codice dei diversi automi è organizzato con una struttura molto simile che s
 dwdqdw
 
 \subsection{Fornitori di servizi}
+Per quanto riguarda gli archi, essi posseggono tre proprietà:
+\begin{itemize}
+	\item Nodo 1 - Nodo 2 : indica quali nodi collega.
+	\item Peso: indica il peso dell'arco, calcolato in funzione della distanza tra i nodi che collega l'arco.
+\end{itemize}
 
-\subsection{Automa Elezione}
+Infine vengono selezionati alcuni nodi tra quelli del grafo che conterranno le colonnine di ricarica. Per far questo è stato applicato il seguente algoritmo:
+\begin{enumerate}
+	\item In base al numero totale delle colonnine, suddivisione del grafo in parti uguale.
+	\item Selezione di un nodo casuale all'interno della parte creata.
+	\item Per fornire una distribuzione abbastanza omogenea, ogni zona del grafo conterrà un'unica colonnina. Ad un nodo casuale della zona viene assegnata la colonnina.
+\end{enumerate}
 
-\subsection{Interazione tra i diversi moduli}
+\subsection{File generati}
+Il linguaggio utilizzato per la generazione della città è python. All'interno del file ``map\_generator'' è possibile impostare i diversi parametri per la generazione della città, vale a dire:
+\begin{itemize}
+\item WEIGHT\_MIN: Peso minimo degli archi.
+\item WEIGHT\_MAX:  Peso massimo degli archi.
+\item TOTAL\_NODES: Totale numero di nodi del grafo.
+\item TOTAL\_EDGES:  Totale numero di archi del grafo.
+\item TOTAL\_CHARGING\_COLS:  Totale numero delle colonnine di ricarica nel grafo.
+\item CARTESIAN\_SIDE:  Lato del quadrato cartesiano utilizzato per la mappa.
+\end{itemize}
+
+Per quanto riguarda il numero di colonnine, esso non è garantito essere rispettato per il seguente motivo: in base al numero impostato, il piano cartesiano viene suddiviso in parti uguali e, se i nodi non sono molto densi, può capitare che alcune di esse siano vuote. Per fornire una distribuzione abbastanza omogenea delle colonnine, esse vengono posizionate una per parte, vale a dire che in ogni zona, anche se sono presenti più nodi, solo uno di essi conterrà la colonnina. Per questi motivi nel caso in cui una parte delle colonnine occupi già tutti le zone disponibili l'altra parte non verrà posizionata.
+
+Lo script in python crea cinque file:
+\begin{itemize}
+	\item ``map.pdf'': 
+	\item ``map.png'':
+	\item ``city\_map\_nodes.dat'':
+	\item ``city\_map\_graph.dat'':
+	\item ``city\_map\_charging\_cols.dat'':
+\end{itemize}
+
+\section{Entità presenti}
+
+\section{Fornitori di servizi}
+
+\section{Automa Elezione}
+
+\section{Interazione tra i diversi moduli}
+
+
+Istruzioni per la compilazione ed esecuzione
+Scompattare il contenuto della cartella in una posizione a scelta. 
+Avviare erlang e posizionarsi all'interno della root del progetto. 
+Se assente, creare la cartella ``ebin'' sempre nella root.
+Eseguire il comando
+\lstinline|make:all().|
+Spostarsi nella cartella "ebin" tramite il comando
+\lstinline|cd("ebin").|
+\lstinline| PID_ENV = main:start_project().|
+Viene avviato l'environment 
+
 
 
 Details about the implementation: every choice about platforms, languages, software/hardware, middlewares, which has not been decided in the requirements.
