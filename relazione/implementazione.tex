@@ -65,5 +65,18 @@ Lo script in python crea cinque file:
 \section{Interazione tra i diversi moduli}
 
 
+Istruzioni per la compilazione ed esecuzione
+Scompattare il contenuto della cartella in una posizione a scelta. 
+Avviare erlang e posizionarsi all'interno della root del progetto. 
+Se assente, creare la cartella ``ebin'' sempre nella root.
+Eseguire il comando
+\lstinline|make:all().|
+Spostarsi nella cartella "ebin" tramite il comando
+\lstinline|cd("ebin").|
+\lstinline| PID_ENV = main:start_project().|
+Viene avviato l'environment 
+
+
+
 Details about the implementation: every choice about platforms, languages, software/hardware, middlewares, which has not been decided in the requirements.
 Important choices about implementation should be described here; e.g., peculiar data structures.
