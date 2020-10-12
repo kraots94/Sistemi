@@ -115,13 +115,13 @@ handle_common({call,From}, {changeDest, NewTarget}, OldState, State) ->
 					if  Res == changed_path ->
 							{changed_path, State#appUserState{request = {CurrentPosition, NewTarget}}};
 						true -> 
-							{cannot_change_path, State}
+							{Res, State}
 					end;
 				true ->
-				    {cannot_change_path, State}
+				    {user_in_car_queue, State}
 			end;
 		true ->
-			{cannot_change_path, State}
+			{invalid_target, State}
 	end,
 	{next_state, OldState, NewState, [{reply, From, Reply}]}.		
 		

@@ -156,7 +156,6 @@ idle(cast, {to_outside, {Target, Data}}, Stato) ->
 			if 
 				First == newNodeReached ->
 					ListUsersInQueue = Stato#taxiListenerState.usersInQueue,
-					io:format("queue: ~p~n",[ListUsersInQueue]),
 					NewList = if 
 						(Target == Stato#taxiListenerState.userCarrying) -> %è un cambio posizione del tipo che trasporto
 							OldRecord = hd(ListUsersInQueue),
@@ -207,7 +206,6 @@ idle({call, From}, {changeDestination, Request}, Stato) ->
 	UsersInQueue = Stato#taxiListenerState.usersInQueue,
 	if 
 		length(UsersInQueue) == 1 -> %and implicitamente chi chiede è quello servito, altrimento non sarebbe arrivato qua
-			io:format("posso"),
 			Self_Name =  Stato#taxiListenerState.name,
 			{Start, To, AppPid} = Request,
 			PidMoving = Stato#taxiListenerState.pidMoving,
@@ -233,12 +231,10 @@ idle({call, From}, {changeDestination, Request}, Stato) ->
 					NewListQueuedUsers = [NewRecord] ++ tl(OldListQueuedUsers),
 					{keep_state, Stato#taxiListenerState{usersInQueue = NewListQueuedUsers}, [{reply, From, changed_path}]};
 				true ->
-					io:format("non posso"),
-					{keep_state, [{reply, From, cannot_change_path}]}
+					{keep_state, Stato, [{reply, From, not_enough_battery}]}
 			end;
 		true ->
-			io:format("non posso"),
-			{keep_state, [{reply, From, cannot_change_path}]}
+			{keep_state, Stato, [{reply, From, user_in_car_queue}]}
 	end;
 
 ?HANDLE_COMMON.
@@ -248,7 +244,7 @@ idle({call, From}, {changeDestination, Request}, Stato) ->
 %% ====================================================================
 
 listen_election(info, {_From, tick}, _Stato) ->
-	keep_state_and_data; %per ora non fare nulla
+	keep_state_and_data; 
 
 listen_election(state_timeout, noReplyElectionInit, Stato) ->
 	PidElection = Stato#taxiListenerState.pidElection,
@@ -351,15 +347,10 @@ listen_election(cast, {election_results, Data}, Stato) ->
 	end,
 	{next_state, idle, NewState};
 
-listen_election(cast, OtherEvents, Stato) ->
+%tutti altri eventi posticipali
+listen_election(_Whatever, OtherEvents, Stato) ->
 	io:format("Evento posticipato: ~w", [OtherEvents]),
-	{keep_state, Stato, [postpone]};
-
-listen_election({call,From}, OtherEvents, Stato) ->
-	io:format("Evento posticipato: ~w", [OtherEvents]),
-	{keep_state, Stato, [postpone]};
-
-?HANDLE_COMMON.
+	{keep_state, Stato, [postpone]}.
 
 %% ====================================================================
 %% Internal functions
