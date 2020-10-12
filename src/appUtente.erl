@@ -271,6 +271,7 @@ checkValidityRequest(UserPos, Request) ->
 findTaxi(State) ->
 	send_message(State#appUserState.pidGPSModule, {getNearestCar}),
 	receive 
+		{already_running_election_wait} -> findTaxi(State); %potresti riceverli 
 		Nearest -> Nearest
 	end.
 

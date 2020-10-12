@@ -106,47 +106,41 @@ init(InitData) ->
 	print_car_message(State#taxiListenerState.name, "Car ready in position [~p]", InitialPos),
 	{ok, idle, State}.
 
-handle_common({call,From}, {areYouKillable}, OldState, State) ->
+%ricezione del tick
+idle(info, {_From, tick}, _Stato) -> keep_state_and_data; 
+
+idle({call,From}, {areYouKillable}, State) ->
 	PidMoving =  State#taxiListenerState.pidMoving,
 	IsMovingKillable = macchina_moving:areYouKillable(PidMoving),
-	if (OldState == idle) and (IsMovingKillable) -> {next_state, idle, State, [{reply,From,true}]};
-		true -> {next_state, OldState, State, [{reply,From,false}]}
+	if (IsMovingKillable) -> {keep_state, State, [{reply,From,true}]};
+		true -> {keep_state, State, [{reply,From,false}]}
 	end;
 
-handle_common(cast, {die}, _OldState, State) ->
+idle(cast, {die}, State) ->
 	killEntities(State);
 
-handle_common(cast, {crash}, OldState, State) ->
-	if 
-		OldState == listen_election -> 
-			io:format("Non dovevo essere qua~n");
-		true ->
-			print_car_message(State#taxiListenerState.name, "I am broken, now i notify my users and waiting for fix"),
-			PidMoving = State#taxiListenerState.pidMoving,
-			ListClients = State#taxiListenerState.usersInQueue,
-			lists:foreach(fun(User) -> 
-				AppUserPid = User#userInQueue.pid,
-				gen_statem:cast(AppUserPid ,{crash})
-			end, ListClients),
-			gen_statem:cast(PidMoving, {crash})
-	end,
-	{next_state, idle, State#taxiListenerState{usersInQueue = [], userCarrying = ""}};
+idle(cast, {crash}, State) ->
+	print_car_message(State#taxiListenerState.name, "I am broken, now i notify my users and waiting for fix"),
+	PidMoving = State#taxiListenerState.pidMoving,
+	ListClients = State#taxiListenerState.usersInQueue,
+	lists:foreach(fun(User) -> 
+		AppUserPid = User#userInQueue.pid,
+		gen_statem:cast(AppUserPid ,{crash})
+		end, ListClients),
+	gen_statem:cast(PidMoving, {crash}),
+	{keep_state, State#taxiListenerState{usersInQueue = [], userCarrying = ""}};
 
-handle_common(cast, {fixed}, _OldState, State) ->
-	print_car_message(State#taxiListenerState.name, "I am fixed, now i can serve again"),
+idle(cast, {fixed}, State) ->
+	print_car_message(State#taxiListenerState.name, "I am fixed, now I can serve again"),
 	PidMoving = State#taxiListenerState.pidMoving,
 	gen_statem:cast(PidMoving, {fixed}),
 	keep_state_and_data;
 
-handle_common(cast, {carrying, UserPid}, _OldState, State) ->
+idle(cast, {carrying, UserPid}, State) ->
 	{keep_state, State#taxiListenerState{userCarrying = UserPid}};
 
-handle_common(cast, {noMoreCarrying}, _OldState, State) ->
-	{keep_state, State#taxiListenerState{userCarrying = none}}.
-
-%ricezione del tick
-idle(info, {_From, tick}, _Stato) ->
-	keep_state_and_data; %per ora non fare nulla
+idle(cast, {noMoreCarrying}, State) ->
+	{keep_state, State#taxiListenerState{userCarrying = none}};
 
 % data out of this car
 idle(cast, {to_outside, {Target, Data}}, Stato) ->
@@ -217,7 +211,6 @@ idle({call, From}, {changeDestination, Request}, Stato) ->
 			City_Cols = City_Map#city.column_positions,			
 			NearestCol = get_nearest_col(To, City_Nodes, City_Cols),	
 			Points = {CurrentPos, Start, To, NearestCol},
-			io:format([?TILDE_CHAR] ++ "w "++[?TILDE_CHAR]++"n", [Points]),
 
 			{_CC, _CRDT, Feasible, QueueCar} = calculateFeasible(Points, BatteryLevel, {Graph_City, City_Nodes}, Self_Name),
 			if 
@@ -237,7 +230,8 @@ idle({call, From}, {changeDestination, Request}, Stato) ->
 			{keep_state, Stato, [{reply, From, user_in_car_queue}]}
 	end;
 
-?HANDLE_COMMON.
+idle(Whatever, What, Foo) ->
+	keep_state_and_data.
 
 %% ====================================================================
 %% ELECTION functions
@@ -349,7 +343,6 @@ listen_election(cast, {election_results, Data}, Stato) ->
 
 %tutti altri eventi posticipali
 listen_election(_Whatever, OtherEvents, Stato) ->
-	io:format("Evento posticipato: ~w", [OtherEvents]),
 	{keep_state, Stato, [postpone]}.
 
 %% ====================================================================
