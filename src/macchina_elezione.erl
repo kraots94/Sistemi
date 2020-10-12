@@ -21,6 +21,7 @@ callback_mode() -> [state_functions, state_enter].
 
 -record(carPartecipate, {refCar, costsCar, sentResults}).
 -record(electionCostData, {pid_source, cost_client, charge_after_transport}).
+%rappresentazione della richiesta dell'utente (usato da elezione)
 
 -record(electionState, {
 				pidCar,
