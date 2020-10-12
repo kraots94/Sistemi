@@ -11,12 +11,12 @@ PATH_MAP = sys.path[0]+PATH_SEPARATOR+".." + \
 PATH_GRAPH = sys.path[0]+PATH_SEPARATOR
 
 WEIGHT_MIN = 1
-WEIGHT_MAX = 20
-TOTAL_NODES = 30
-TOTAL_EDGES = 70
-TOTAL_CHARGING_COLS = 10
+WEIGHT_MAX = 40
+TOTAL_NODES = 10
+TOTAL_EDGES = 30
+TOTAL_CHARGING_COLS = 4
 CARTESIAN_SIDE = 20
-MAX_DISTANCE_SQUARED = CARTESIAN_SIDE*CARTESIAN_SIDE*2
+MAX_DISTANCE = math.sqrt(CARTESIAN_SIDE*CARTESIAN_SIDE*2)
 
 """convert positive decimal integer n to equivalent in another base (2-26)"""
 
@@ -159,8 +159,8 @@ def getNodeFromName(node_name, Nodes):
 def calculateWeight(U, V):
     P = {"x": U[1], "y": U[2]}
     Q = {"x": V[1], "y": V[2]}
-    squaredDistance = calculateSquaredDistance(P, Q)
-    return math.floor(mapValues(squaredDistance, 0, MAX_DISTANCE_SQUARED, WEIGHT_MIN, WEIGHT_MAX))
+    distance = math.sqrt(calculateSquaredDistance(P, Q))
+    return math.floor(mapValues(distance, 0, MAX_DISTANCE, WEIGHT_MIN, WEIGHT_MAX))
 
 def createPath(V, E):
     visitedList = []

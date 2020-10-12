@@ -4,7 +4,7 @@
 
 \chapter{Implementazione}
 
-Il linguaggio scelto per l'implementazione del progetto è Erlang. Esso è stato selezionato per i seguenti motivi: fornisce nativamente il supporto alla gestione di messaggi e scambio di essi tra diverse entità; permette di creare in poche righe di codice diversi beam a cui poter richiedere dei servizi; grazie alla libreria gen\_statem è possibile creare facilmente gli automi.
+Il linguaggio scelto per l'implementazione del progetto è Erlang. Esso è stato selezionato per diversi motivi tra cui: fornisce nativamente il supporto alla gestione di messaggi e scambio di essi tra diverse entità; permette di creare in poche righe di codice diversi beam a cui poter richiedere dei servizi; grazie alla libreria ``gen\_statem'' è possibile creare facilmente gli automi e le interazioni fra essi.
 
 In questo progetto non utilizzate piattaforme esterne di alcun genere poiché si assume che l'autenticazione tra utente e applicazione per il servizio sia già stata effettuata.
 
@@ -12,6 +12,8 @@ Essendo un'architettura peer to peer, non è necessaria alcuna piattaforma a par
 
 \section{Generazione dell'ambiente virtuale}
 Il problema della modellazione di una città è stato risolto con un grafo pesato connesso non orientato: si assume che se due nodi sono connessi è perché vi è una strada tra di essi ed è bidirezionale. Il peso indica quanto costa attraversarla. 
+
+Si immagina che i diversi nodi siano posizionati all'interno di un piano cartesiano, pertanto possiedono delle coordinate che ne indicano la posizione. Questo permette di capire la distanza tra di essi e quindi se diverse entità riescono a comunicare tra di loro.
 
 \subsection{Componenti del grafo}
 Ogni nodo del grafo possiede quattro proprietà:
@@ -23,18 +25,17 @@ Ogni nodo del grafo possiede quattro proprietà:
 
 Per quanto riguarda gli archi, essi posseggono tre proprietà:
 \begin{itemize}
-	\item Nodo 1 - Nodo 2 : indica quali nodi collega.
+	\item ID\_Nodo\_1 - ID\_Nodo\_2: indica quali nodi collega.
 	\item Peso: indica il peso dell'arco, calcolato in funzione della distanza tra i nodi che collega l'arco.
 \end{itemize}
 
 Infine vengono selezionati alcuni nodi tra quelli del grafo che conterranno le colonnine di ricarica. Per far questo è stato applicato il seguente algoritmo:
 \begin{enumerate}
-	\item In base al numero totale delle colonnine, suddivisione del grafo in parti uguale.
-	\item Selezione di un nodo casuale all'interno della parte creata.
-	\item Per fornire una distribuzione abbastanza omogenea, ogni zona del grafo conterrà un'unica colonnina. Ad un nodo casuale della zona viene assegnata la colonnina.
+	\item In base al numero totale delle colonnine, il piano cartesiano viene suddiviso in parti uguali.
+	\item Selezione di un nodo casuale all'interno della parte creata a cui assegnare la colonnina.
 \end{enumerate}
 
-\subsection{File generati}
+\subsection{Parametri per la generazione}
 Il linguaggio utilizzato per la generazione della città è python. All'interno del file ``map\_generator'' è possibile impostare i diversi parametri per la generazione della città, vale a dire:
 \begin{itemize}
 \item WEIGHT\_MIN: Peso minimo degli archi.
@@ -45,16 +46,54 @@ Il linguaggio utilizzato per la generazione della città è python. All'interno 
 \item CARTESIAN\_SIDE:  Lato del quadrato cartesiano utilizzato per la mappa.
 \end{itemize}
 
-Per quanto riguarda il numero di colonnine, esso non è garantito essere rispettato per il seguente motivo: in base al numero impostato, il piano cartesiano viene suddiviso in parti uguali e, se i nodi non sono molto densi, può capitare che alcune di esse siano vuote. Per fornire una distribuzione abbastanza omogenea delle colonnine, esse vengono posizionate una per parte, vale a dire che in ogni zona, anche se sono presenti più nodi, solo uno di essi conterrà la colonnina. Per questi motivi nel caso in cui una parte delle colonnine occupi già tutti le zone disponibili l'altra parte non verrà posizionata.
+Per quanto riguarda il numero di colonnine, esso non è garantito essere rispettato per il seguente motivo: come spiegato precedentemente, l'algoritmo utilizzato suddivide il piano in parti uguali ma potrebbe capitare nel caso esse siano piccole che non vi sia alcun nodo all'interno. Dato che in ogni zona è presente al più una colonnina, può capitare che non siano presenti zone con nodi liberi a cui assegnare le rimanenti.
 
+\subsection{File generati}
 Lo script in python crea cinque file:
 \begin{itemize}
-	\item ``map.pdf'': 
-	\item ``map.png'':
-	\item ``city\_map\_nodes.dat'':
-	\item ``city\_map\_graph.dat'':
-	\item ``city\_map\_charging\_cols.dat'':
+	\item ``map.pdf'': I dati generati per il grafo vengono esportati nel formato dot e da esso viene generato questo file al cui interno è presente una rappresentazione visuale del grafo: sono presenti i nodi con le proprietà descritte precedentemente e gli archi con delle etichette rappresentanti il loro peso. Un esempio del pdf prodotto è l'immagine \ref{fig:esempio_citta_dot}.
+	\item ``map.png'': Rappresentazione visuale delle posizioni dei nodi all'interno del piano cartesiano. I nodi colorati di rosso sono quelli contenenti le colonnine di ricarica. Un esempio del png prodotto è l'immagine \ref{fig:esempio_citta_png}.
+	\item ``city\_map\_nodes.dat'': file testuale contenente i dati dei nodi formattati in modo da essere compatibili con la struttura creata in erlang. Un esempio è il seguente:
+	\begin{lstlisting}
+		10
+		a 0 1 4
+		b 1 2 12
+		c 2 3 12
+		d 3 3 16
+		e 4 5 2
+		...
+	\end{lstlisting}
+	\item ``city\_map\_graph.dat'': file testuale contenente i dati del grafo formattato in modo da essere compatibile con la libreria utilizzata in erlang. Un esempio è il seguente:
+	\begin{lstlisting}
+		10 30 undirected d
+		6 0 17
+		0 1 12
+		1 8 18
+		8 4 20
+		4 7 14
+		7 3 21
+		3 9 18
+		...
+	\end{lstlisting}
+	\item ``city\_map\_charging\_cols.dat'': file testuale contenente i dati dei nodi delle colonnine. Essi sono formattati in modo da essere compatibili con la struttura creata in erlang. Lo stile è il medesimo del file ``city\_map\_nodes.dat''.
+	
 \end{itemize}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=14cm]{esempio_citta_dot.jpg}
+	\caption{Esempio di grafo utilizzato per la simulazione della città.}
+	\label{fig:esempio_citta_dot}
+\end{figure}
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=8cm]{esempio_citta_png.jpg}
+	\caption{Esempio del posizionamento dei nodi all'interno della città.}
+	\label{fig:esempio_citta_png}
+\end{figure}
+
 
 \section{Entità presenti}
 
@@ -64,17 +103,6 @@ Lo script in python crea cinque file:
 
 \section{Interazione tra i diversi moduli}
 
-
-Istruzioni per la compilazione ed esecuzione
-Scompattare il contenuto della cartella in una posizione a scelta. 
-Avviare erlang e posizionarsi all'interno della root del progetto. 
-Se assente, creare la cartella ``ebin'' sempre nella root.
-Eseguire il comando
-\lstinline|make:all().|
-Spostarsi nella cartella "ebin" tramite il comando
-\lstinline|cd("ebin").|
-\lstinline| PID_ENV = main:start_project().|
-Viene avviato l'environment 
 
 
 
