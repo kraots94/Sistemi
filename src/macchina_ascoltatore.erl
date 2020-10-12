@@ -234,7 +234,8 @@ idle({call, From}, {changeDestination, Request}, Stato) ->
 			{keep_state, Stato, [{reply, From, user_in_car_queue}]}
 	end;
 
-idle(Whatever, What, Foo) ->
+%nel caso di ricezione di eventi che non matchano con nulla...evento molto improbabile
+idle(_WhateverType, _WhateverEvent, _WhateverState) ->
 	keep_state_and_data.
 
 %% ====================================================================
@@ -346,8 +347,8 @@ listen_election(cast, {election_results, Data}, Stato) ->
 	{next_state, idle, NewState};
 
 %tutti altri eventi posticipali
-listen_election(_Whatever, OtherEvents, Stato) ->
-	{keep_state, Stato, [postpone]}.
+listen_election(_WhateverType, _WhateverEvent, WhateverState) ->
+	{keep_state, WhateverState, [postpone]}.
 
 %% ====================================================================
 %% Internal functions
