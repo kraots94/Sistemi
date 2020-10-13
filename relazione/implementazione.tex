@@ -5,24 +5,23 @@
 \chapter{Implementazione}
 
 \section{Automi} \label{implementazioneAutomi}
-Per l'implementazione degli automi è stata utilizzato ``gen\_statem'', il behavior erlang che semplifica la costruzione di macchine a stati finiti guidate da eventi. Questo behavior è un framework con numerose primitive riguardanti questi costrutti: invio e ricezione di eventi sincroni o asincroni, impostazione di timer e molto altro. Gli schemi degli automi mostrati in ... sono stati implementati in modo relativamente veloce potendosi concentrare quasi esclusivamente sulla logica del loro funzionamento piuttosto che sui dettagli implementativi, nascosti appunto dal suddetto framework. 
-Qui di seguito si riporta un link alla documentazione ufficiale del framework: ...
+Per l'implementazione degli automi è stata utilizzato ``gen\_statem'', il behavior erlang che semplifica la costruzione di macchine a stati finiti guidate da eventi. Questo behavior è un framework con numerose primitive riguardanti questi costrutti: invio e ricezione di eventi sincroni o asincroni, impostazione di timer e molto altro. Gli automi discussi in \ref{automi} sono stati implementati in modo relativamente veloce potendosi concentrare quasi esclusivamente sulla logica del loro funzionamento piuttosto che sui dettagli implementativi, nascosti appunto dal suddetto framework. 
+Qui di seguito si riporta un link alla documentazione ufficiale del framework: \url{https://erlang.org/doc/man/gen_statem.html}.
 
 I sorgenti sono stati opportunatamente commentati per descrivere il funzionamento del codice ma è opportuno compiere una descrizione generale di questi automi, soffermandosi sulle scelte implementative effettuate.
 
-Gli automi implementati rispettano fedelmente gli schemi mostrati ..., fatta eccezione per alcune mancanze e piccole modifiche che verranno ora elencate
+Gli automi implementati rispettano fedelmente gli schemi mostrati \ref{automi}, fatta eccezione per alcune mancanze e piccole modifiche che verranno ora elencate
 
 \begin{itemize}
 	\item Negli schemi progettuali si mostrava come la comunicazione fra automi interni a un'automobile non avvenisse mai in modo diretto, infatti l'ascoltatore del mezzo si comportava da proxy fra i due automi. Questa scelta progettuale è stata rivista in fase di implementazione, infatti si è ritenuto più veloce permettere una comunicazione diretta, ottenendo anche un codice più snello, pulito e dal comportamento più chiaro. 
 	La comunicazione fra un automa interno al veicolo e un automa esterno, come per esempio fra l'automa dell'elezione e l'applicazione utente, avviene tuttavia usando l'ascoltatore come proxy, il quale infatti è l'interfaccia col mondo esterno per un veicolo. Questo ha permesso di diminuire le dipendeze fra i diversi automi: un automa esterno al mezzo deve conoscere soltanto l'ascoltatore per poter comunicare con il veicolo e tutte le sue istanze.
-	\item come descritto sopra in ... non è stato aggiunto il cambiamento della topologia cittadina, pertanto gli automi non presentano gli eventi correlati.
 	\item Negli schemi progettuali erano stati inseriti molti stati che non presentano una controparte nel codice, questi erano stati definiti in fase di progettazione per chiarire le idee sui comportamenti degli automi, o per rendere gli schemi più espressivi, ma non si è ritenuto utile o conveniente inserirli nella loro implementazione. Il comportamento degli automi non è stato tuttavia intaccato dall'eliminazione di questi stati. 
 	\item Similmente agli stati, alcuni eventi riportati negli schemi progettuali non presentano una controparte "esatta" negli automi, nel senso che i nomi di questi eventi sono stati ridefiniti in fase implementativa trovando alternative più espressive o, in generale, migliori per le esigenze del codice. Anche in questo caso il comportamento non è stato intaccato ed è possibile trovare un isomorfismo fra i nomi degli eventi inseriti negli schemi e quelli inseriti nel codice.
-	\item Per la temporizzazione, in fase di progettazione, si faceva riferimento all'uso di orologi interni, i quali scandivano il tempo attraverso l'uso dei più volte citati "Tick". Questo è stato implementato con il server tick sopra mostrato ... tuttavia per alcuni particolari casi si è preferito utilizzare i timer del behavior gen\_statem. La preferenza nell'uso dei due strumenti dipende dal particolare caso ma gran parte del codice usa i Tick per la temporizzazione.
+	\item Per la temporizzazione, in fase di progettazione, si faceva riferimento all'uso di orologi interni, i quali scandivano il tempo attraverso l'uso dei più volte citati ``Tick''. Questo è stato implementato con il modulo gestione tempo sopra mostrato \ref{modules} tuttavia per alcuni particolari casi si è preferito utilizzare i timer del behavior ``gen\_statem''. La preferenza nell'uso dei due strumenti dipende dal particolare caso ma gran parte del codice usa i Tick per la temporizzazione.
 \end{itemize}
 
 \subsection{Struttura generale} \label{strutturaGeneraleAutomi}
-I diversi automi implementati presentano tutti uno stato interno, inteso come una propria memoria che varia durante l'esecuzione, ed è importante non confondersi con lo stato della macchina a stati finiti, la similitudine fra i due termini si presta a diversi fraintendimenti e d'ora in poi si userà il termine "memoria" per indicare lo stato con questa accezione. La memoria di ogni automa è stata modellata definendo un record specifico, il quale aggrega tutti i dati necessari.
+I diversi automi implementati presentano tutti uno stato interno, inteso come una propria memoria che varia durante l'esecuzione, ed è importante non confondersi con lo stato della macchina a stati finiti, la similitudine fra i due termini si presta a diversi fraintendimenti e d'ora in poi si userà il termine ``memoria'' per indicare lo stato con questa accezione. La memoria di ogni automa è stata modellata definendo un record specifico, il quale aggrega tutti i dati necessari.
 
 Il codice dei diversi automi è organizzato con una struttura molto simile che si può schematizzare in queste 5 sezioni:
 
@@ -36,21 +35,30 @@ Il codice dei diversi automi è organizzato con una struttura molto simile che s
 
 Ogni automa nel codice ha questa suddivisione e i file col codice sono stati opportunatamente marcati con dei commenti per enfatizzare questa struttura. Ulteriori commenti sono stati sparpagliati nel codice per semplificarne la comprensione, in particolar modo sono stati definiti dei contratti nei metodi delle API.
 
-\subsection{eventi globali - la funzione Handle\_Common} \label{eventiGlobaliAutomi}
-In questa sezione si descrive come sono stati gestiti gli eventi globali negli automi, ossia eventi che possono essere ricevuti in stati diversi dell'automa. Come descritto sopra, la sezione 4 del codice raccoglie le funzioni che descrivono la logica dell'automa, il behavior gen\_statem e il pattern matching di Erlang garantiscono che, se l'automa si trova in un certo stato e riceve un particolare evento, verrà eseguita la funzione insrita in questa sezione che rappresenta la particolare combinazione stato-evento; questa, eventulamente, modificherà la memoria del processo e/o  effettuerà un cambiamento di stato. 
+\subsection{Eventi Globali - la funzione ``handle\_common''} \label{eventiGlobaliAutomi}
+In questa sezione si descrive come sono stati gestiti gli eventi globali negli automi, ossia eventi che possono essere ricevuti in stati diversi dell'automa. Come descritto sopra, la sezione 4 del codice raccoglie le funzioni che descrivono la logica dell'automa, il behavior ``gen\_statem'' e il pattern matching di Erlang garantiscono che, se l'automa si trova in un certo stato e riceve un particolare evento, verrà eseguita la funzione insrita in questa sezione che rappresenta la particolare combinazione stato-evento; questa, eventulamente, modificherà la memoria del processo e/o  effettuerà un cambiamento di stato. 
 Qui viene riportato un frammento di codice che mostra una di queste funzioni: 
 
-codiceStatoEventoAutoma.erl
+\begin{lstlisting}
+waiting_car_queued(cast, taxiServingYou, State) ->
+	{next_state, waiting_car, State};
+\end{lstlisting}
 
-si noti come il secondo parametro della funzione indichi il nome dell'evento che triggera l'esecuzione del codice, mentre il nome della funzione indica lo stato.
+Si noti come il secondo parametro della funzione indichi il nome dell'evento che triggera l'esecuzione del codice, mentre il nome della funzione indica lo stato.
 
 Gli eventi globali portano a un ovvio overhead se implementati in questo modo, infatti per un evento ricevibile in N stati è necessario scrivere N funzioni diverse, se il comportamento è lo stesso in tutti gli stati questo comporta la scrittura di N funzioni tutte uguali ottenendo ulteriormente numerose dipendeze.
 
-Grazie alle comode primitive Erlang si può definire una sola funziona che gestisca lo stesso evento per stati diversi, nel progetto in esame questa è stata chiamata handle\_common. Nella sezione 4 di quasi tutti gli automi, in testa, sono state definite diverse funzioni handle\_common che adempiono, appunto, a questo scopo. Ne viene qui riportato un esempio;
+Grazie alle comode primitive Erlang si può definire una sola funziona che gestisca lo stesso evento per stati diversi, nel progetto in esame questa è stata chiamata ``handle\_common''. Nella sezione 4 di quasi tutti gli automi, in testa, sono state definite diverse funzioni ``handle\_common'' che adempiono, appunto, a questo scopo. Ne viene qui riportato un esempio;
 
-esempioEventoGlobale.erl
+\begin{lstlisting}
+%ricezione del comando di terminazione
+handle_common(cast, {die}, _OldState, State) ->
+	PidGpsModule = State#appUserState.pidGPSModule,
+	gps_module:end_gps_module(PidGpsModule),
+	gen_statem:stop(self());
+\end{lstlisting}
 
-Queste funzioni hanno una firma diversa in base all'evento: l'atomo inserito come secondo parametro della funzione indica quale evento "triggera" l'esecuzione di quel codice.
+Queste funzioni hanno una firma diversa in base all'evento: l'atomo inserito come secondo parametro della funzione indica quale evento ``triggera'' l'esecuzione di quel codice.
 
 \subsection{automa elezione}
 

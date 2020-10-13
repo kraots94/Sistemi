@@ -152,8 +152,8 @@ Sono stati gestiti sette tipi di eventi. Di seguito l'identificativo dell'evento
 	\item 1 Spawn car: questo evento causa la creazione di una macchina in un punto casuale della città. La creazione viene discussa nella parte \ref{creazione_distruzione_entita}.
 	\item 2 Spawn user: questo evento causa la creazione di un utente in un punto casuale della città con una destinazione random. Maggiori informazioni sono presenti nella parte \ref{creazione_distruzione_entita}
 	\item 3 Change target: quando occorre questo evento un utente casuale oppure quello passato per parametro cambierà la propria destinazione se possibile.
-	\item 4 Car crash: una macchina scelta casualmente o determinata dal parametro passato passerà dallo stato normale a crash. Maggiori informazioni nella parte RIFERIMENTO\_CAR\_CRASH. Il suo pid viene aggiunto alla lista cars\_crashed. Nel caso venga selezionata una macchina già in quello stato viene stampato un messaggio di errore.
-	\item 5 Car fix: una tra le macchine presenti nella lista cars\_crashed viene selezionata e ripatata tramite l'apposito evento. 
+	\item 4 Car crash: una macchina scelta casualmente o determinata dal parametro passato passerà dallo stato normale a crash. Maggiori informazioni nella parte RIFERIMENTO\_CAR\_CRASH. Il suo pid viene aggiunto alla lista ``cars\_crashed''. Nel caso venga selezionata una macchina già in quello stato viene stampato un messaggio di errore.
+	\item 5 Car fix: una tra le macchine presenti nella ``lista cars\_crashed'' viene selezionata e ripatata tramite l'apposito evento. 
 	\item 6 Remove Car: una macchina in stato ``idle'' viene rimossa dalla mappa. Se la macchina selezionata non è in idle si cerca una seconda macchia e via via fino al valore limite della variabile globale ``max\_kill\_tries''. Questo limite è dovuto alla volontà di evitare situazioni di stallo.
 \end{itemize}
 
@@ -172,13 +172,13 @@ I dati di cui necessita una macchina sono: posizione di partenza, pid del server
 Il modulo della macchina crea le proprie istanze come spiegato al punto REF\_SPAWN\_MACCHINA
 
 \subsubsection{Creazione di un utente}
-I dati di cui necessita un utente sono: posizione di partenza, richiesta di trasporto formata dalle due posizioni di partenza e arrivo, pid del server gps per la propria applicazione e nome dell'utente. Il pid del server gps serve poichè è l'automa utente a creare l'automa app\_utente. Il punto di partenza della richiesta deve essere lo stesso della posizione iniziale dell'utente. In caso contrario viene generato un messaggio di errore. Come per la macchina, anche dopo la creazione dell'utente vengono aggiornate le relative liste.
+I dati di cui necessita un utente sono: posizione di partenza, richiesta di trasporto formata dalle due posizioni di partenza e arrivo, pid del server gps per la propria applicazione e nome dell'utente. Il pid del server gps serve poichè è l'automa utente a creare l'automa ``app\_utente''. Il punto di partenza della richiesta deve essere lo stesso della posizione iniziale dell'utente. In caso contrario viene generato un messaggio di errore. Come per la macchina, anche dopo la creazione dell'utente vengono aggiornate le relative liste.
 
 \subsubsection{Eliminazione di una macchina}
 Come già accennato nella parte \ref{env_events}, l'eliminazione di una macchina dall'ambiente avviene solo se essa si trova nello stato di idle. Questa scelta è stata fatta perché simile alla realtà. Una volta individuata, le si invia il segnale di morte e la si rimuove dalla lista delle macchine nell'ambiente. Inoltre viene rimossa la sua coppia nome-pid nel dizionario.
 
 \subsubsection{Rimozione di un utente dall'ambiente}
-Quando un utente è giunto a destinazione, considera compiuto il proprio dovere ed invoca il metodo dell'environment ``removeUser'' che ne elimina i riferimenti dallo stato come già spiegato per la macchina.
+Quando un utente è giunto a destinazione, esso considera compiuto il proprio dovere ed invoca il metodo dell'environment ``removeUser'' che ne elimina i riferimenti dallo stato come già spiegato per la macchina.
 
 \section{Mappa città e relativi algoritmi} \label{citta_e_algoritmi}
 Il record ``city'' contiene cinque parametri:
