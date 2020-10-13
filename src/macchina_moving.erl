@@ -535,11 +535,12 @@ calculateNewState(Stato, TappaAttuale, Tappe) ->
 			ProssimaTappa = hd(NuoveTappe),
 			ProssimoUtente = ProssimaTappa#tappa.user,
 			ProssimoTipo = ProssimaTappa#tappa.type,
+			ProssimoTempo = ProssimaTappa#tappa.t,
 			if 
 				ProssimoUtente /= TappaAttuale#tappa.user ->
 					taxiServingAppId(ProssimoUtente, NewState),
 					if 
-						(ProssimoTipo =:= user_start) -> %caso in cui il prossimo utente è nel nodo attuale
+						(ProssimoTipo =:= user_start) and (ProssimoTempo =:= 0) -> %caso in cui il prossimo utente è nel nodo attuale
 							arrivedInUserPosition(ProssimoUtente, NewState),
 							NuoveNuoveTappe = tl(NuoveTappe),
 							NewState#movingCarState{tappe = NuoveNuoveTappe, 

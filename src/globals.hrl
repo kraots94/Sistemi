@@ -1,6 +1,6 @@
 -define(TILDE_CHAR, 126).
 
-% paths for ECLIPSE
+%paths for ECLIPSE
 %-define(FILE_MAP, "map/city_map_graph.dat").
 %-define(FILE_NODES, "map/city_map_nodes.dat").
 %-define(FILE_CHARGING_COLS, "map/city_map_charging_cols.dat").

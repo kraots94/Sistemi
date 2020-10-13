@@ -133,7 +133,7 @@ Sono stati gestiti sette tipi di eventi. Di seguito l'identificativo dell'evento
 
 Nel caso in cui il flag ``autoEvents'' dello stato sia impostato a ``true'', il contatore dei tick ricevuti inizierà ad accumulare il tempo trascorso. In base alla variabile globale ``ticks\_event'' vengono determinati ogni quanti tick ricevuti debba acccadere un evento casuale tra quelli appena discussi.
 
-Tramite le API fornite dal modulo è possibile innescare un determinato evento tramite la funzione ``triggerEvent'' e l'identificativo dell'evento desiderato. In alternativa è possibile utilizzare le funzioni già pronte per gli eventi a cui si può passare i parametri desiderati. Maggiori informazioni sono presenti nella documentazione dei singoli metodi.
+Tramite le API fornite dal modulo è possibile innescare un determinato evento tramite la funzione ``triggerEvent'' e l'identificativo dell'evento desiderato. In alternativa è possibile utilizzare le funzioni già pronte per gli eventi a cui si può passare i parametri desiderati. Maggiori informazioni sono nella parte \ref{esecuzione_codice}.
 
 \subsection{Creazione ed eliminazione delle entità} \label{creazione_distruzione_entita}
 La creazione l'eliminazione di una determinata entità comportano diverse modifiche allo stato dell'environment, pertanto verranno analizzate in modo separato.
@@ -153,174 +153,6 @@ Come già accennato nella parte \ref{env_events}, l'eliminazione di una macchina
 
 \subsubsection{Rimozione di un utente dall'ambiente}
 Quando un utente è giunto a destinazione, esso considera compiuto il proprio dovere ed invoca il metodo dell'environment ``removeUser'' che ne elimina i riferimenti dallo stato come già spiegato per la macchina.
-
-\section{Automi} \label{implementazioneAutomi}
-Per l'implementazione degli automi è stata utilizzato ``gen\_statem'', il behavior erlang che semplifica la costruzione di macchine a stati finiti guidate da eventi. Questo behavior è un framework con numerose primitive riguardanti questi costrutti: invio e ricezione di eventi sincroni o asincroni, impostazione di timer e molto altro. Gli automi discussi in \ref{automi} sono stati implementati in modo relativamente veloce potendosi concentrare quasi esclusivamente sulla logica del loro funzionamento piuttosto che sui dettagli implementativi, nascosti appunto dal suddetto framework. 
-Qui di seguito si riporta un link alla documentazione ufficiale del framework: \url{https://erlang.org/doc/man/gen_statem.html}.
-
-I sorgenti sono stati opportunatamente commentati per descrivere il funzionamento del codice ma è opportuno compiere una descrizione generale di questi automi, soffermandosi sulle scelte implementative effettuate.
-
-Gli automi implementati rispettano fedelmente gli schemi mostrati \ref{automi}, fatta eccezione per alcune mancanze e piccole modifiche che verranno ora elencate
-
-\begin{itemize}
-	\item Negli schemi progettuali si mostrava come la comunicazione fra automi interni a un'automobile non avvenisse mai in modo diretto, infatti l'ascoltatore del mezzo si comportava da proxy fra i due automi. Questa scelta progettuale è stata rivista in fase di implementazione, infatti si è ritenuto più veloce permettere una comunicazione diretta, ottenendo anche un codice più snello, pulito e dal comportamento più chiaro. 
-	La comunicazione fra un automa interno al veicolo e un automa esterno, come per esempio fra l'automa dell'elezione e l'applicazione utente, avviene tuttavia usando l'ascoltatore come proxy, il quale infatti è l'interfaccia col mondo esterno per un veicolo. Questo ha permesso di diminuire le dipendeze fra i diversi automi: un automa esterno al mezzo deve conoscere soltanto l'ascoltatore per poter comunicare con il veicolo e tutte le sue istanze.
-	\item Negli schemi progettuali erano stati inseriti molti stati che non presentano una controparte nel codice, questi erano stati definiti in fase di progettazione per chiarire le idee sui comportamenti degli automi, o per rendere gli schemi più espressivi, ma non si è ritenuto utile o conveniente inserirli nella loro implementazione. Il comportamento degli automi non è stato tuttavia intaccato dall'eliminazione di questi stati. 
-	\item Similmente agli stati, alcuni eventi riportati negli schemi non presentano una controparte ``esatta'' negli automi, nel senso che i nomi di questi eventi sono stati ridefiniti in fase implementativa trovando alternative più espressive o, in generale, migliori per le esigenze del codice. Anche in questo caso il comportamento non è stato intaccato ed è possibile trovare un isomorfismo fra i nomi degli eventi inseriti negli schemi e quelli inseriti nel codice.
-	\item Per la temporizzazione, in fase di progettazione, si faceva riferimento all'uso di orologi interni, i quali scandivano il tempo attraverso l'uso dei più volte citati ``Tick''. Questo è stato implementato con il modulo gestione tempo come mostrato al punto \ref{modules}, tuttavia per alcuni particolari casi si è preferito utilizzare i timer del behavior ``gen\_statem''. La scelta effettuata dipende dal particolare caso ma gran parte del codice usa i Tick per la temporizzazione.
-\end{itemize}
-
-\subsection{Struttura generale} \label{strutturaGeneraleAutomi}
-I diversi automi implementati presentano tutti uno stato interno, inteso come una propria memoria che varia durante l'esecuzione, ed è importante non confondersi con lo stato della macchina a stati finiti, la similitudine fra i due termini si presta a diversi fraintendimenti e d'ora in poi si userà il termine ``memoria'' per indicare lo stato con questa accezione. La memoria di ogni automa è stata modellata definendo un record specifico, il quale aggrega tutti i dati necessari.
-
-Il codice dei diversi automi è organizzato con una struttura molto simile che si può schematizzare in queste 5 sezioni:
-
-\begin{enumerate}
-	\item Codice per l'importazione di metodi da moduli esterni,importazioni di costanti definite esternamente, esportazione di metodi, definizione di costanti utilizzate solo localmente.
-	\item definizione del record specifico per l'automa: secondo quanto detto ne modella la sua memoria.
-	\item elenco dell'API dell'automa: inteso come le funzionalità della sua interfaccia, esportate per essere usate da altri automi.
-	\item funzioni dell'automa: ricalcano gli stati dell'automa e i possibili comportamenti a seguito della ricezione dei vari eventi, ogni funzione inserita in questa sezione rappresenta una combinazione stato automa-evento ricevibile in quello stato, la logica dell'automa è raccolta in questa sezione.
-	\item funzioni interne: usate localmente.
-\end{enumerate}
-
-Ogni automa nel codice ha questa suddivisione e i file col codice sono stati opportunatamente marcati con dei commenti per enfatizzare questa struttura. Ulteriori commenti sono stati disposti nel codice per semplificarne la comprensione, in particolar modo sono stati definiti dei contratti nei metodi delle API.
-
-\subsection{Eventi Globali - la funzione ``handle\_common''} \label{eventiGlobaliAutomi}
-In questa sezione si descrive come sono stati gestiti gli eventi globali negli automi, ossia eventi che possono essere ricevuti in stati diversi dell'automa. Come descritto sopra, la sezione 4 del codice raccoglie le funzioni che descrivono la logica dell'automa, il behavior ``gen\_statem'' e il pattern matching di Erlang garantiscono che, se l'automa si trova in un certo stato e riceve un particolare evento, verrà eseguita la funzione insrita in questa sezione che rappresenta la particolare combinazione stato-evento; questa, eventulamente, modificherà la memoria del processo e/o  effettuerà un cambiamento di stato. 
-Qui viene riportato un frammento di codice che mostra una di queste funzioni: 
-
-\begin{lstlisting}
-waiting_car_queued(cast, taxiServingYou, State) ->
-	{next_state, waiting_car, State};
-\end{lstlisting}
-
-Si noti come il secondo parametro della funzione indichi il nome dell'evento che ``triggera'' l'esecuzione del codice, mentre il nome della funzione indica lo stato.
-
-Gli eventi globali portano a un ovvio overhead se implementati in questo modo, infatti per un evento ricevibile in N stati è necessario scrivere N funzioni diverse, se il comportamento è lo stesso in tutti gli stati questo comporta la scrittura di N funzioni tutte uguali ottenendo ulteriormente numerose dipendeze.
-
-Grazie alle comode primitive Erlang si può definire una sola funziona che gestisca lo stesso evento per stati diversi, nel progetto in esame questa è stata chiamata ``handle\_common''. Nella sezione 4 di quasi tutti gli automi, in testa, sono state definite diverse funzioni ``handle\_common'' che adempiono, appunto, a questo scopo. Ne viene qui riportato un esempio;
-
-\begin{lstlisting}
-%ricezione del comando di terminazione
-handle_common(cast, {die}, _OldState, State) ->
-	PidGpsModule = State#appUserState.pidGPSModule,
-	gps_module:end_gps_module(PidGpsModule),
-	gen_statem:stop(self());
-\end{lstlisting}
-
-Queste funzioni hanno una firma diversa in base all'evento: l'atomo inserito come secondo parametro della funzione indica quale evento ``triggera'' l'esecuzione di quel codice.
-
-\section{Automi Macchina} \label{automiMacchina}
-
-le macchine, come mostrato negli schemi progettuali, presentano più automi che lavorano in parallelo: automa ``ascoltatore'', automa ``gestione movimento'', ``gestione batteria'' ed ``elezione''. La descrizione sommaria di questi è già stata affrontata in \ref{automi}, in questa sezione verrà fatta una descrizione di essi soffermandosi sugli aspetti principali della loro implementazione.
-
-\subsection{Automa ascoltatore} \label{automaAscoltatore}
-
-L'automa ascoltatore, o listener, è il padre della gerarchia che rappresenta i vari automi del mezzo. Quando l'environment genera un nuovo taxi si preoccupa soltanto di inizializzare un automa di questo tipo, il quale automaticamente creerà tutti i restanti automi sottostanti mantenendo un riferimento a ognuno di essi nella propria memoria. Oltre ad essi, l'ascoltatore si impegna a creare anche il modulo gps usato dall'auto e il ``server tick'', indicando ad esso di inserire fra gli abbonati tutti gli automi del mezzo, così da garantire una temporizzazione sincronizzata. Se l'environment è interessato a provocare qualche evento che intacca i taxi, comunica soltanto con questo automa, il quale poi comunicherà con gli opportuni automi sottostanti.
-
-\subsubsection{Lista di utenti in coda} \label{usersInQueue}
-
-Per semplificare la gestione di incidenti, cambi di destinazione, cambiamenti alla topologia della mappa cittadina, si è pensato di mantenere nell'ascoltatore una lista di tutti gli utenti in coda per il taxi. In particolare, è stato definito uno speciale record che rappresenta una ``comanda'' del taxi, ossia una istanza di richiesta del servizio da parte di un utente.
-Questo record è definito nel sorgente di questo automa e si chiama ``userInQueue'', esso presenta questi 3 campi:
-
-\begin{enumerate}
-	\item pid = il pid dell'applicazione dell'utente richiedente il servizio
-	\item position = la posizione attuale del cliente 
-	\item target = la destinazione del cliente
-\end{enumerate}
-
-Nella propria memoria, un ascoltatore, mantiene una lista di record di questo tipo, uno per ogni cliente in coda.
-Nel caso in cui accadano gli eventi sopra citati, tale lista viene consultata in questi modi:
-\begin{itemize}
-	\item incidente: per ogni elemento della lista, viene inviato al pid dell'applicativo la notifica di incidente.
-	\item cambio di destinazione: viene fatto un controllo sulla lunghezza della lista, se questa presenta un solo elemento significa che c'è un solo utente accodato ed è possibile il cambio di desinazione, ne viene quindi calcolata la fattibilità in base alla batteria attuale. Se la lista presenta più elementi allora non è possibile il cambio e l'app dell'utente richiedente viene opportunatamente notificata.
-	\item cambio di topologia: per ogni elemento della lista, viene calcolato se è possibile garantire quella comanda considerando il cambiamento appena avvenuto nei percorsi, notificando le relative app in base all'esito. Questo aspetto è stato trattato in \ref{aggiornamentoMappa}.
-\end{itemize}
-
-\subsubsection{Legame con automa elezione} \label{listenerElection}
-Questo automa lavora a stretto contatto con l'automa dell'elezione, essi concorrono a garantire all'utente richiedente il servizio un giusto candidato. Quando l'ascoltatore riceve dall'utente la richiesta, oppure la partecipazione all'elezioni da altri taxi, inoltra all'automa elezione quest'ultima e attende il processamento dell'algoritmo distribuito. Al termine dell'esecuzione di questo algoritmo, l'ascoltatore riceve uno specifico evento contenente l'ouptut, come spiegato nel punto \ref{implementazione_algoritmo_elezione}: in esso è presente il riferimento al taxi vincitore e se questo combacia con se stesso significa che il taxi si dovrà spostare verso nuovi nodi. Questo comporta un aggiornamento della lista dei punti da visitare, aspetto che verrà affrontato nelle prossime sezioni quando si parlerà dell'automa gestione movimento.
-
-\subsection{Automa batteria} \label{automaBatteria}
-Questo automa si proccupa di controllare il livello della batteria del mezzo, controllando se questa è inferiore o superiore a certi valori di soglia e in base ai casi notificare il mezzo se è necessario andare a ricaricare oppure se non è più necessario continuare la ricarica.
-
-Inoltre, questo automa controlla se il mezzo è stazionario da un lungo intervallo di tempo e in tal caso lo notifica riguardo alla necessità di iniziare la ricarica con pannelli solari. Questa forma di ricarica è più lenta di quella con colonnina ma è stata implementata in modo da evitare casi di stallo del veicolo. Infatti, un taxi potrebbe rimanere fermo su un nodo, impossibilitato a vincere nuove elezioni a causa di una batteria troppo bassa. 
-
-\subsection{Automa gestione movimento} \label{automaMoving}
-
-Questo automa si preoccupa di garantire lo spostamento del mezzo, l'automa ascooltatore invia ad esso le tappe da percorrere secondo quanto detto in \ref{listenerElection}.
-Per tappa si intende dire uno spostamnto fra due nodi adiacenti. Concettualmente questo automa ha o scopo di consumare le tappe ricevute dall'esterno e notificare il suo ascoltatore di avvisare eventuali utenti incontrati nel percorso o serviti. 
-
-le tappe sono state modellate creando un record chiamato, per l'appunto, ``tappa'', che presenta questi 4 campi:
-
-\begin{enumerate}
-	\item user = pid dell'applicazione utente che viene servito in questa tappa
-	\item type = il tipo di nodo che verrà raggiunto dopo questa tappa, si è deciso di definire 4 diversi tipi di nodi, vedasi sezione successiva ``tipi di nodi''
-	\item t = il tempo necessario a percorrere questa tappa
-	\item node\_name = il nome del nodo raggiunto dalla tappa
-\end{enumerate}
-Sono stati definiti opportuni metodi che elaborano l'output dell'algoritmo del calcolo dei percorsi minimi e creano le tappe formattate in questo modo, pronte per essere date in pasto a questo automa.
-
-\subsubsection{Tipi di nodi} \label{tipiTappe}
-
-assumiamo che un utente abbia sottomesso al servizio una richiesta di questo tipo: spostamento dal nodo ``a'' al nodo ``d''.
-i tipi di nodi delle tappe sono stati distinti con questi 4 atomi:
-
-\begin{enumerate}
-	\item 'user\_start' = indica il nodo nel quale si trova l'utente, il nodo ``a'' della richiesta
-	\item 'user\_target' =  indica il nodo che l'utente vuole raggiungere, il nodo ``d'' della richiesta
-	\item 'intermediate' =  indica un nodo intermedio, ossia tutti quei nodi che nel tragitto da percorrere si frappongono fra il nodo ``a'' e il nodo ``d'' della richiesta oppure fra il nodo ``d'' e quello della colonnina da raggiungere, eventualmente, per la ricarica.
-	\item column = indica il nodo contenente la colonnina di ricarica, verso il quale andare eventualmente a caricare dopo aver servito l'utente.
-\end{enumerate}
-
-\subsubsection{Consumo delle tappe} \label{consumo tappe}
-Questo automa raccoglie i record tappe in una lista nella propria memoria, dopo un numero fissato di tick ``consuma'' la  tappa inserita in testa, elaborandone il contenuto per sapere come comportarsi, alcuni esempi: il tipo della tappa indica se è necessario comunicare all'utente aggiornamenti sulla sua richiesta oppure se è stata raggiunta la colonnina di ricarica, il valore 't' indica il tempo rimanente al raggiungimento del prossimo nodo.
-Le possibili combinazioni di comportamenti in base al contenuto della tappa sono molte, una lista esaustiva di tutti questi non è lo scopo di questo documento e sono stati riportati solo alcuni esempi per favorire la comprensione dell'automa.
-
-\subsubsection{Ricarica del mezzo} \label{tappe colonnina}
-Come detto in \ref{tipiTappe}, uno dei tipi di tappa è quello del nodo con la colonnina di ricarica, pertanto l'automa deve inserire tra le sue mansioni anche lo spostamento verso le colonnine e la ricarica del mezzo.
-
-Questo automa riceve dall'automa ascoltatore 2 liste di tappe: quelle da consumare per soddisfare la richiesta del cliente e quelle da consumare per raggiungere la colonnina di ricarica. Alla ricezione di queste l'automa procede al consumo della prima lista, ma salva la seconda in un attributo specifico della memoria non sapendo se consumerà anche queste tappe. Se, durante lo spostamento, la batteria scenderà sotto un certo livello, l'automa batteria invierà a questo la notifica secondo quanto detto in \ref{automaBatteria} e l'automa si accingerà al consumo della seconda lista. 
-In tale modo si garantisce che venga seguito il percorso verso la colonnina solo se viene valutato necessario caricare il mezzo.
-
-Al raggiungimento del nodo 'column' l'automa si sposta nello stato di ricarica, nel quale a ogni intervallo costante di tick aumenta la propria batteria. Questo processo continua fino alla ricezione della notifica di fermo da parte dell'automa batteria, con la quale avviene il ritorno allo stato idle.
-Similmente, se l'automa batteria decide di avviare la ricarica solare, l'automa compie le stesse transizioni.
-
-\subsubsection{Dati necessari all'elezione}
-I dati necessari all'algoritmo di elezione riguardano principalmente il processamento di elementi presenti nella memoria di questo automa, si pensi per esempio al livello di batteria rimanente oppure al nodo destinazione verso cui il mezzo si sta dirigendo per soddisfare l'ultimo cliente in coda.
-Per tale motivo si è valutato utile inserire nell'API di questo automa un metodo che restituisca tutti questi dati necessari all'automa dell'elezione, il quale lo chiamerà quando necessario per l'esecuzione dell'algoritmo. Il metodo è stato chiamato ``getDataElection'' e restituisce valori diversi a seconda dello stato del taxi, viene qui riportato quello eseguito del caso in cui questo automa si trovi in idle :
-
-\begin{lstlisting}
-idle({call,From}, {getDataElection}, State) ->
-	Cost_To_last_Target = 0,
-	Current_Target = State#movingCarState.currentPos,
-	Battery_level = State#movingCarState.batteryLevel,
-	Packet = {Cost_To_last_Target, Current_Target, Battery_level ,ok},
-	{keep_state, State, [{reply,From,Packet}]};
-\end{lstlisting}
-
-\section{Automi Utente} \label{automiUtenti}
-Gli automi degli utenti sono più semplici di quelli dei taxi, si suddividono in automa utente e applicazione utente. 
-
-\subsection{Automa utente}
-L'automa utente, similmente a quello ascoltatore per i taxi, genera il suo automa applicazione utente con il quale comunica per usare il servizio e ricevere notifiche su di esso. L'environment, quando genera un nuovo utente, si preoccupa di inizializzare un automa di questo tipo e l'app verrà generata indipendentemente. 
-Non c'è molto da dire su questo automa, l'environment comunica con questo automa per immettere nuove richieste al sistema o cambiare la destinazione di un utente e l'applicazione inoltra ogni aggiornamento sulla gestione della richiesta al rispettivo automa utente.
-
-\subsection{Automa applicazione}
-L'automa applicazione utente genera, al momento della inizializzazione, il proprio modulo gps per poter conoscere il taxi più vicino a cui inviare la richiesta. 
-
-\subsubsection{Timer}
-Questo automa è uno dei pochi che usano i timer del behavior piuttosto che il server tick per la temporizzazione. Il timer usato è di tipo ``state\_timout'' (uno specifico timer del behavior). 
-Questo timer viene lanciato quando l'app invia al taxi più vicino la richiesta di spostamento e si sposta nello stato ``waiting\_election'', nella quale aspetta una risposta. Se questa risposta non viene ricevuta nei tempi impostati dal timer, quest scatta e l'app decide di reiterare la richiesta. 
-
-\subsubsection{Attese random}
-ci sono 4 cirocstanze in cui l'app decide di aspettare un tempo random e reiterare la richiesta dell'utente al taxi più vicino:
-\begin{enumerate}
-	\item l'applicazione non ha trovato nessun taxi nei paraggi per inviare la richiesta, ossia il modulo gps non ha rilevato nessuna macchina nella mappa.
-	\item c'è stato un incidente del mezzo nel quale viaggiava l'utente.
-	\item il taxi a cui è stata inviata la richiesta è occupato nell'esecuzione di un'altra elezione.
-	\item il pacchetto contenente l'output dell'elezione ricevuto dal taxi indica che non è presente nessun vincitore.
-\end{enumerate}
-
 
 \section{Mappa città e relativi algoritmi} \label{citta_e_algoritmi}
 Il record ``city'' contiene cinque parametri:
@@ -412,6 +244,176 @@ La funzione ``getNearestCar'' richiede al Gps server le entità presenti ordinat
 
 La funzione ``getNearCars'' esegue come la precedente la richiesta al server indicando la propria posizione e il proprio livello di segnale. La risposta del server, dopo aver rimosso da essa il pid relativo all'entità di cui il modulo fa parte, viene inoltrata all'entità che ha eseguto questa funzione.
 
+\section{Modulo gestione tempo} \label{moduloGestioneTempo}
+Questo modulo, il cui scopo è garantire la temporizzazione per altri moduli del codice, è stato costruito come un semplice server che invia a cadenza regolare un segnale di ``Tick''. Il costruttore di questo modulo riceve una lista di processi interessati a ricevere il segnale, definiti ``Subscribers''. I processi Subcribers, ricevendo il segnale, sanno che ciò indica l'avanzamento del tempo e decidono come comportarsi secondo una loro logica di funzionamento.
+Nel teso questo modulo verrà definito anche "Server Tick".
+
+\section{Automi} \label{implementazioneAutomi}
+Per l'implementazione degli automi è stata utilizzato ``gen\_statem'', il behavior erlang che semplifica la costruzione di macchine a stati finiti guidate da eventi. Questo behavior è un framework con numerose primitive riguardanti questi costrutti: invio e ricezione di eventi sincroni o asincroni, impostazione di timer e molto altro. Gli automi discussi in \ref{automi} sono stati implementati in modo relativamente veloce potendosi concentrare quasi esclusivamente sulla logica del loro funzionamento piuttosto che sui dettagli implementativi, nascosti appunto dal suddetto framework. 
+Qui di seguito si riporta un link alla documentazione ufficiale del framework: \url{https://erlang.org/doc/man/gen_statem.html}.
+
+I sorgenti sono stati opportunatamente commentati per descrivere il funzionamento del codice ma è opportuno compiere una descrizione generale di questi automi, soffermandosi sulle scelte implementative effettuate.
+
+Gli automi implementati rispettano fedelmente gli schemi mostrati \ref{automi}, fatta eccezione per alcune mancanze e piccole modifiche che verranno ora elencate
+
+\begin{itemize}
+	\item Negli schemi progettuali si mostrava come la comunicazione fra automi interni a un'automobile non avvenisse mai in modo diretto, infatti l'ascoltatore del mezzo si comportava da proxy fra i due automi. Questa scelta progettuale è stata rivista in fase di implementazione, infatti si è ritenuto più veloce permettere una comunicazione diretta, ottenendo anche un codice più snello, pulito e dal comportamento più chiaro. 
+	La comunicazione fra un automa interno al veicolo e un automa esterno, come per esempio fra l'automa dell'elezione e l'applicazione utente, avviene tuttavia usando l'ascoltatore come proxy, il quale infatti è l'interfaccia col mondo esterno per un veicolo. Questo ha permesso di diminuire le dipendeze fra i diversi automi: un automa esterno al mezzo deve conoscere soltanto l'ascoltatore per poter comunicare con il veicolo e tutte le sue istanze.
+	\item Negli schemi progettuali erano stati inseriti molti stati che non presentano una controparte nel codice, questi erano stati definiti in fase di progettazione per chiarire le idee sui comportamenti degli automi, o per rendere gli schemi più espressivi, ma non si è ritenuto utile o conveniente inserirli nella loro implementazione. Il comportamento degli automi non è stato tuttavia intaccato dall'eliminazione di questi stati. 
+	\item Similmente agli stati, alcuni eventi riportati negli schemi non presentano una controparte ``esatta'' negli automi, nel senso che i nomi di questi eventi sono stati ridefiniti in fase implementativa trovando alternative più espressive o, in generale, migliori per le esigenze del codice. Anche in questo caso il comportamento non è stato intaccato ed è possibile trovare un isomorfismo fra i nomi degli eventi inseriti negli schemi e quelli inseriti nel codice.
+	\item Per la temporizzazione, in fase di progettazione, si faceva riferimento all'uso di orologi interni, i quali scandivano il tempo attraverso l'uso dei più volte citati ``Tick''. Questo è stato implementato con il modulo gestione tempo come mostrato al punto \ref{modules} e la cui implementazione è stato descritta in \ref{moduloGestioneTempo}, tuttavia per alcuni particolari casi si è preferito utilizzare i timer del behavior ``gen\_statem''. La scelta effettuata dipende dal particolare caso ma gran parte del codice usa i Tick per la temporizzazione.
+\end{itemize}
+
+\subsection{Struttura generale} \label{strutturaGeneraleAutomi}
+I diversi automi implementati presentano tutti uno stato interno, inteso come una propria memoria che varia durante l'esecuzione, ed è importante non confondersi con lo stato della macchina a stati finiti, la similitudine fra i due termini si presta a diversi fraintendimenti e d'ora in poi si userà il termine ``memoria'' per indicare lo stato con questa accezione. La memoria di ogni automa è stata modellata definendo un record specifico, il quale aggrega tutti i dati necessari.
+
+Il codice dei diversi automi è organizzato con una struttura molto simile che si può schematizzare in queste 5 sezioni:
+
+\begin{enumerate}
+	\item Codice per l'importazione di metodi da moduli esterni,importazioni di costanti definite esternamente, esportazione di metodi, definizione di costanti utilizzate solo localmente.
+	\item definizione del record specifico per l'automa: secondo quanto detto ne modella la sua memoria.
+	\item elenco dell'API dell'automa: inteso come le funzionalità della sua interfaccia, esportate per essere usate da altri automi.
+	\item funzioni dell'automa: ricalcano gli stati dell'automa e i possibili comportamenti a seguito della ricezione dei vari eventi, ogni funzione inserita in questa sezione rappresenta una combinazione stato automa-evento ricevibile in quello stato, la logica dell'automa è raccolta in questa sezione.
+	\item funzioni interne: usate localmente.
+\end{enumerate}
+
+Ogni automa nel codice ha questa suddivisione e i file col codice sono stati opportunatamente marcati con dei commenti per enfatizzare questa struttura. Ulteriori commenti sono stati disposti nel codice per semplificarne la comprensione, in particolar modo sono stati definiti dei contratti nei metodi delle API.
+
+\subsection{Eventi Globali - la funzione ``handle\_common''} \label{eventiGlobaliAutomi}
+In questa sezione si descrive come sono stati gestiti gli eventi globali negli automi, ossia eventi che possono essere ricevuti in stati diversi dell'automa. Come descritto sopra, la sezione 4 del codice raccoglie le funzioni che descrivono la logica dell'automa, il behavior ``gen\_statem'' e il pattern matching di Erlang garantiscono che, se l'automa si trova in un certo stato e riceve un particolare evento, verrà eseguita la funzione insrita in questa sezione che rappresenta la particolare combinazione stato-evento; questa, eventulamente, modificherà la memoria del processo e/o  effettuerà un cambiamento di stato. 
+Qui viene riportato un frammento di codice che mostra una di queste funzioni: 
+
+\begin{lstlisting}
+	waiting_car_queued(cast, taxiServingYou, State) ->
+	{next_state, waiting_car, State};
+\end{lstlisting}
+
+Si noti come il secondo parametro della funzione indichi il nome dell'evento che ``triggera'' l'esecuzione del codice, mentre il nome della funzione indica lo stato.
+
+Gli eventi globali portano a un ovvio overhead se implementati in questo modo, infatti per un evento ricevibile in N stati è necessario scrivere N funzioni diverse, se il comportamento è lo stesso in tutti gli stati questo comporta la scrittura di N funzioni tutte uguali ottenendo ulteriormente numerose dipendeze.
+
+Grazie alle comode primitive Erlang si può definire una sola funziona che gestisca lo stesso evento per stati diversi, nel progetto in esame questa è stata chiamata ``handle\_common''. Nella sezione 4 di quasi tutti gli automi, in testa, sono state definite diverse funzioni ``handle\_common'' che adempiono, appunto, a questo scopo. Ne viene qui riportato un esempio;
+
+\begin{lstlisting}
+	%ricezione del comando di terminazione
+	handle_common(cast, {die}, _OldState, State) ->
+	PidGpsModule = State#appUserState.pidGPSModule,
+	gps_module:end_gps_module(PidGpsModule),
+	gen_statem:stop(self());
+\end{lstlisting}
+
+Queste funzioni hanno una firma diversa in base all'evento: l'atomo inserito come secondo parametro della funzione indica quale evento ``triggera'' l'esecuzione di quel codice.
+
+\section{Automi Macchina} \label{automiMacchina}
+
+le macchine, come mostrato negli schemi progettuali, presentano più automi che lavorano in parallelo: automa ``ascoltatore'', automa ``gestione movimento'', ``gestione batteria'' ed ``elezione''. La descrizione sommaria di questi è già stata affrontata in \ref{automi}, in questa sezione verrà fatta una descrizione di essi soffermandosi sugli aspetti principali della loro implementazione.
+
+\subsection{Automa ascoltatore} \label{automaAscoltatore}
+
+L'automa ascoltatore, o listener, è il padre della gerarchia che rappresenta i vari automi del mezzo. Quando l'environment genera un nuovo taxi si preoccupa soltanto di inizializzare un automa di questo tipo, il quale automaticamente creerà tutti i restanti automi sottostanti mantenendo un riferimento a ognuno di essi nella propria memoria. Oltre ad essi, l'ascoltatore si impegna a creare anche il modulo gps usato dall'auto e il ``server tick'', indicando ad esso di inserire fra gli abbonati tutti gli automi del mezzo, così da garantire una temporizzazione sincronizzata. Se l'environment è interessato a provocare qualche evento che intacca i taxi, comunica soltanto con questo automa, il quale poi comunicherà con gli opportuni automi sottostanti.
+
+\subsubsection{Lista di utenti in coda} \label{usersInQueue}
+
+Per semplificare la gestione di incidenti, cambi di destinazione, cambiamenti alla topologia della mappa cittadina, si è pensato di mantenere nell'ascoltatore una lista di tutti gli utenti in coda per il taxi. In particolare, è stato definito uno speciale record che rappresenta una ``comanda'' del taxi, ossia una istanza di richiesta del servizio da parte di un utente.
+Questo record è definito nel sorgente di questo automa e si chiama ``userInQueue'', esso presenta questi 3 campi:
+
+\begin{enumerate}
+	\item pid = il pid dell'applicazione dell'utente richiedente il servizio
+	\item position = la posizione attuale del cliente 
+	\item target = la destinazione del cliente
+\end{enumerate}
+
+Nella propria memoria, un ascoltatore, mantiene una lista di record di questo tipo, uno per ogni cliente in coda.
+Nel caso in cui accadano gli eventi sopra citati, tale lista viene consultata in questi modi:
+\begin{itemize}
+	\item incidente: per ogni elemento della lista, viene inviato al pid dell'applicativo la notifica di incidente.
+	\item cambio di destinazione: viene fatto un controllo sulla lunghezza della lista, se questa presenta un solo elemento significa che c'è un solo utente accodato ed è possibile il cambio di desinazione, ne viene quindi calcolata la fattibilità in base alla batteria attuale. Se la lista presenta più elementi allora non è possibile il cambio e l'app dell'utente richiedente viene opportunatamente notificata.
+	\item cambio di topologia: per ogni elemento della lista, viene calcolato se è possibile garantire quella comanda considerando il cambiamento appena avvenuto nei percorsi, notificando le relative app in base all'esito. Questo aspetto è stato trattato in \ref{aggiornamentoMappa}.
+\end{itemize}
+
+\subsubsection{Legame con automa elezione} \label{listenerElection}
+Questo automa lavora a stretto contatto con l'automa dell'elezione, essi concorrono a garantire all'utente richiedente il servizio un giusto candidato. Quando l'ascoltatore riceve dall'utente la richiesta, oppure la partecipazione all'elezioni da altri taxi, inoltra all'automa elezione quest'ultima e attende il processamento dell'algoritmo distribuito. Al termine dell'esecuzione di questo algoritmo, l'ascoltatore riceve uno specifico evento contenente l'ouptut, come spiegato nel punto \ref{implementazione_algoritmo_elezione}: in esso è presente il riferimento al taxi vincitore e se questo combacia con se stesso significa che il taxi si dovrà spostare verso nuovi nodi. Questo comporta un aggiornamento della lista dei punti da visitare, aspetto che verrà affrontato nelle prossime sezioni quando si parlerà dell'automa gestione movimento.
+
+\subsection{Automa batteria} \label{automaBatteria}
+Questo automa si proccupa di controllare il livello della batteria del mezzo, controllando se questa è inferiore o superiore a certi valori di soglia e in base ai casi notificare il mezzo se è necessario andare a ricaricare oppure se non è più necessario continuare la ricarica.
+
+Inoltre, questo automa controlla se il mezzo è stazionario da un lungo intervallo di tempo e in tal caso lo notifica riguardo alla necessità di iniziare la ricarica con pannelli solari. Questa forma di ricarica è più lenta di quella con colonnina ma è stata implementata in modo da evitare casi di stallo del veicolo. Infatti, un taxi potrebbe rimanere fermo su un nodo, impossibilitato a vincere nuove elezioni a causa di una batteria troppo bassa. 
+
+\subsection{Automa gestione movimento} \label{automaMoving}
+
+Questo automa si preoccupa di garantire lo spostamento del mezzo, l'automa ascooltatore invia ad esso le tappe da percorrere secondo quanto detto in \ref{listenerElection}.
+Per tappa si intende dire uno spostamnto fra due nodi adiacenti. Concettualmente questo automa ha o scopo di consumare le tappe ricevute dall'esterno e notificare il suo ascoltatore di avvisare eventuali utenti incontrati nel percorso o serviti. 
+
+le tappe sono state modellate creando un record chiamato, per l'appunto, ``tappa'', che presenta questi 4 campi:
+
+\begin{enumerate}
+	\item user = pid dell'applicazione utente che viene servito in questa tappa
+	\item type = il tipo di nodo che verrà raggiunto dopo questa tappa, si è deciso di definire 4 diversi tipi di nodi, vedasi sezione successiva ``tipi di nodi''
+	\item t = il tempo necessario a percorrere questa tappa
+	\item node\_name = il nome del nodo raggiunto dalla tappa
+\end{enumerate}
+Sono stati definiti opportuni metodi che elaborano l'output dell'algoritmo del calcolo dei percorsi minimi e creano le tappe formattate in questo modo, pronte per essere date in pasto a questo automa.
+
+\subsubsection{Tipi di nodi} \label{tipiTappe}
+
+assumiamo che un utente abbia sottomesso al servizio una richiesta di questo tipo: spostamento dal nodo ``a'' al nodo ``d''.
+i tipi di nodi delle tappe sono stati distinti con questi 4 atomi:
+
+\begin{enumerate}
+	\item 'user\_start' = indica il nodo nel quale si trova l'utente, il nodo ``a'' della richiesta
+	\item 'user\_target' =  indica il nodo che l'utente vuole raggiungere, il nodo ``d'' della richiesta
+	\item 'intermediate' =  indica un nodo intermedio, ossia tutti quei nodi che nel tragitto da percorrere si frappongono fra il nodo ``a'' e il nodo ``d'' della richiesta oppure fra il nodo ``d'' e quello della colonnina da raggiungere, eventualmente, per la ricarica.
+	\item column = indica il nodo contenente la colonnina di ricarica, verso il quale andare eventualmente a caricare dopo aver servito l'utente.
+\end{enumerate}
+
+\subsubsection{Consumo delle tappe} \label{consumo tappe}
+Questo automa raccoglie i record tappe in una lista nella propria memoria, dopo un numero fissato di tick ``consuma'' la  tappa inserita in testa, elaborandone il contenuto per sapere come comportarsi, alcuni esempi: il tipo della tappa indica se è necessario comunicare all'utente aggiornamenti sulla sua richiesta oppure se è stata raggiunta la colonnina di ricarica, il valore 't' indica il tempo rimanente al raggiungimento del prossimo nodo.
+Le possibili combinazioni di comportamenti in base al contenuto della tappa sono molte, una lista esaustiva di tutti questi non è lo scopo di questo documento e sono stati riportati solo alcuni esempi per favorire la comprensione dell'automa.
+
+\subsubsection{Ricarica del mezzo} \label{tappe colonnina}
+Come detto in \ref{tipiTappe}, uno dei tipi di tappa è quello del nodo con la colonnina di ricarica, pertanto l'automa deve inserire tra le sue mansioni anche lo spostamento verso le colonnine e la ricarica del mezzo.
+
+Questo automa riceve dall'automa ascoltatore 2 liste di tappe: quelle da consumare per soddisfare la richiesta del cliente e quelle da consumare per raggiungere la colonnina di ricarica. Alla ricezione di queste l'automa procede al consumo della prima lista, ma salva la seconda in un attributo specifico della memoria non sapendo se consumerà anche queste tappe. Se, durante lo spostamento, la batteria scenderà sotto un certo livello, l'automa batteria invierà a questo la notifica secondo quanto detto in \ref{automaBatteria} e l'automa si accingerà al consumo della seconda lista. 
+In tale modo si garantisce che venga seguito il percorso verso la colonnina solo se viene valutato necessario caricare il mezzo.
+
+Al raggiungimento del nodo 'column' l'automa si sposta nello stato di ricarica, nel quale a ogni intervallo costante di tick aumenta la propria batteria. Questo processo continua fino alla ricezione della notifica di fermo da parte dell'automa batteria, con la quale avviene il ritorno allo stato idle.
+Similmente, se l'automa batteria decide di avviare la ricarica solare, l'automa compie le stesse transizioni.
+
+\subsubsection{Dati necessari all'elezione}
+I dati necessari all'algoritmo di elezione riguardano principalmente il processamento di elementi presenti nella memoria di questo automa, si pensi per esempio al livello di batteria rimanente oppure al nodo destinazione verso cui il mezzo si sta dirigendo per soddisfare l'ultimo cliente in coda.
+Per tale motivo si è valutato utile inserire nell'API di questo automa un metodo che restituisca tutti questi dati necessari all'automa dell'elezione, il quale lo chiamerà quando necessario per l'esecuzione dell'algoritmo. Il metodo è stato chiamato ``getDataElection'' e restituisce valori diversi a seconda dello stato del taxi, viene qui riportato quello eseguito del caso in cui questo automa si trovi in idle :
+
+\begin{lstlisting}
+	idle({call,From}, {getDataElection}, State) ->
+	Cost_To_last_Target = 0,
+	Current_Target = State#movingCarState.currentPos,
+	Battery_level = State#movingCarState.batteryLevel,
+	Packet = {Cost_To_last_Target, Current_Target, Battery_level ,ok},
+	{keep_state, State, [{reply,From,Packet}]};
+\end{lstlisting}
+
+\section{Automi Utente} \label{automiUtenti}
+Gli automi degli utenti sono più semplici di quelli dei taxi, si suddividono in automa utente e applicazione utente. 
+
+\subsection{Automa utente}
+L'automa utente, similmente a quello ascoltatore per i taxi, genera il suo automa applicazione utente con il quale comunica per usare il servizio e ricevere notifiche su di esso. L'environment, quando genera un nuovo utente, si preoccupa di inizializzare un automa di questo tipo e l'app verrà generata indipendentemente. 
+Non c'è molto da dire su questo automa, l'environment comunica con questo automa per immettere nuove richieste al sistema o cambiare la destinazione di un utente e l'applicazione inoltra ogni aggiornamento sulla gestione della richiesta al rispettivo automa utente.
+
+\subsection{Automa applicazione}
+L'automa applicazione utente genera, al momento della inizializzazione, il proprio modulo gps per poter conoscere il taxi più vicino a cui inviare la richiesta. 
+
+\subsubsection{Timer} \label{timerAppUtente}
+Questo automa è uno dei pochi che usano i timer del behavior piuttosto che il server tick per la temporizzazione. Il timer usato è di tipo ``state\_timout'' (uno specifico timer del behavior). 
+Questo timer viene lanciato quando l'app invia al taxi più vicino la richiesta di spostamento e si sposta nello stato ``waiting\_election'', nella quale aspetta una risposta. Se questa risposta non viene ricevuta nei tempi impostati dal timer, quest scatta e l'app decide di reiterare la richiesta. 
+
+\subsubsection{Attese random}
+ci sono 4 cirocstanze in cui l'app decide di aspettare un tempo random e reiterare la richiesta dell'utente al taxi più vicino:
+\begin{enumerate}
+	\item l'applicazione non ha trovato nessun taxi nei paraggi per inviare la richiesta, ossia il modulo gps non ha rilevato nessuna macchina nella mappa.
+	\item c'è stato un incidente del mezzo nel quale viaggiava l'utente.
+	\item il taxi a cui è stata inviata la richiesta è occupato nell'esecuzione di un'altra elezione.
+	\item il pacchetto contenente l'output dell'elezione ricevuto dal taxi indica che non è presente nessun vincitore.
+\end{enumerate}
 
 \section{Automa Elezione}
 Il principale problema affrontato in questo progetto è stato quello di eleggere quale sia la migliore macchina per soddisfare la richiesta dell'utente. Come già accennatto precedentemente al punto \ref{automiMacchina}, ogni macchina possiede un'istanza di questo automa.
@@ -520,4 +522,9 @@ quando viene calcolato la macchina non possa vincere l'elezione.
 quando viene calcolato la macchina può vincere l'elezione. La variabile QueueCar viene salvata nello stato della macchina assegnandola alla ``queueToManage'' e utilizzata dopo come già spiegato.
 
 \subsection{Gestione dei timer}
-Lo scopo è di gestire il caso in cui un nodo non risponda alle richieste dell'elezione...
+Lo scopo è di gestire il caso in cui un nodo non risponda alle richieste dell'elezione. Similmente all'automa App utente, è stato utilizzato un timeout di gen\_statem, in particolare lo stesso timout\_state\ref{timerAppUtente}. 
+Il valore temporale impostato per tale timer non è una costante fissata uguale per ogni nodo partecipante all'elezione, si è valutato di impostare un valore temporale direttamente proporzionato a quanto il nodo è distante dall'iniziatore.
+Un valore che rappresenta questa distanza, benchè in modo approssimativo, è il valore TTL dei pacchetti che viaggiano nell'elezione. Infatti, ogni nodo partecipante all'elezione può stimare la sua distanza col TTL che legge dal pacchetto ricevuto da altri nodi. 
+Si è deciso quindi di impostare il valore temporale usando una formula di questo tipo:
+TTL * slotCostante
+
