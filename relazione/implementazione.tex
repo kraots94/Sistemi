@@ -94,8 +94,8 @@ Lo script in python crea cinque file:
 	\label{fig:esempio_citta_dot}
 \end{figure}
 
-\section{Entità Ambiente}
-Questa entità, chiamata anche ``environment'', rappresenta il mondo in cui avviene la simulazione. Tramite esso è possibile creare entità, rimuoverle e far acccadere eventi.
+\section{Entità Ambiente} \label{ambiente}
+Questa entità, chiamata anche ``environment'', rappresenta il mondo in cui avviene la simulazione. Tramite esso è possibile creare entità, rimuoverle e far accadere eventi.
 
 \subsection{Variabili di stato}
 Il suo stato contiene:
@@ -131,7 +131,7 @@ Sono stati gestiti sette tipi di eventi. Di seguito l'identificativo dell'evento
 	\item 6 Remove Car: una macchina in stato ``idle'' viene rimossa dalla mappa. Se la macchina selezionata non è in idle si cerca una seconda macchia e via via fino al valore limite della variabile globale ``max\_kill\_tries''. Questo limite è dovuto alla volontà di evitare situazioni di stallo.
 \end{itemize}
 
-Nel caso in cui il flag ``autoEvents'' dello stato sia impostato a ``true'', il contatore dei tick ricevuti inizierà ad accumulare il tempo trascorso. In base alla variabile globale ``ticks\_event'' vengono determinati ogni quanti tick ricevuti debba acccadere un evento casuale tra quelli appena discussi.
+Nel caso in cui il flag ``autoEvents'' dello stato sia impostato a ``true'', il contatore dei tick ricevuti inizierà ad accumulare il tempo trascorso. In base alla variabile globale ``ticks\_event'' vengono determinati ogni quanti tick ricevuti debba accadere un evento casuale tra quelli appena discussi.
 
 Tramite le API fornite dal modulo è possibile innescare un determinato evento tramite la funzione ``triggerEvent'' e l'identificativo dell'evento desiderato. In alternativa è possibile utilizzare le funzioni già pronte per gli eventi a cui si può passare i parametri desiderati. Maggiori informazioni sono nella parte \ref{esecuzione_codice}.
 
@@ -141,12 +141,12 @@ La creazione l'eliminazione di una determinata entità comportano diverse modifi
 Dopo aver creato un'entità è necessario aggiornare il relativo contatore per evitare che esistano entità diverse ma con lo stesso nome.
 
 \subsubsection{Creazione di una macchina}
-I dati di cui necessita una macchina sono: posizione di partenza, pid del server gps a cui poter comnicare la propria posizione, mappa della città per poter eseguire l'algoritmo di elezione ed infine nome a lei assegnato. Dopo aver preparato i dati viene eseguita una chiamata al modulo della macchina e il pid ottenuto viene aggiunto alla lista delle macchina attualmente in città. Vengono incrementati i contatori delle macchine in città e dei nomi di esse. Infine viene aggiornato il dizionario che tiene traccia dell'associazione nome-pid macchina.
+I dati di cui necessita una macchina sono: posizione di partenza, pid del server gps a cui poter comunicare la propria posizione, mappa della città per poter eseguire l'algoritmo di elezione ed infine nome a lei assegnato. Dopo aver preparato i dati viene eseguita una chiamata al modulo della macchina e il pid ottenuto viene aggiunto alla lista delle macchina attualmente in città. Vengono incrementati i contatori delle macchine in città e dei nomi di esse. Infine viene aggiornato il dizionario che tiene traccia dell'associazione nome-pid macchina.
 
 Il modulo della macchina crea le proprie istanze come spiegato al punto \ref{automaAscoltatore}.
 
-\subsubsection{Creazione di un utente}
-I dati di cui necessita un utente sono: posizione di partenza, richiesta di trasporto formata dalle due posizioni di partenza e arrivo, pid del server gps per la propria applicazione e nome dell'utente. Il pid del server gps serve poichè è l'automa utente a creare l'automa ``app\_utente''. Il punto di partenza della richiesta deve essere lo stesso della posizione iniziale dell'utente. In caso contrario viene generato un messaggio di errore. Come per la macchina, anche dopo la creazione dell'utente vengono aggiornate le relative liste.
+\subsubsection{Creazione di un utente} \label{instanziazione_utente}
+I dati di cui necessita un utente sono: posizione di partenza, richiesta di trasporto formata dalle due posizioni di partenza e arrivo, pid del server gps per la propria applicazione e nome dell'utente. Il pid del server gps serve poiché è l'automa utente a creare l'automa ``app\_utente''. Il punto di partenza della richiesta deve essere lo stesso della posizione iniziale dell'utente. In caso contrario viene generato un messaggio di errore. Come per la macchina, anche dopo la creazione dell'utente vengono aggiornate le relative liste.
 
 \subsubsection{Eliminazione di una macchina}
 Come già accennato nella parte \ref{env_events}, l'eliminazione di una macchina dall'ambiente avviene solo se essa si trova nello stato di idle. Questa scelta è stata fatta perché simile alla realtà. Una volta individuata, le si invia il segnale di morte e la si rimuove dalla lista delle macchine nell'ambiente. Inoltre viene rimossa la sua coppia nome-pid nel dizionario.
@@ -165,9 +165,9 @@ Il record ``city'' contiene cinque parametri:
 \end{itemize}
 
 Esso contiene lo stato attuale della città dal punto di vista topologico. Le sue componenti vengono utilizzate da diverse entità del sistema per diversi scopi:
-L'automa elezione inserire riferimento ne utilizza il city\_graph per calcolare i costi della macchina.
+L'automa elezione \ref{automaElezione} ne utilizza il city\_graph per calcolare i costi della macchina.
 
-L'entità ambiente inserire riferimento ne utlizza i nodi per generare casualmente le posizion iniziali di macchine e utenti.
+L'entità ambiente \ref{ambiente} ne utilizza i nodi per generare casualmente le posizioni iniziali di macchine e utenti.
 
 Il Gps Server \ref{gps_server} ne utilizza i nodi per creare la propria struttura dove tiene traccia della posizione attuale delle entità presenti in un determinato istante nella città
 
@@ -175,18 +175,18 @@ Il Gps Server \ref{gps_server} ne utilizza i nodi per creare la propria struttur
 Come già descritto al punto \ref{componenti_grafo_citta}, ogni nodo possiede diverse proprietà che vengono memorizzate nell'apposito record definito in questo modo:
 \begin{itemize}
 	\item name: nome del nodo
-	\item id: identificativo numerico del nodo, utlizzato per la sua codifica nel grafo. Questo è necessario poichè la libreria descritta al punto \ref{libreria_algoritmi} per identificare i nodi utilizza il loro id numerico.
+	\item id: identificativo numerico del nodo, utilizzato per la sua codifica nel grafo. Questo è necessario poichè la libreria descritta al punto \ref{libreria_algoritmi} per identificare i nodi utilizza il loro id numerico.
 	\item pos\_x: coordinata sull'asse delle ascisse del nodo.
 	\item pos\_y: coordinata sull'asse delle ordinate del nodo.
 \end{itemize}
 
 All'avvio l'entità ambiente, tramite il modulo ``node\_utils'', carica la lista dei nodi presenti nel file ``city\_map\_nodes.dat'' e la lista presente nel file ``city\_map\_charging\_cols.dat''. Queste due liste vengono utilizzate per identificare quali sono i nodi della città e quali di essi sono colonnine. 
 
-La scelta di separarle è stata effettuata poichè nella ricerca della colonnina più vicina alla posizione della macchina è sufficiente calcolare la distanza tra ogni colonnina e il punto desiderato, senza scorrere tutti i nodi della mappa.
+La scelta di separarle è stata effettuata poiché nella ricerca della colonnina più vicina alla posizione della macchina è sufficiente calcolare la distanza tra ogni colonnina e il punto desiderato, senza scorrere tutti i nodi della mappa.
 
 Il metodo ``get\_nearest\_col/3'' presente nel modulo ``city\_map'' permette di sapere quale colonnina sia quella più geograficamente vicina al nodo passato come parametro.
 
-Il modulo ``node\_utils'' fornisce i diversi getter per ottenere le informazioni desiderate a partire dalla lista e un identificativo per un determinato nodo. Esso inoltre fornisce dei metodi per ottenere un nodo random presente, con la possibilità di escludere un nodo. Questa proprietà viene utilizzata nella generazione delle richieste degli utentei come spiegato al punto REF\_CREATING\_REQUEST.
+Il modulo ``node\_utils'' fornisce i diversi getter per ottenere le informazioni desiderate a partire dalla lista e un identificativo per un determinato nodo. Esso inoltre fornisce dei metodi per ottenere un nodo random presente, con la possibilità di escludere un nodo. Questa proprietà viene utilizzata nella generazione delle richieste degli utenti come spiegato al punto \ref{instanziazione_utente}.
 
 \subsection{Libreria per algoritmi} \label{libreria_algoritmi}
 Data la natura del progetto, è necessario poter gestire grafi ed applicare ad essi l'algoritmo di Dijkstra per il calcolo dei cammini minimi tra due nodi di esso. Per eseguire questo compito, si è scelto di utilizzare la libreria ``erlang-algorithms'' fornita da Aggelos Giantsios, reperibile al sito \url{https://github.com/aggelgian/erlang-algorithms}. Essa fornisce sia le strutture base che gli algoritmi da applicare ad esse.
@@ -198,7 +198,7 @@ Di questa libreria vengono principalmente tre funzionalità:
 	\item graph\_utils:getDataPath/2: vengono passati i risultati calcolati da dijkstra e il nodo target di cui si vuole sapere il percorso calcolato.
 \end{itemize}
 
-L'algoritmo di Dijkstra viene utilizzato nell'automa dell'elezione come spiegato al punto REF\_elezione\_automa.
+L'algoritmo di Dijkstra viene utilizzato nell'automa dell'elezione come spiegato al punto \ref{automaElezione}.
 
 \section{Moduli Gps e Server Gps}
 Il problema in esame concerne la posizione delle diverse entità all'interno di una città, pertanto è necessario esse possiedano un modulo in grado di dir loro la posizione e distanza delle altre entità presenti. Per far questo è stato deciso di creare due moduli:
@@ -208,7 +208,7 @@ Il problema in esame concerne la posizione delle diverse entità all'interno di 
 \end{itemize}
 
 \subsection{Gps Server}\label{gps_server}
-Con lo scopo di simulare la ricezione dei vicini delle diverse entità, esso fornisce dei messaggi tramite i quali è possibile ottenere queste informazioni. Questo modulo utlizza quattro record:
+Con lo scopo di simulare la ricezione dei vicini delle diverse entità, esso fornisce dei messaggi tramite i quali è possibile ottenere queste informazioni. Questo modulo utilizza quattro record:
 
 \begin{itemize}
 	\item nodeDistance: è una tupla formata da due valori, vale a dire ``dist'', che indica la distanza dal nodo che fa la richiesta, e ``entities'', che è una lista di pid. Il significato di essa è ``a questa distanza ci sono queste entità''.
@@ -252,13 +252,13 @@ Nel teso questo modulo verrà definito anche "Server Tick".
 Per l'implementazione degli automi è stata utilizzato ``gen\_statem'', il behavior erlang che semplifica la costruzione di macchine a stati finiti guidate da eventi. Questo behavior è un framework con numerose primitive riguardanti questi costrutti: invio e ricezione di eventi sincroni o asincroni, impostazione di timer e molto altro. Gli automi discussi in \ref{automi} sono stati implementati in modo relativamente veloce potendosi concentrare quasi esclusivamente sulla logica del loro funzionamento piuttosto che sui dettagli implementativi, nascosti appunto dal suddetto framework. 
 Qui di seguito si riporta un link alla documentazione ufficiale del framework: \url{https://erlang.org/doc/man/gen_statem.html}.
 
-I sorgenti sono stati opportunatamente commentati per descrivere il funzionamento del codice ma è opportuno compiere una descrizione generale di questi automi, soffermandosi sulle scelte implementative effettuate.
+I sorgenti sono stati opportunamente commentati per descrivere il funzionamento del codice ma è opportuno compiere una descrizione generale di questi automi, soffermandosi sulle scelte implementative effettuate.
 
 Gli automi implementati rispettano fedelmente gli schemi mostrati \ref{automi}, fatta eccezione per alcune mancanze e piccole modifiche che verranno ora elencate
 
 \begin{itemize}
 	\item Negli schemi progettuali si mostrava come la comunicazione fra automi interni a un'automobile non avvenisse mai in modo diretto, infatti l'ascoltatore del mezzo si comportava da proxy fra i due automi. Questa scelta progettuale è stata rivista in fase di implementazione, infatti si è ritenuto più veloce permettere una comunicazione diretta, ottenendo anche un codice più snello, pulito e dal comportamento più chiaro. 
-	La comunicazione fra un automa interno al veicolo e un automa esterno, come per esempio fra l'automa dell'elezione e l'applicazione utente, avviene tuttavia usando l'ascoltatore come proxy, il quale infatti è l'interfaccia col mondo esterno per un veicolo. Questo ha permesso di diminuire le dipendeze fra i diversi automi: un automa esterno al mezzo deve conoscere soltanto l'ascoltatore per poter comunicare con il veicolo e tutte le sue istanze.
+	La comunicazione fra un automa interno al veicolo e un automa esterno, come per esempio fra l'automa dell'elezione e l'applicazione utente, avviene tuttavia usando l'ascoltatore come proxy, il quale infatti è l'interfaccia col mondo esterno per un veicolo. Questo ha permesso di diminuire le dipendenze fra i diversi automi: un automa esterno al mezzo deve conoscere soltanto l'ascoltatore per poter comunicare con il veicolo e tutte le sue istanze.
 	\item Negli schemi progettuali erano stati inseriti molti stati che non presentano una controparte nel codice, questi erano stati definiti in fase di progettazione per chiarire le idee sui comportamenti degli automi, o per rendere gli schemi più espressivi, ma non si è ritenuto utile o conveniente inserirli nella loro implementazione. Il comportamento degli automi non è stato tuttavia intaccato dall'eliminazione di questi stati. 
 	\item Similmente agli stati, alcuni eventi riportati negli schemi non presentano una controparte ``esatta'' negli automi, nel senso che i nomi di questi eventi sono stati ridefiniti in fase implementativa trovando alternative più espressive o, in generale, migliori per le esigenze del codice. Anche in questo caso il comportamento non è stato intaccato ed è possibile trovare un isomorfismo fra i nomi degli eventi inseriti negli schemi e quelli inseriti nel codice.
 	\item Per la temporizzazione, in fase di progettazione, si faceva riferimento all'uso di orologi interni, i quali scandivano il tempo attraverso l'uso dei più volte citati ``Tick''. Questo è stato implementato con il modulo gestione tempo come mostrato al punto \ref{modules} e la cui implementazione è stato descritta in \ref{moduloGestioneTempo}, tuttavia per alcuni particolari casi si è preferito utilizzare i timer del behavior ``gen\_statem''. La scelta effettuata dipende dal particolare caso ma gran parte del codice usa i Tick per la temporizzazione.
@@ -277,10 +277,10 @@ Il codice dei diversi automi è organizzato con una struttura molto simile che s
 	\item funzioni interne: usate localmente.
 \end{enumerate}
 
-Ogni automa nel codice ha questa suddivisione e i file col codice sono stati opportunatamente marcati con dei commenti per enfatizzare questa struttura. Ulteriori commenti sono stati disposti nel codice per semplificarne la comprensione, in particolar modo sono stati definiti dei contratti nei metodi delle API.
+Ogni automa nel codice ha questa suddivisione e i file col codice sono stati opportunamente marcati con dei commenti per enfatizzare questa struttura. Ulteriori commenti sono stati disposti nel codice per semplificarne la comprensione, in particolar modo sono stati definiti dei contratti nei metodi delle API.
 
 \subsection{Eventi Globali - la funzione ``handle\_common''} \label{eventiGlobaliAutomi}
-In questa sezione si descrive come sono stati gestiti gli eventi globali negli automi, ossia eventi che possono essere ricevuti in stati diversi dell'automa. Come descritto sopra, la sezione 4 del codice raccoglie le funzioni che descrivono la logica dell'automa, il behavior ``gen\_statem'' e il pattern matching di Erlang garantiscono che, se l'automa si trova in un certo stato e riceve un particolare evento, verrà eseguita la funzione insrita in questa sezione che rappresenta la particolare combinazione stato-evento; questa, eventulamente, modificherà la memoria del processo e/o  effettuerà un cambiamento di stato. 
+In questa sezione si descrive come sono stati gestiti gli eventi globali negli automi, ossia eventi che possono essere ricevuti in stati diversi dell'automa. Come descritto sopra, la sezione 4 del codice raccoglie le funzioni che descrivono la logica dell'automa, il behavior ``gen\_statem'' e il pattern matching di Erlang garantiscono che, se l'automa si trova in un certo stato e riceve un particolare evento, verrà eseguita la funzione inserita in questa sezione che rappresenta la particolare combinazione stato-evento; questa, eventualmente, modificherà la memoria del processo e/o  effettuerà un cambiamento di stato. 
 Qui viene riportato un frammento di codice che mostra una di queste funzioni: 
 
 \begin{lstlisting}
@@ -290,7 +290,7 @@ Qui viene riportato un frammento di codice che mostra una di queste funzioni:
 
 Si noti come il secondo parametro della funzione indichi il nome dell'evento che ``triggera'' l'esecuzione del codice, mentre il nome della funzione indica lo stato.
 
-Gli eventi globali portano a un ovvio overhead se implementati in questo modo, infatti per un evento ricevibile in N stati è necessario scrivere N funzioni diverse, se il comportamento è lo stesso in tutti gli stati questo comporta la scrittura di N funzioni tutte uguali ottenendo ulteriormente numerose dipendeze.
+Gli eventi globali portano a un ovvio overhead se implementati in questo modo, infatti per un evento ricevibile in N stati è necessario scrivere N funzioni diverse, se il comportamento è lo stesso in tutti gli stati questo comporta la scrittura di N funzioni tutte uguali ottenendo ulteriormente numerose dipendenze.
 
 Grazie alle comode primitive Erlang si può definire una sola funziona che gestisca lo stesso evento per stati diversi, nel progetto in esame questa è stata chiamata ``handle\_common''. Nella sezione 4 di quasi tutti gli automi, in testa, sono state definite diverse funzioni ``handle\_common'' che adempiono, appunto, a questo scopo. Ne viene qui riportato un esempio;
 
@@ -327,7 +327,7 @@ Nella propria memoria, un ascoltatore, mantiene una lista di record di questo ti
 Nel caso in cui accadano gli eventi sopra citati, tale lista viene consultata in questi modi:
 \begin{itemize}
 	\item incidente: per ogni elemento della lista, viene inviato al pid dell'applicativo la notifica di incidente.
-	\item cambio di destinazione: viene fatto un controllo sulla lunghezza della lista, se questa presenta un solo elemento significa che c'è un solo utente accodato ed è possibile il cambio di desinazione, ne viene quindi calcolata la fattibilità in base alla batteria attuale. Se la lista presenta più elementi allora non è possibile il cambio e l'app dell'utente richiedente viene opportunatamente notificata.
+	\item cambio di destinazione: viene fatto un controllo sulla lunghezza della lista, se questa presenta un solo elemento significa che c'è un solo utente accodato ed è possibile il cambio di destinazione, ne viene quindi calcolata la fattibilità in base alla batteria attuale. Se la lista presenta più elementi allora non è possibile il cambio e l'app dell'utente richiedente viene opportunamente notificata.
 	\item cambio di topologia: per ogni elemento della lista, viene calcolato se è possibile garantire quella comanda considerando il cambiamento appena avvenuto nei percorsi, notificando le relative app in base all'esito. Questo aspetto è stato trattato in \ref{aggiornamentoMappa}.
 \end{itemize}
 
@@ -335,13 +335,13 @@ Nel caso in cui accadano gli eventi sopra citati, tale lista viene consultata in
 Questo automa lavora a stretto contatto con l'automa dell'elezione, essi concorrono a garantire all'utente richiedente il servizio un giusto candidato. Quando l'ascoltatore riceve dall'utente la richiesta, oppure la partecipazione all'elezioni da altri taxi, inoltra all'automa elezione quest'ultima e attende il processamento dell'algoritmo distribuito. Al termine dell'esecuzione di questo algoritmo, l'ascoltatore riceve uno specifico evento contenente l'ouptut, come spiegato nel punto \ref{implementazione_algoritmo_elezione}: in esso è presente il riferimento al taxi vincitore e se questo combacia con se stesso significa che il taxi si dovrà spostare verso nuovi nodi. Questo comporta un aggiornamento della lista dei punti da visitare, aspetto che verrà affrontato nelle prossime sezioni quando si parlerà dell'automa gestione movimento.
 
 \subsection{Automa batteria} \label{automaBatteria}
-Questo automa si proccupa di controllare il livello della batteria del mezzo, controllando se questa è inferiore o superiore a certi valori di soglia e in base ai casi notificare il mezzo se è necessario andare a ricaricare oppure se non è più necessario continuare la ricarica.
+Questo automa si preoccupa di controllare il livello della batteria del mezzo, controllando se questa è inferiore o superiore a certi valori di soglia e in base ai casi notificare il mezzo se è necessario andare a ricaricare oppure se non è più necessario continuare la ricarica.
 
 Inoltre, questo automa controlla se il mezzo è stazionario da un lungo intervallo di tempo e in tal caso lo notifica riguardo alla necessità di iniziare la ricarica con pannelli solari. Questa forma di ricarica è più lenta di quella con colonnina ma è stata implementata in modo da evitare casi di stallo del veicolo. Infatti, un taxi potrebbe rimanere fermo su un nodo, impossibilitato a vincere nuove elezioni a causa di una batteria troppo bassa. 
 
 \subsection{Automa gestione movimento} \label{automaMoving}
 
-Questo automa si preoccupa di garantire lo spostamento del mezzo, l'automa ascooltatore invia ad esso le tappe da percorrere secondo quanto detto in \ref{listenerElection}.
+Questo automa si preoccupa di garantire lo spostamento del mezzo, l'automa ascoltatore invia ad esso le tappe da percorrere secondo quanto detto in \ref{listenerElection}.
 Per tappa si intende dire uno spostamnto fra due nodi adiacenti. Concettualmente questo automa ha o scopo di consumare le tappe ricevute dall'esterno e notificare il suo ascoltatore di avvisare eventuali utenti incontrati nel percorso o serviti. 
 
 le tappe sono state modellate creando un record chiamato, per l'appunto, ``tappa'', che presenta questi 4 campi:
@@ -408,7 +408,7 @@ Questo automa è uno dei pochi che usano i timer del behavior piuttosto che il s
 Questo timer viene lanciato quando l'app invia al taxi più vicino la richiesta di spostamento e si sposta nello stato ``waiting\_election'', nella quale aspetta una risposta. Se questa risposta non viene ricevuta nei tempi impostati dal timer, questa scatta e l'app decide di reiterare la richiesta. 
 
 \subsubsection{Attese random}
-ci sono 4 cirocstanze in cui l'app decide di aspettare un tempo random e reiterare la richiesta dell'utente al taxi più vicino:
+ci sono 4 circostanze in cui l'app decide di aspettare un tempo random e reiterare la richiesta dell'utente al taxi più vicino:
 \begin{enumerate}
 	\item l'applicazione non ha trovato nessun taxi nei paraggi per inviare la richiesta, ossia il modulo gps non ha rilevato nessuna macchina nella mappa.
 	\item c'è stato un incidente del mezzo nel quale viaggiava l'utente.
@@ -418,7 +418,7 @@ ci sono 4 cirocstanze in cui l'app decide di aspettare un tempo random e reitera
 
 la scelta di attendere un tempo random è finalizzata principalmente nel cercare di evitare una sovrapposizione fra wave diverse originate da richieste immesse nello stesso istante da utenti differenti. In tal caso, infatti, la garanzia di offrire un servizio di qualità verrebbe intaccata.
 
-\section{Automa Elezione}
+\section{Automa Elezione} \label{automaElezione}
 Il principale problema affrontato in questo progetto è stato quello di eleggere quale sia la migliore macchina per soddisfare la richiesta dell'utente. Come già accennatto precedentemente al punto \ref{automiMacchina}, ogni macchina possiede un'istanza di questo automa.
 
 \subsection{Record utilizzati}\label{record_elezione}
@@ -426,11 +426,11 @@ Per l'elezione vengono utilizzati diversi record, che per lo più rispecchiano i
 
 \begin{itemize}
 	\item user\_request: formato dalla coppia ``from''  e ``to'' indica il punto di partenza e arrivo dell'utente.
-	\item dataElectionBegin: creato dall'automa ascoltatore, indica all'elezione di iniziare i calcoli per l'elezione. Al suo interno contine la richiesta dell'utente ed il pid dell'applicazione dell'utente.
+	\item dataElectionBegin: creato dall'automa ascoltatore, indica all'elezione di iniziare i calcoli per l'elezione. Al suo interno contiene la richiesta dell'utente ed il pid dell'applicazione dell'utente.
 	\item dataElectionPartecipate: creato dall'automa elezione, rispecchia la struttura spiegata precedentemente. Contiene: riferimento alla macchina ``padre'' per la successiva comunicazione dei risultati; user request come definita prima; ttl per determinare se inoltrare ulteriormente l'invito.
 	\item electionCostData: vengono creati da ogni macchina e contengono il proprio pid per l'eventuale comunicazione del vincitore assieme al CC e CRDT come definiti al punto \ref{funzioni_di_costo_macchine}.
 	\item carPartecipate: formato da tre campi, ha lo scopo di mantenere le informazioni dei nodi invitati a partecipare a una determinata elezione. Contiene il pid della macchina invitata, una lista dei costi ad essa associata ed una variabile ``sent results'' che indica se la determinata macchina ha già inviato oppure no i propri calcoli per l'elezione.
-	\item election\_result\_to\_car: risultati per la macchina, contengono il pid del vincitore, il pid dell'app dell'utente per la creazione delle relative tappe per l'automa moving e la richiesta in modo che sia più facile popolare la lista ``users in queue'' dell'automa ascoltatore. Maggiori informazioni al punto REF\_USERS\_IN\_QUEUE.
+	\item election\_result\_to\_car: risultati per la macchina, contengono il pid del vincitore, il pid dell'app dell'utente per la creazione delle relative tappe per l'automa moving e la richiesta in modo che sia più facile popolare la lista ``users in queue'' dell'automa ascoltatore. Maggiori informazioni al punto \ref{usersInQueue}.
 	\item election\_result\_to\_user: risultati per gli utenti, vengono creati dall'automa ascoltatore risultato vincitore dell'elezione. Contengono il pid e nome del taxi vincitore assieme al tempo di attesa per l'arrivo nella posizione dell'utente.
 \end{itemize}
 
@@ -497,7 +497,7 @@ Riprendendo l'algoritmo definito al punto \ref{algoritmo_elezione}, di seguito n
 
 	In entrambi i casi alla fine viene chiamata la procedura dedicata al calcolo della fine ``running\_election'' che se, la lista degli invitati è vuota e tutti i partecipanti hanno inviato i propri dati, invia i dati al nodo genitore e sposta l'automa nello stato di attesa / calcolo dei risultati dell'elezione.
 	
-	Per ridurre i calcoli eseguiti da un unico nodo, si è optato per inoltrare al genitore solamente i dati del nodo migliore del proprio sottoalbero. I dati scambiati contenenti le informazio di un particolare nodo sono presenti nei record di tipo ``electionCostData'' come già definito.
+	Per ridurre i calcoli eseguiti da un unico nodo, si è optato per inoltrare al genitore solamente i dati del nodo migliore del proprio sotto-albero. I dati scambiati contenenti le informazioni di un particolare nodo sono presenti nei record di tipo ``electionCostData'' come già definito.
 
 	\item Il nodo iniziatore, a differenza dei nodi partecipanti, appena riceve tutte le risposte dai propri figli si sposta nello stato speciale ``initiator final state'' nel quale, dopo l'applicazione della funzione di selezione del miglior dato, crea i risultati dell'elezione. In base ai calcoli effettuati crea il record del vincitore e inoltra il messaggio a tutti i nodi partecipanti all'elezione.
 	
