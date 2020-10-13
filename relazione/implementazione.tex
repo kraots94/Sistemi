@@ -5,7 +5,7 @@
 \chapter{Implementazione}
 
 \section{Automi} \label{implementazioneAutomi}
-Per l'implementazione degli automi è stata utilizzato il behavior erlang "gen\_statem", il quale semplifica la costruzione di macchine a stati finiti guidate da eventi. Questo behavior è un framework con numerose primitive riguardanti questi costrutti: invio e ricezione di eventi sincroni o asincroni, impostazione di timer e molto altro. Gli schemi degli automi mostrati in ... sono stati implementati in modo relativamente veloce potendosi concentrare quasi esclusivamente sulla logica del loro funzionamento piuttosto che sui dettagli implementativi, nascosti appunto dal suddetto framework. 
+Per l'implementazione degli automi è stata utilizzato ``gen\_statem'', il behavior erlang che semplifica la costruzione di macchine a stati finiti guidate da eventi. Questo behavior è un framework con numerose primitive riguardanti questi costrutti: invio e ricezione di eventi sincroni o asincroni, impostazione di timer e molto altro. Gli schemi degli automi mostrati in ... sono stati implementati in modo relativamente veloce potendosi concentrare quasi esclusivamente sulla logica del loro funzionamento piuttosto che sui dettagli implementativi, nascosti appunto dal suddetto framework. 
 Qui di seguito si riporta un link alla documentazione ufficiale del framework: ...
 
 I sorgenti sono stati opportunatamente commentati per descrivere il funzionamento del codice ma è opportuno compiere una descrizione generale di questi automi, soffermandosi sulle scelte implementative effettuate.

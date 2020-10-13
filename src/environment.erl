@@ -28,16 +28,16 @@
 							cars_crashed,
 							total_cars_crashed,
 							city, 
-							tick_s_pid, 
 							pid_gps_server, 
-							tick_counter,
 							autoEvents,
-							user_pids,
-							last_user_id,
-							user_prefix = u,
+							tick_s_pid, 
+							tick_counter,
 							car_pids,
 							last_car_id,
-							car_prefix = c}).
+							user_pids,
+							last_user_id,
+							car_prefix = c,
+							user_prefix = u}).
 						
 %% ====================================================================
 %% API functions
@@ -302,66 +302,72 @@ loop(State) ->
 
 handle_random_event(S, N) ->
 	EventID = if 	
-	    N < 0   ->  -1;
-		N < 10  ->   1;
-	   	N < 15  ->  -1;
-		N < 25  ->   2;
-		N < 35  ->  -1;
-		N < 45  ->   3;
-		N < 50  ->  -1;
-		N < 60  ->   4;
-		N < 70  ->   5;
-		N < 75  ->  -1;
-		N < 77  ->   6;
-		N == 77 ->  -1;
-		N < 80  ->   7;
-		N == 80 ->  -1;
-		N < 83  ->   8;
-		N == 83 ->  -1;
-		N < 86  ->   9;
-		N < 95  ->  -1;
-		N < 100 ->  10;
-		true    ->   -1
+	    N < 0    ->  -1;
+		N < 5  	 ->   1;
+	    N < 10   ->  -1;
+		N < 15   ->   2;
+	    N < 20   ->  -1;
+		N < 25 	 ->   3;
+	    N < 30   ->  -1;
+		N < 35   ->   4;
+	    N < 40   ->  -1;
+		N < 45   ->   5;
+	    N < 50   ->  -1;
+		N < 55   ->   6;
+	    N < 60   ->  -1;
+		N < 65   ->  -1;
+	    N < 70   ->  -1;
+		N < 75   ->  -1;
+	    N < 80   ->  -1;
+		N < 85   ->  -1;
+	    N < 90   ->  -1;
+		N < 95   ->  -1;
+	   	N < 100  ->  -1;
+		true     ->  -1
 	end,
 	handle_event(S, EventID, {none}).
 
 handle_event(S, EventID, Data) ->
 	NewState = if
 		EventID == -1 -> % Nothing
-			print_debug_message(self(), "Event: ~p", "nothing happened"),
+			print_environment_message(self(), "Event: ~p", "nothing happened"),
 			S;
 		EventID == 1 -> % Spawn car
-			print_debug_message(self(), "Event: ~p", "spawn car"),
+			print_environment_message(self(), "Event: ~p", "spawn car"),
 			event_generate_car(S);
 		EventID == 2 -> % Spawn user
-			print_debug_message(self(), "Event: ~p", "spawn user"),
+			print_environment_message(self(), "Event: ~p", "spawn user"),
 			event_generate_user(S);
 		EventID == 3 -> % Change target
-			print_debug_message(self(), "Event: ~p", "client change target"),
+			print_environment_message(self(), "Event: ~p", "client change target"),
 			event_user_change_target(S, Data);
 		EventID == 4 -> % Car crash
-			print_debug_message(self(), "Event: ~p", "car crash"),
+			print_environment_message(self(), "Event: ~p", "car crash"),
 			event_car_crash(S, Data);
 		EventID == 5 -> % Fix car
-			print_debug_message(self(), "Event: ~p", "fix car"),
+			print_environment_message(self(), "Event: ~p", "fix car"),
 			event_fix_car(S, Data);
-		EventID == 6 -> % Add node to map
-			print_debug_message(self(), "Event: ~p", "add node to map"),
-			S;
-		EventID == 7 -> % Add street to map
-			print_debug_message(self(), "Event: ~p", "add street to map"),
-			S;
-		EventID == 8 -> % Remove node from map
-			print_debug_message(self(), "Event: ~p", "remove node from map"),
-			S;
-		EventID == 9 -> % Remove street from map
-			print_debug_message(self(), "Event: ~p", "remove street from map"),
-			S;
-		EventID == 10 -> % Remove car
-			print_debug_message(self(), "Event: ~p", "remove car from environment"),
+		EventID == 6 -> % Remove car
+			print_environment_message(self(), "Event: ~p", "remove car from environment"),
 			event_remove_car(S, Data);
+		EventID == 7 -> % Add node to map
+			print_environment_message(self(), "Event ~w does not exist", EventID),
+			%print_environment_message(self(), "Event: ~p", "add node to map"),
+			S;
+		EventID == 8 -> % Add street to map
+			print_environment_message(self(), "Event ~w does not exist", EventID),
+			%print_environment_message(self(), "Event: ~p", "add street to map"),
+			S;
+		EventID == 9 -> % Remove node from map
+			print_environment_message(self(), "Event ~w does not exist", EventID),
+			%print_environment_message(self(), "Event: ~p", "remove node from map"),
+			S;
+		EventID == 10 -> % Remove street from map
+			print_environment_message(self(), "Event ~w does not exist", EventID),
+			%print_environment_message(self(), "Event: ~p", "remove street from map"),
+			S;
 		true ->
-			print_debug_message(self(), "Event ~w does not exist", EventID),
+			print_environment_message(self(), "Event ~w does not exist", EventID),
 			S
 	end,
 	NewState.

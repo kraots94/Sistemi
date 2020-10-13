@@ -103,13 +103,6 @@ Lo script in python crea cinque file:
 	
 \end{itemize}
 
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=14cm]{esempio_citta_dot.jpg}
-	\caption{Esempio di grafo utilizzato per la simulazione della città.}
-	\label{fig:esempio_citta_dot}
-\end{figure}
-
 
 \begin{figure}[htbp]
 	\centering
@@ -118,9 +111,76 @@ Lo script in python crea cinque file:
 	\label{fig:esempio_citta_png}
 \end{figure}
 
-\section{Entità Ambiente}
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=14cm]{esempio_citta_dot.jpg}
+	\caption{Esempio di grafo utilizzato per la simulazione della città.}
+	\label{fig:esempio_citta_dot}
+\end{figure}
 
-\section{Mappa città e relativi algoritmi}
+\newpage
+
+\section{Entità Ambiente}
+Questa entità, chiamata anche ``environment'', rappresenta il mondo in cui avviene la simulazione. Tramite esso è possibile creare entità, rimuoverle e far acccadere eventi.
+
+\subsection{Variabili di stato}
+Il suo stato contiene:
+\begin{itemize}
+	\item cars: lista dei pid delle macchine attualmente presenti nella città. In particolare è memorizzato il pid dell'automa ascoltatore, poichè è ad esso che vengono poi indirizzati i messaggi che riguardano la macchina di cui fa parte.
+	\item total\_cars: numero totale delle macchine presenti. Esso viene aggiornato a ogni aggiunta e rimozione.
+	\item users: lista dei pid degli utenti presenti nella città. Essa viene aggiornata sia quando l'utente viene creato che rimosso, vale a dire quando è giunto a destinazione.
+	\item total\_users: numero totale degli utenti attualmente in città.
+	\item cars\_crashed: lista delle macchine attualmente in stato ``crash''.
+	\item total\_cars\_crashed: numero totale delle macchine in stato ``crash''.
+	\item city: dati della città come descritti nella parte \ref{citta_e_algoritmi}.
+	\item pid\_gps\_server: pid del server gps. Ne viene spiegato il funzionamento al punto \ref{gps_server}.
+	\item autoEvents: flag che indica se gli eventi automatici sono abilitati oppure no.
+	\item tick\_s\_pid: pid dell'istanza tick server dedicata all'environment.
+	\item tick\_counter: contatore dei tick ricevuti.
+	\item car\_pids: dizionario che associa il nome al pid delle macchine presenti.
+	\item last\_car\_id: numero incrementale utilizzato per la generazione del nome delle macchine.
+	\item user\_pids: dizionario che associa il nome al pid degli utenti present.
+	\item last\_user\_id: numero incrementale utilizzato per la generazione del nome degli utenti.
+	\item car\_prefix: prefisso utilizzato per i nomi delle macchine. Nella simulazione è pari a ``c''.
+	\item user\_prefix: prefisso utilizzato per i nomi delle macchine. Nella simulazione è pari a ``u''.
+\end{itemize}
+
+\subsection{Eventi e gestione di essi}\label{env_events}
+Sono stati gestiti sette tipi di eventi. Di seguito l'identificativo dell'evento ed il relativo nome assieme a una minima spiegazione:
+\begin{itemize}
+	\item -1 Nothing: nulla, lo stato della città resta inalterato.
+	\item 1 Spawn car: questo evento causa la creazione di una macchina in un punto casuale della città. La creazione viene discussa nella parte \ref{creazione_distruzione_entita}.
+	\item 2 Spawn user: questo evento causa la creazione di un utente in un punto casuale della città con una destinazione random. Maggiori informazioni sono presenti nella parte \ref{creazione_distruzione_entita}
+	\item 3 Change target: quando occorre questo evento un utente casuale oppure quello passato per parametro cambierà la propria destinazione se possibile.
+	\item 4 Car crash: una macchina scelta casualmente o determinata dal parametro passato passerà dallo stato normale a crash. Maggiori informazioni nella parte RIFERIMENTO\_CAR\_CRASH. Il suo pid viene aggiunto alla lista cars\_crashed. Nel caso venga selezionata una macchina già in quello stato viene stampato un messaggio di errore.
+	\item 5 Car fix: una tra le macchine presenti nella lista cars\_crashed viene selezionata e ripatata tramite l'apposito evento. 
+	\item 6 Remove Car: una macchina in stato ``idle'' viene rimossa dalla mappa. Se la macchina selezionata non è in idle si cerca una seconda macchia e via via fino al valore limite della variabile globale ``max\_kill\_tries''. Questo limite è dovuto alla volontà di evitare situazioni di stallo.
+\end{itemize}
+
+Nel caso in cui il flag ``autoEvents'' dello stato sia impostato a ``true'', il contatore dei tick ricevuti inizierà ad accumulare il tempo trascorso. In base alla variabile globale ``ticks\_event'' vengono determinati ogni quanti tick ricevuti debba acccadere un evento casuale tra quelli appena discussi.
+
+Tramite le API fornite dal modulo è possibile innescare un determinato evento tramite la funzione ``triggerEvent'' e l'identificativo dell'evento desiderato. In alternativa è possibile utilizzare le funzioni già pronte per gli eventi a cui si può passare i parametri desiderati. Maggiori informazioni sono presenti nella documentazione dei singoli metodi.
+
+\subsection{Creazione ed eliminazione delle entità} \label{creazione_distruzione_entita}
+La creazione l'eliminazione di una determinata entità comportano diverse modifiche allo stato dell'environment, pertanto verranno analizzate in modo separato.
+
+Dopo aver creato un'entità è necessario aggiornare il relativo contatore per evitare che esistano entità diverse ma con lo stesso nome.
+
+\subsubsection{Creazione di una macchina}
+I dati di cui necessita una macchina sono: posizione di partenza, pid del server gps a cui poter comnicare la propria posizione, mappa della città per poter eseguire l'algoritmo di elezione ed infine nome a lei assegnato. Dopo aver preparato i dati viene eseguita una chiamata al modulo della macchina e il pid ottenuto viene aggiunto alla lista delle macchina attualmente in città. Vengono incrementati i contatori delle macchine in città e dei nomi di esse. Infine viene aggiornato il dizionario che tiene traccia dell'associazione nome-pid macchina.
+
+Il modulo della macchina crea le proprie istanze come spiegato al punto REF\_SPAWN\_MACCHINA
+
+\subsubsection{Creazione di un utente}
+I dati di cui necessita un utente sono: posizione di partenza, richiesta di trasporto formata dalle due posizioni di partenza e arrivo, pid del server gps per la propria applicazione e nome dell'utente. Il pid del server gps serve poichè è l'automa utente a creare l'automa app\_utente. Il punto di partenza della richiesta deve essere lo stesso della posizione iniziale dell'utente. In caso contrario viene generato un messaggio di errore. Come per la macchina, anche dopo la creazione dell'utente vengono aggiornate le relative liste.
+
+\subsubsection{Eliminazione di una macchina}
+Come già accennato nella parte \ref{env_events}, l'eliminazione di una macchina dall'ambiente avviene solo se essa si trova nello stato di idle. Questa scelta è stata fatta perché simile alla realtà. Una volta individuata, le si invia il segnale di morte e la si rimuove dalla lista delle macchine nell'ambiente. Inoltre viene rimossa la sua coppia nome-pid nel dizionario.
+
+\subsubsection{Rimozione di un utente dall'ambiente}
+Quando un utente è giunto a destinazione, considera compiuto il proprio dovere ed invoca il metodo dell'environment ``removeUser'' che ne elimina i riferimenti dallo stato come già spiegato per la macchina.
+
+\section{Mappa città e relativi algoritmi} \label{citta_e_algoritmi}
 Il record ``city'' contiene cinque parametri:
 \begin{itemize}
 	\item city\_graph: grafo caricato dalla libreria descritta al punto \ref{libreria_algoritmi}.
@@ -135,8 +195,7 @@ L'automa elezione inserire riferimento ne utilizza il city\_graph per calcolare 
 
 L'entità ambiente inserire riferimento ne utlizza i nodi per generare casualmente le posizion iniziali di macchine e utenti.
 
-Il Gps Server inserire riferimento ne utilizza i nodi per creare la propria struttura dove tiene traccia della posizione attuale delle entità presenti in un determinato istante nella città
-
+Il Gps Server \ref{gps_server} ne utilizza i nodi per creare la propria struttura dove tiene traccia della posizione attuale delle entità presenti in un determinato istante nella città
 
 \subsection{Nodi città}\label{nodi_citta}
 Come già descritto al punto \ref{componenti_grafo_citta}, ogni nodo possiede diverse proprietà che vengono memorizzate nell'apposito record definito in questo modo:
@@ -196,7 +255,20 @@ In entrambi i casi vengono effettuati i seguenti passaggi: nel calcolo delle dis
 \subsection{Gps Module}\label{gps_module}
 Rappresenta il modulo ``localizzatore vicini'' descritto nella parte \ref{modules}. Esso fornisce all'automa della macchina e dell'applicazione dell'utente le funzioni per il recupero delle entità vicine.
 
+Il suo stato contiene i seguenti parametri:
+\begin{itemize}
+	\item pid\_entity: il pd a cui è associato il modulo gps. Nel protetto corrisponde all'applicazione dell'utente oppure all'automa ascoltatore della macchina.
+	\item name\_entity: il nome dell'entità di cui fa parte.
+	\item pid\_gps\_server: il pid del server gps a cui fare le richieste delle entità vicine.
+	\item entity\_type: tipo dell'entità a cui è associato. Nel caso faccia parte di una macchina esso sarà ``car'' mentre nel caso dell'applicazione utente sarà ``user''.
+	\item current\_position: nome del nodo attuale dov'è situata l'entità di cui fa parte.
+	\item module\_range: potenza del segnale gps del modulo. Viene utilizzato dal gps server per filtrare i risultati come già spiegato al punto \ref{gps_server}.
+	\item map\_side: poiché viene assunto che il modulo dell'applicazione utente possa sempre individuare la macchina più vicina, la potenza utilizzata dalla funzione ``getNearestCar'' è pari alla diagonale della mappa, pertanto sicuramente individua tutte le macchine.
+\end{itemize}
 
+La funzione ``getNearestCar'' richiede al Gps server le entità presenti ordinate secondo la distanza dal nodo dov'è situato il modulo gps e, dopo aver rimosso il pid relativo a alla propria entità, ne seleziona il primo elemento. 
+
+La funzione ``getNearCars'' esegue come la precedente la richiesta al server indicando la propria posizione e il proprio livello di segnale. La risposta del server, dopo aver rimosso da essa il pid relativo all'entità di cui il modulo fa parte, viene inoltrata all'entità che ha eseguto questa funzione.
 
 \section{Automi macchina}
 
