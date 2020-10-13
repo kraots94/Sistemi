@@ -130,10 +130,21 @@ Ci sono diverse cose da notare in esso ripercorrendo il log:
 	\item Il messaggio di begin election dell'utente ``u1'' è il primo giunto al taxi poiché gli altri due hanno stampato il messaggio di errore relativo al caso in cui la macchina a cui viene chiesto il servizio è già nello stato di running election.
 	\item Dopo la comunicazione da parte della macchina all'utente ``u1'' dei propri tempi di percorrenza, l'utente ``u3'' ha esaurito la propria attesa casuale per il nuovo tentativo di richiesta del servizio e, dopo aver inviato la richiesta, riceve la risposta con i tempi. 
 	\item L'utente ``u2'', essendo l'ultimo ad effettuare la richiesta, non viene soddisfatto e resta nello stato di waiting election. La macchina non risponderà in modo positivo finché non possiederà abbastanza batteria.
-	\item Dopo aver trasportato sia ``u1'' che ``u3'', la macchina continua a fare i calcoli per soddisfare 
+	\item Dopo aver trasportato sia ``u1'' che ``u3'', la macchina continua a fare i calcoli per capire se può soddisfare ``u2'' tuttavia la bassa batteria le impedisce di vincere. Essendo nello stato di ``idle'', tuttavia, dopo un numero di tick pari a 20, viene abilitata la carica solare che ricarica ad ogni tick ricevuto un'unità di batteria.
+	\item si può notare infatti come il messaggio stampatao da parte della macchina ``Triggered Solar Charghing'' notifichi l'inizio della ricarica.
+	\item Non appena sufficiente batteria è stata ricaricata, la macchina vince l'elezione e trasporta l'utente ``u2'' a destinazione.
+	\item Si può notare come, dopo il trasporto di ``u2'' e il viaggio alla colonnina, la macchina abbia zero batteria e inizia la ricarica normale.
 \end{itemize}
 
+\subsection{Test - Un utente e diverse macchine}
+\subsection{Test - Utente cambia destinazione}
+Il quarto test consiste nell'evento di cambio destinazione da parte dell'utente. Il log è presente nell'appendice al punto \ref{log_change_dest}.
 
+Si può notare come il percorso della macchina cambi da prima a dopo la richiesta dell'utente.
 
+\subsection{Test - Evento Crash e Fix}
+Il quinto test mostra come il sistema reagisce in base al crash di una macchina. Il log è presente nell'appendice al punto \ref{car_crash_fix_event}.
 
-\section{Controllo requisiti}
+In seguito alla chiamata di sistema che causa l'evento ``crash'' di una macchina, essa notifica a tutti gli utentei in coda il fatto di non poter più proseguire, infatti si vedono le notifiche da parte degli automi di questo. 
+
+Dopo un tempo random si è deciso di riparare la macchina. Le applicazioni degli utenti sono riuscite quindi a riottenere il servizio da parte della macchina e garantire il servizio.
