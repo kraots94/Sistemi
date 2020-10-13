@@ -181,7 +181,8 @@ loop(State) ->
 					NewTargetID = nodes_util:getNodeID(NewTarget, Nodes),
 					if 
 						NewTargetID == -1 -> 
-							print_environment_message(self(), "Node with name {~p} does not exist", NewTarget);
+							print_environment_message(self(), "Node with name {~p} does not exist", NewTarget),
+							State;
 						true ->
 							handle_event(State, 3, {hd(Pid), NewTarget})
 					end
