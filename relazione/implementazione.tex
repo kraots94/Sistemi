@@ -60,6 +60,95 @@ handle_common(cast, {die}, _OldState, State) ->
 
 Queste funzioni hanno una firma diversa in base all'evento: l'atomo inserito come secondo parametro della funzione indica quale evento ``triggera'' l'esecuzione di quel codice.
 
-\subsection{automa elezione}
+\section{Automi Macchina} \label{automiMacchina}
 
-Si vuole in questa sezione descrivere un particolare automa del progetto ossia quello relativo all'algoritmo di elezione del taxi candidato...
+le macchine, come mostrato negli schemi progettuali, presentano più automi che lavorano in parallelo: automa "ascoltatore", automa "gestione movimento", "gestione batteria" ed "elezione". La descrizione sommaria di questi è già stata affrontata in \ref{automi}, in questa sezione verrà fatta una descrizione di essi soffermandosi sugli aspetti principali della loro implementazione.
+
+\subsection{Automa ascoltatore} \label{automaAscoltatore}
+
+L'automa ascoltatore, o listener, è il padre della gerarchia che rappresenta i vari automi del mezzo. Quando l'environment genera un nuovo taxi si preoccupa soltanto di inizializzare un automa di questo tipo, il quale automaticamente creerà tutti i restanti automi sottostanti mantenendo un riferimento a ognuno di essi nella propria memoria. Oltre ad essi, l'ascoltatore si impegna a creare anche il modulo gps usato dall'auto e il "server tick", indicando ad esso di inserire fra gli abbonati tutti gli automi del mezzo, così da garantire una temporizzazione sincronizzata. 
+
+\subsubsection{la lista di utenti in coda} \label{usersInQueue}
+
+Per semplificare la gestione di incidenti, cambi di destinazione, cambiamenti alla topologia cittadina, si è pensato di mantenere nell'ascoltatore una lista di tutti gli utenti in coda per il taxi. In particolare, è stato definito uno speciale record che rappresenta una "comanda" del taxi, ossia una istanza di richiesta del servizio da parte di un utente.
+Questo record è definito nel sorgente di questo automa e si chiama "userInQueue", esso presenta questi 3 campi:
+
+\begin{enumerate}
+	\item pid = il pid dell'applicazione dell'utente richiedente il servizio
+	\item position = la posizione attuale del cliente 
+	\item target = la destinazione del cliente
+\end{enumerate}
+
+Nella propria memoria, un ascoltatore, mantiene una lista di record di questo tipo, uno per ogni cliente in coda.
+Nel caso in cui accadano gli eventi sopra citati, tale lista viene consultata in questi modi:
+\begin{itemize}
+	\item incidente: per ogni elemento della lista, viene inviato al pid dell'applicativo la notifica di incidente.
+	\item cambio di destinazione: viene fatto un controllo sulla lunghezza della lista, se questa presenta un solo elemento significa che c'è un solo utente accodato ed è possibile il cambio di desinazione, ne viene quindi calcolata la fattibilità in base alla batteria attuale. Se la lista presenta più elementi allora non è possibile il cambio e l'app dell'utente richiedente viene opportunatamente notificata.
+	\item cambio di topologia: per ogni elemento della lista, viene calcolato se è possibile garantire quella comanda considerando il cambiamento appena avvenuto nei percorsi, notificando le relative app in base all'esito. Questo aspetto è stato trattato in \ref{aggiornamentoMappa}.
+\end{itemize}
+
+\subsubsection{legame con automa elezione} \label{listenerElection}
+Questo automa lavora a stretto contatto con l'automa dell'elezione, essi concorrono a garantire all'utente richiedente il servizio un giusto candidato. Quando l'ascoltatore riceve dall'utente la richiesta, oppure la partecipazione all'elezioni da altri taxi, inoltra all'automa elezione quest'ultima e attende il processamento dell'algoritmo distribuito. Al termine dell'esecuzione di questo algoritmo, l'ascoltatore riceve uno specifico evento contenente l'ouptut, in esso è presente il riferimento al taxi vincitore e se questo combacia con se stesso significa che il taxi si dovrà spostare verso nuovi nodi. Questo comporta un aggiornamento della lista dei punti da visitare, aspetto che verrà affrontato nelle prossime sezioni quando si parlerà dell'automa gestione movimento.
+
+\subsection{Automa batteria} \label{automaBatteria}
+Questo automa si proccupa di controllare il livello della batteria del mezzo, controllando se questa è inferiore o superiore a certi valori di soglia e in base ai casi notificare il mezzo se è necessario andare a ricaricare oppure se non è più necessario continuare la ricarica.
+
+Inoltre, questo automa controlla se il mezzo è stazionario da un lungo intervallo di tempo e in tal caso lo notifica riguardo alla necessità di iniziare la ricarica con pannelli solari. Questa forma di ricarica è più lenta di quella con colonnina ma è stata implementata in modo da evitare casi di stallo del veicolo. Infatti, un taxi potrebbe rimanere fermo su un nodo, impossibilitato a vincere nuove elezioni a causa di una batteria troppo bassa. 
+
+\subsection{Automa gestione movimento} \label{automaMoving}
+
+Questo automa si preoccupa di garantire lo spostamento del mezzo, l'automa ascooltatore invia ad esso le tappe da percorrere secondo quanto detto in \ref{listenerElection}.
+Per tappa si intende dire uno spostamnto fra due nodi adiacenti. Concettualmente questo automa ha o scopo di consumare le tappe ricevute dall'esterno e notificare il suo ascoltatore di avvisare eventuali utenti incontrati nel percorso o serviti. 
+
+le tappe sono state modellate creando un record chiamato, per l'appunto, "tappa", che presenta questi 4 campi:
+
+\begin{enumerate}
+	\item user = pid dell'applicazione utente che viene servito in questa tappa
+	\item type = il tipo di nodo che verrà raggiunto dopo questa tappa, si è deciso di definire 4 diversi tipi di nodi, vedasi sezione successiva "tipi di nodi"
+	\item t = il tempo necessario a percorrere questa tappa
+	\item node\_name = il nome del nodo raggiunto dalla tappa
+\end{enumerate}
+Sono stati definiti opportuni metodi che elaborano l'output dell'algoritmo del calcolo dei percorsi minimi e creano le tappe formattate in questo modo, pronte per essere date in pasto a questo automa.
+
+\subsubsection{tipi di nodi} \label{tipiTappe}
+
+assumiamo che un utente abbia sottomesso al servizio una richiesta di questo tipo: spostamento dal nodo "a" al nodo "d".
+i tipi di nodi delle tappe sono stati distinti con questi 4 atomi:
+
+\begin{enumerate}
+	\item 'user\_start' = indica il nodo nel quale si trova l'utente, il nodo "a" della richiesta
+	\item 'user\_target' =  indica il nodo che l'utente vuole raggiungere, il nodo "d" della richiesta
+	\item 'intermediate' =  indica un nodo intermedio, ossia tutti quei nodi che nel tragitto da percorrere si frappongono fra il nodo "a" e il nodo "d" della richiesta oppure fra il nodo "d" e quello della colonnina da raggiungere, eventualmente, per la ricarica.
+	\item column = indica il nodo contenente la colonnina di ricarica, verso il quale andare eventualmente a caricare dopo aver servito l'utente.
+\end{enumerate}
+
+\subsubsection{consumo delle tappe} \label{consumo tappe}
+Questo automa raccoglie i record tappe in una lista nella propria memoria, dopo un numero fissato di tick "consuma" la  tappa inserita in testa, elaborandone il contenuto per sapere come comportarsi, alcuni esempi: il tipo della tappa indica se è necessario comunicare all'utente aggiornamenti sulla sua richiesta oppure se è stata raggiunta la colonnina di ricarica, il valore 't' indica il tempo rimanente al raggiungimento del prossimo nodo.
+Le possibili combinazioni di comportamenti in base al contenuto della tappa sono molte, una lista esausitva di tutti questi non è lo scopo di questo documento e sono stati riportati solo alcuni esempi per favorire la comprensione dell'automa.
+
+\subsubsection{ricarica del mezzo} \label{tappe colonnina}
+Come detto in \ref{tipiTappe}, uno dei tipi di tappa è quello del nodo con la colonnina di ricarica, pertanto l'automa deve inserire tra le sue mansioni anche lo spostamento verso le colonnine e la ricarica del mezzo.
+
+Questo automa riceve dall'automa ascoltatore 2 liste di tappe: quelle da consumare per soddisfare la richiesta del cliente e quelle da consumare per raggiungere la colonnina di ricarica. Alla ricezione di queste l'automa procede al consumo della prima lista, ma salva la seconda in un attributo specifico della memoria non sapendo se consumerà anche queste tappe. Se, durante lo spostamento, la batteria scenderà sotto un certo livello, l'automa batteria invierà a questo la notifica secondo quanto detto in \ref{automaBatteria} e l'automa si accingerà al consumo della seconda lista. 
+In tale modo si garantisce che venga seguito il percorso verso la colonnina solo se viene valutato necessario caricare il mezzo.
+
+Al raggiungimento del nodo 'column' l'automa si sposta nello stato di ricarica, nel quale a ogni intervallo costante di tick aumenta la propria batteria. Questo processo continua fino alla ricezione della notifica di fermo da parte dell'automa batteria, con la quale avviene il ritorno allo stato idle.
+Similmente, se l'automa batteria decide di avviare la ricarica solare, l'automa compie le stesse transizioni.
+
+\subsubsection{dati necessari all'elezione}
+I dati necessari all'algoritmo di elezione riguardano principalmente il processamento di elementi presenti nella memoria di questo automa, si pensi per esempio al livello di batteria rimanente oppure al nodo destinazione verso cui il mezzo si sta dirigendo per soddisfare l'ultimo cliente in coda.
+Per tale motivo si è valutato utile inserire nell'API di questo automa un metodo che restituisca tutti questi dati necessari all'automa dell'elezione, il quale lo chiamerà quando necessario per l'esecuzione dell'algoritmo. Il metodo è stato chiamato "getDataElection" e restituisce valori diversi a seconda dello stato del taxi, viene qui riportato quello eseguito del caso in cui questo automa si trovi in idle :
+
+\begin{lstlisting}
+idle({call,From}, {getDataElection}, State) ->
+	Cost_To_last_Target = 0,
+	Current_Target = State#movingCarState.currentPos,
+	Battery_level = State#movingCarState.batteryLevel,
+	Packet = {Cost_To_last_Target, Current_Target, Battery_level ,ok},
+	{keep_state, State, [{reply,From,Packet}]};
+\end{lstlisting}
+
+
+
+
+

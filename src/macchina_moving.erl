@@ -115,7 +115,7 @@ activateSolarCharge(Pid) ->
 %aggiornamento queue delle tappe del mezzo
 %usato da @automata macchina_ascoltatore dopo aver vinto un elezione oppure dopo aver verificato che un cambio destinazione è fattibile
 %@param Queue :: List of record 'tappe', tappe da percorrere
-%@param Mode :: atomo 'append' o 'replace', indica se le tappe vanno accodate all'attuale queue oppure rimpiazzate
+%@param Mode :: atomo 'append' o 'replace', indica se le tappe vanno accodate all'attuale queue oppure rimpiazzate (dipende se è stato fatto cambio dest. oppure no)
 updateQueue(Pid, Queue, Mode) ->
 	gen_statem:cast(Pid, {updateQueue, Queue, Mode}).
 
@@ -196,8 +196,6 @@ handle_common({call,From}, {getTimeToUser}, OldState, State) ->
 	{next_state, OldState, State, [{reply,From,TimeToUser}]};
 
 handle_common(cast, {crash}, _OldState, State) ->
-	%avviso listener che avvisi utenti ...
-	% Prepare data for special election -> [Battery, [{pid, from, to}, ...]] vengono inviati a ascoltatore e si arrangia lui
 	{next_state, crash, State#movingCarState{tappe = [], currentUser = none,
 											timeToUser = 0, costToLastDestination = 0}};
 
@@ -343,7 +341,8 @@ moving(enter, _OldState, State) ->
 	end,	
 	printState(ActualState),
 	{keep_state, ActualState};
-	
+
+%qui avviene il vero e proprio consumo delle tappe (escluse quelle verso colonnina)
 moving(internal, move, State) ->
 	%calcolo subito il decremento batteria e costo al last target...visto che mi son spostato
 	NewBattery = State#movingCarState.batteryLevel - 1,
@@ -407,7 +406,7 @@ moving({call,From}, {getDataElection}, State) ->
 	{keep_state, State, [{reply,From,Packet}]};
 
 moving(cast, {charged}, State) ->
-	printDebug(State, "charged in moving"),
+	printDebug(State, "charged in moving, this is an error"),
 	keep_state_and_data;
 
 ?HANDLE_COMMON.
@@ -423,7 +422,7 @@ movingToCharge({call,From}, {getDataElection}, State) ->
 	{keep_state, State, [{reply,From,Packet}]};
 
 %similar to moving
-%di fatto consumi qua le tappe
+%consumo delle tappe path verso la colonnina ricarica
 movingToCharge(internal, move, State) ->
 	NewBattery = State#movingCarState.batteryLevel - 1,
 	TappeAttuali = State#movingCarState.pathCol,
