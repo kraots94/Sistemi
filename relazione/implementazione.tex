@@ -373,13 +373,13 @@ Le possibili combinazioni di comportamenti in base al contenuto della tappa sono
 \subsubsection{Ricarica del mezzo} \label{tappe colonnina}
 Come detto in \ref{tipiTappe}, uno dei tipi di tappa è quello del nodo con la colonnina di ricarica, pertanto l'automa deve inserire tra le sue mansioni anche lo spostamento verso le colonnine e la ricarica del mezzo.
 
-Questo automa riceve dall'automa ascoltatore 2 liste di tappe: quelle da consumare per soddisfare la richiesta del cliente e quelle da consumare per raggiungere la colonnina di ricarica. Alla ricezione di queste l'automa procede al consumo della prima lista, ma salva la seconda in un attributo specifico della memoria non sapendo se consumerà anche queste tappe. Se, durante lo spostamento, la batteria scenderà sotto un certo livello, l'automa batteria invierà a questo la notifica secondo quanto detto in \ref{automaBatteria} e l'automa si accingerà al consumo della seconda lista. 
+Questo automa riceve dall'automa ascoltatore 2 liste di tappe: quelle da consumare per soddisfare la richiesta del cliente e quelle da consumare per raggiungere la colonnina di ricarica. Alla ricezione di queste l'automa procede al consumo della prima lista, ma salva la seconda in un attributo specifico della memoria non sapendo se consumerà anche queste tappe. Se, durante lo spostamento, la batteria scenderà sotto un certo livello minimo, l'automa batteria invierà a questo la notifica secondo quanto detto in \ref{automaBatteria} e l'automa si accingerà al consumo della seconda lista. 
 In tale modo si garantisce che venga seguito il percorso verso la colonnina solo se viene valutato necessario caricare il mezzo.
 
 Al raggiungimento del nodo 'column' l'automa si sposta nello stato di ricarica, nel quale a ogni intervallo costante di tick aumenta la propria batteria. Questo processo continua fino alla ricezione della notifica di fermo da parte dell'automa batteria, con la quale avviene il ritorno allo stato idle.
 Similmente, se l'automa batteria decide di avviare la ricarica solare, l'automa compie le stesse transizioni.
 
-\subsubsection{Dati necessari all'elezione}
+\subsubsection{Dati necessari all'elezione} \label{getDataElection}
 I dati necessari all'algoritmo di elezione riguardano principalmente il processamento di elementi presenti nella memoria di questo automa, si pensi per esempio al livello di batteria rimanente oppure al nodo destinazione verso cui il mezzo si sta dirigendo per soddisfare l'ultimo cliente in coda.
 Per tale motivo si è valutato utile inserire nell'API di questo automa un metodo che restituisca tutti questi dati necessari all'automa dell'elezione, il quale lo chiamerà quando necessario per l'esecuzione dell'algoritmo. Il metodo è stato chiamato ``getDataElection'' e restituisce valori diversi a seconda dello stato del taxi, viene qui riportato quello eseguito del caso in cui questo automa si trovi in idle :
 
@@ -397,6 +397,7 @@ Gli automi degli utenti sono più semplici di quelli dei taxi, si suddividono in
 
 \subsection{Automa utente}
 L'automa utente, similmente a quello ascoltatore per i taxi, genera il suo automa applicazione utente con il quale comunica per usare il servizio e ricevere notifiche su di esso. L'environment, quando genera un nuovo utente, si preoccupa di inizializzare un automa di questo tipo e l'app verrà generata indipendentemente. 
+
 Non c'è molto da dire su questo automa, l'environment comunica con questo automa per immettere nuove richieste al sistema o cambiare la destinazione di un utente e l'applicazione inoltra ogni aggiornamento sulla gestione della richiesta al rispettivo automa utente.
 
 \subsection{Automa applicazione}
@@ -404,7 +405,7 @@ L'automa applicazione utente genera, al momento della inizializzazione, il propr
 
 \subsubsection{Timer} \label{timerAppUtente}
 Questo automa è uno dei pochi che usano i timer del behavior piuttosto che il server tick per la temporizzazione. Il timer usato è di tipo ``state\_timout'' (uno specifico timer del behavior). 
-Questo timer viene lanciato quando l'app invia al taxi più vicino la richiesta di spostamento e si sposta nello stato ``waiting\_election'', nella quale aspetta una risposta. Se questa risposta non viene ricevuta nei tempi impostati dal timer, quest scatta e l'app decide di reiterare la richiesta. 
+Questo timer viene lanciato quando l'app invia al taxi più vicino la richiesta di spostamento e si sposta nello stato ``waiting\_election'', nella quale aspetta una risposta. Se questa risposta non viene ricevuta nei tempi impostati dal timer, questa scatta e l'app decide di reiterare la richiesta. 
 
 \subsubsection{Attese random}
 ci sono 4 cirocstanze in cui l'app decide di aspettare un tempo random e reiterare la richiesta dell'utente al taxi più vicino:
@@ -414,6 +415,8 @@ ci sono 4 cirocstanze in cui l'app decide di aspettare un tempo random e reitera
 	\item il taxi a cui è stata inviata la richiesta è occupato nell'esecuzione di un'altra elezione.
 	\item il pacchetto contenente l'output dell'elezione ricevuto dal taxi indica che non è presente nessun vincitore.
 \end{enumerate}
+
+la scelta di attendere un tempo random è finalizzata principalmente nel cercare di evitare una sovrapposizione fra wave diverse originate da richieste immesse nello stesso istante da utenti differenti. In tal caso, infatti, la garanzia di offrire un servizio di qualità verrebbe intaccata.
 
 \section{Automa Elezione}
 Il principale problema affrontato in questo progetto è stato quello di eleggere quale sia la migliore macchina per soddisfare la richiesta dell'utente. Come già accennatto precedentemente al punto \ref{automiMacchina}, ogni macchina possiede un'istanza di questo automa.
@@ -431,12 +434,12 @@ Per l'elezione vengono utilizzati diversi record, che per lo più rispecchiano i
 	\item election\_result\_to\_user: risultati per gli utenti, vengono creati dall'automa ascoltatore risultato vincitore dell'elezione. Contengono il pid e nome del taxi vincitore assieme al tempo di attesa per l'arrivo nella posizione dell'utente.
 \end{itemize}
 
-\subsection{Varaibli di istanza dell'automa}\label{stato_elezione_automa}
+\subsection{Varaibli di istanza dell'automa} \label{stato_elezione_automa}
 Ogni istanza dell'automa possiede alcune variabili costanti e altre che variano per ogni elezione. Queste sono le variabili comuni a tutte le elezioni:
 \begin{itemize}
 	\item pidCar: pid dell'ascoltatore della macchina, utilizzata per inviare i messaggi agli altri automi.
 	\item nameCar: nome della macchina, utilizzata per i messaggi di stato.
-	\item pidMovingCar: pid dell'automa moving, a cui vengono richiesti i dati dell'elezione come discusso al punto REF\_DATI\_ELEZIONE.
+	\item pidMovingCar: pid dell'automa moving, a cui vengono richiesti i dati dell'elezione come discusso al punto \ref{getDataElection}.
 	\item pidGps: pid della propria scheda gps, utilizzata per sapere quali siano le macchine vicine.
 	\item cityMap: mappa della città, come descritta al punto \ref{citta_e_algoritmi}.
 \end{itemize}
@@ -506,7 +509,7 @@ Riprendendo l'algoritmo definito al punto \ref{algoritmo_elezione}, di seguito n
 \end{itemize}
 
 \subsection{Calcolo dei costi per l'elezione}\label{implementazione_calcolo_costi}
-Per calcolare i costi di una determinata macchina si sono utilizzate le formule descritte al punto \ref{funzioni_di_costo_macchine}. Dopo aver richiesto i dati attuali all'automa moving della macchina tramite la funzione ``getDataElection'', viene calcolato il nodo della mappa dove è presente una colonnina di ricarica più vicino al punto di arrivo della richiesta in esame.
+Per calcolare i costi di una determinata macchina si sono utilizzate le formule descritte al punto \ref{funzioni_di_costo_macchine}. Dopo aver richiesto i dati attuali all'automa moving della macchina tramite la funzione ``getDataElection'' \ref{getDataElection}, viene calcolato il nodo della mappa dove è presente una colonnina di ricarica più vicino al punto di arrivo della richiesta in esame.
 In totale si calcola il costo di tre percorsi: dalla posizione della macchina dopo l'eventuale trasporto in corso fino al punto di prelievo del cliente richiedente; il tragitto del cliente; il percorso tra punto obiettivo del cliente e nodo dove è presente la colonnina.
 Si procede quindi con il calcolo dei percorsi aggiungendo via via i costi calcolati e calcolando se la batteria rimanente è sufficiente. Nel caso in cui durante il calcolo di uno di essi la batteria risulti insufficiente si considera che la macchina non possa essere vincitrice.
 
@@ -514,8 +517,7 @@ La procedura ``calculateSelfCost'' restituisce due tipi di risultati:
 \begin{lstlisting}
 	{-1, -1, i_can_not_win, {}}
 \end{lstlisting}
-quando viene calcolato la macchina non possa vincere l'elezione.
-
+quando viene calcolato la macchina non può vincere l'elezione.
 \begin{lstlisting}
 	{CC, CRDT, i_can_win, QueueCar}
 \end{lstlisting}
@@ -523,7 +525,7 @@ quando viene calcolato la macchina può vincere l'elezione. La variabile QueueCa
 
 \subsection{Gestione dei timer}
 Lo scopo è di gestire il caso in cui un nodo non risponda alle richieste dell'elezione. Similmente all'automa App utente, è stato utilizzato un timeout di gen\_statem, in particolare lo stesso timout\_state\ref{timerAppUtente}. 
-Il valore temporale impostato per tale timer non è una costante fissata uguale per ogni nodo partecipante all'elezione, si è valutato di impostare un valore temporale direttamente proporzionato a quanto il nodo è distante dall'iniziatore.
+Il valore temporale impostato per tale timer non è una costante fissata uguale per ogni nodo partecipante all'elezione, si è valutato di impostare un valore temporale direttamente proporzionale a quanto il nodo è distante dall'iniziatore.
 Un valore che rappresenta questa distanza, benchè in modo approssimativo, è il valore TTL dei pacchetti che viaggiano nell'elezione. Infatti, ogni nodo partecipante all'elezione può stimare la sua distanza col TTL che legge dal pacchetto ricevuto da altri nodi. 
 Si è deciso quindi di impostare il valore temporale usando una formula di questo tipo:
 TTL * slotCostante
