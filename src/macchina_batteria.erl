@@ -59,7 +59,7 @@ handle_common(info, {_From, tick}, _OldState, State) ->
 			BatteryLevel = macchina_moving:getBatteryLevel(PidAttachedCar),
 			if 
 				(ActualTickStillStationary >= ?TICKS_TOGOSOLARCHARGE) and (BatteryLevel < ?BATTERY_LEVEL_MAX) ->  
-					print_debug_message(State#batteryState.nameCar, "Battery - Triggered Solar Charging"),
+					print_car_message(State#batteryState.nameCar, "Battery - Triggered Solar Charging"),
 					NewState = State#batteryState{sameBatteryCounter = 0},
 					{keep_state, NewState, [{next_event,internal,activateSolarCharge}]};
 				true -> 

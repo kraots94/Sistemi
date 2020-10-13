@@ -2,6 +2,15 @@
 %!TEX root = progetto_finale.tex
 %!TEX encoding = UTF-8 Unicode
 
-\chapter{Conclusioni}
+\chapter{Conclusioni} \label{conclusioni_progetto}
 
-What has been done with respect to what has been promised in Chapters 1 and 2, and what is left out.
+Per quanto riguarda l'analisi dei requisiti funzionali e non funzionali eseguita nel capitolo \ref{requisiti_funzionali}, il requisito numero 6, relativo alla gestione dei cambiamenti della mappa, non è soddisfatto. Infatti al momento nel caso di una modifica della topologia della mappa le macchine non vengono né notificate né rieseguono il calcolo dei percorsi. Gli altri requisiti sono stati tutti soddisfatti come dimostrato nella parte della validazione al punto \ref{test_eseguiti}.
+
+Sempre riguardo alla modifica della topologia, il codice predispone già le funzioni per la gestione: il gestore eventi dell'environment li supporta, tuttavia mancano le funzioni che modificano attivamente il grafo della città; la macchina possiede già la lista degli utenti attualmente in coda assieme alle informazioni delle loro richieste per poter calcolare quante di esse riesce a soddisfare (si faccia riferimento alla parte \ref{usersInQueue}).
+
+Per quanto riguarda il CAP Theorem, la disponibilità e la tolleranza alle partizioni vengono garantite poiché il progetto è stato implementato applicando gli stessi ragionamenti effettuati in fase di progettazione. Pertanto, quanto discusso al punto \ref{cap_theorem_definizioni}, vale ancora.
+
+Rispetto alle trasparenze, la ``location transparency'' è garantita poiché l'entità utente conosce unicamente il PID della propria applicazione. La ``failure transparency'', come mostrato nei test effettuati, il sistema trova una soluzione per garantire il servizio al cliente in modo trasparente. La ``scaling transparency'' è garantita poiché gli algoritmi progettati in fase di analisi erano fin da subito limitati nel numero dei nodi coinvolti, pertanto un eventuale aumento di essi non influisce sulle prestazioni. In questo contesto ha senso nominare anche l'attesa di un tempo casuale tra una richiesta da parte dell'app e la successiva in caso di esito negativo: in tal modo non avviene una congestione di richieste a una determinata macchina.
+
+Tutti i requisiti non funzionali definiti al punto \ref{requisiti_non_funzionali} sono soddisfatti. L'adattabilità è garantita poiché prima o poi tutti gli utenti che hanno richiesto il servizio verranno soddisfatti, si veda il test \ref{tre_utenti_una_macchina_test}. I limiti di tempo dovuti al fatto che i nodi sono in movimento, vengono tenuti a bada grazie ai timeout utilizzati in fase di elezione, si faccia riferimento alla parte \ref{timer_elezione}. La complessità algorimica sia dal punto di vista computazionale che di scambio messaggi viene limitata grazie a diverse scelte progettuali: per il calcolo dei cammini minimi viene utilizzato, come già spiegato nella parte \ref{implementazione_algoritmo_elezione}, l'algoritmo di Dijkstra per i cammini minimi, inoltre la scelta della macchina migliore viene effettuata in ogni nodo prima dell'invio al nodo genitore in modo da evitare che la radice debba controllare tutti i partecipanti; il numero dei messaggi viene limitato grazie a diverse ottimizzazioni effettuate durante l'elezione, come per esempio l'invio dei risultati dell'elezione solo ai nodi che hanno partecipato attivamente nell'elezione in corso. 
+

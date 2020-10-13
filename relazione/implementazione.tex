@@ -57,23 +57,23 @@ Lo script in python crea cinque file:
 	\item ``city\_map\_nodes.dat'': file testuale contenente i dati dei nodi formattati in modo da essere compatibili con la struttura creata in erlang. Un esempio è il seguente:
 	\begin{lstlisting}
 		10
-		a 0 1 4
-		b 1 2 12
-		c 2 3 12
-		d 3 3 16
-		e 4 5 2
+		a 0 2 4
+		b 1 4 17
+		c 2 5 7
+		d 3 6 11
+		e 4 6 16
 		...
 	\end{lstlisting}
 	\item ``city\_map\_graph.dat'': file testuale contenente i dati del grafo formattato in modo da essere compatibile con la libreria utilizzata in erlang. Un esempio è il seguente:
 	\begin{lstlisting}
 		10 30 undirected d
-		6 0 17
-		0 1 12
-		1 8 18
-		8 4 20
-		4 7 14
-		7 3 21
-		3 9 18
+		2 6 13
+		6 8 24
+		8 7 6
+		7 4 14
+		4 1 4
+		1 9 21
+		9 5 18
 		...
 	\end{lstlisting}
 	\item ``city\_map\_charging\_cols.dat'': file testuale contenente i dati dei nodi delle colonnine. Essi sono formattati in modo da essere compatibili con la struttura creata in erlang. Lo stile è il medesimo del file ``city\_map\_nodes.dat''.
@@ -523,10 +523,12 @@ quando viene calcolato la macchina non può vincere l'elezione.
 \end{lstlisting}
 quando viene calcolato la macchina può vincere l'elezione. La variabile QueueCar viene salvata nello stato della macchina assegnandola alla ``queueToManage'' e utilizzata dopo come già spiegato.
 
-\subsection{Gestione dei timer}
+\subsection{Gestione dei timer} \label{timer_elezione}
 Lo scopo è di gestire il caso in cui un nodo non risponda alle richieste dell'elezione. Similmente all'automa App utente, è stato utilizzato un timeout di gen\_statem, in particolare lo stesso timout\_state\ref{timerAppUtente}. 
-Il valore temporale impostato per tale timer non è una costante fissata uguale per ogni nodo partecipante all'elezione, si è valutato di impostare un valore temporale direttamente proporzionale a quanto il nodo è distante dall'iniziatore.
-Un valore che rappresenta questa distanza, benchè in modo approssimativo, è il valore TTL dei pacchetti che viaggiano nell'elezione. Infatti, ogni nodo partecipante all'elezione può stimare la sua distanza col TTL che legge dal pacchetto ricevuto da altri nodi. 
-Si è deciso quindi di impostare il valore temporale usando una formula di questo tipo:
-TTL * slotCostante
+Il valore temporale impostato per tale timer non è una costante fissata uguale per ogni nodo partecipante all'elezione, ma varia in base al ttl ricevuto nella fase di invito alla partecipazione. Questa scelta è stata fatta seguendo la seguente logica: più un nodo si trova vicino a una foglia, più è ragionevole pensare che impieghi meno tempo a raccogliere i dati dei propri figli e selezionare il risultato migliore da inoltrare al nodo genitore.
 
+La formula applicata per il calcolo del tempo di attesa è la seguente:
+\begin{equation}
+	TempoDiAttesa = TTL * Costante
+\end{equation}
+dove costante è un valore impostato attualmente a 500ms.

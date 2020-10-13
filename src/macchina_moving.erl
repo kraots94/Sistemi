@@ -374,6 +374,7 @@ moving(internal, move, State) ->
 			NewState = calculateNewState(State, TappaAttuale, TappeAttuali),
 			if  %controllo se sono arrivato al target oppure se sono arrivato da utente nuovo
 				TipoNodoAttuale =:= user_target ->
+					print_car_message(NameListener, "Arrived in user target position [~p]", TappaAttuale#tappa.node_name),
 					arrivedInTargetPosition(PersonaAttuale, State);
 				TipoNodoAttuale =:= user_start ->
 					arrivedInUserPosition(PersonaAttuale, State);

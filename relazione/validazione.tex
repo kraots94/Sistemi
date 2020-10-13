@@ -16,7 +16,7 @@ Per poter eseguire il codice è necessario svolgere i seguenti passi:
 \begin{enumerate}
 	\item Scompattare il contenuto della cartella in una posizione a scelta.
 	\item Aprire un terminale e spostari all'interno della cartella root del progetto.
-	\item Eseguire il comando \lstinline |make:all().| .
+	\item Eseguire il comando \lstinline |make:all().| per compilare i file. Esso crea all'interno della cartella ``ebin'' i file necessari all'esecuzione del codice.
 	\item Eseguire il comando \lstinline |cd("ebin").| per spostarsi all'interno della cartella con i beam appena generati.
 	\item Eseguire il comando \lstinline |PID_ENV = main:start_project().| per avviare il progetto.
 \end{enumerate}
@@ -35,9 +35,105 @@ Mails: forgiarini.alessandro@spes.uniud.it, andreussi.angelo@spes.uniud.it
 5> ["Env"] {<0.220.0>} - "Environment Created"
 \end{lstlisting}
 
-\subsection{Esecuzione del codice}
+\subsection{Esecuzione del codice}\label{esecuzione_codice}
+Il modo di interazione attuale tra utente reale e sistema prevede di eseguire i diversi comandi forniti dall'entità ``Environment''. Essa fornisce un insieme di API che permettono di simulare le diverse situazioni che possono venirsi a creare in un contesto reale. Questo si è reso necessario poiché è stato creato un ambiente simulativo della realtà.
+
+Per via della convenzione utilizzata, tutti i nomi sono stringe, siano essi di nodi o di entità. Per passarli come parametro è necessario racchiuderli tra virgolette, per esempio: "aa".
+
+Come già spiegato nel punto \ref{componenti_grafo_citta}, i nomi dei nodi sono delle stringhe del tipo ``aa, ab, ...''.
+
+I nomi delle macchine sono del tipo ``c1, c2, ...''
+
+I nomi degli utenti sono del tipo ``u1, u2, ...''
+
+Per invocare i comandi,  è necessario utilizzare la seguente sintassi dalla console di Erlang:
+\begin{lstlisting}
+environment:nome_funzione(PID_ENV, Param1, ...).
+\end{lstlisting}
+Di seguito un elenco con spiegazione dei metodi forniti:
+\begin{itemize}
+	\item \lstinline |triggerEvent(PID_ENV, ID)|
+
+	Permette di scatenare nell'ambiente l'evento con ID pari a quello passato come parametro. Un elenco degli eventi disponibili è al punto \ref{env_events}.
+	\item \lstinline |triggerChangeDestUser(PID_ENV, UserName)|
+	
+	Permette di cambiare la destinazione attuale dell'utente passato come parametro con una destinazione casuale.
+	\item \lstinline |triggerChangeDestUser(PID_ENV, UserName, NewTarget)|
+	Permette di cambiare la destinazione attuale dell'utente passato come parametro con una destinazione specifica.
+	\item \lstinline |triggerCarCrash(PID_ENV, CarName)|
+	
+	Scatena l'evento di ``crash'' di una macchina con conseguente notifica agli utenti in coda e impossibilità di muoversi fino all'evento di riparazione.
+	\item \lstinline |triggerFixCar(PID_ENV, CarName)|
+
+	Scatena l'evento di ``fix'' di una macchina incidentata con conseguente possibilità di vittoria delle elezioni e trasporto degli utenti.
+	\item \lstinline |triggerCarRemove(PID_ENV, CarName)|
+
+	Se la macchina passata come parametro è nello stato ``idle'' la rimuove dal sistema, altrimenti notifica che non è stato eseguito nulla.
+	\item \lstinline |enableAutoEvents(PID_ENV)|
+
+	Abilita gli eventi casuali automatici.
+	\item \lstinline |disableAutoEvents(PID_ENV)|
+
+	Disabilita gli eventi casuali automatici.
+	\item \lstinline |printGpsState(PID_ENV)|
+	
+	Stampa lo stato interno del server gps. In tal modo è possibile sapere in quel momento dove si trovano tutte le entità.
+	\item \lstinline |printSelfState(PID_ENV)|
+
+	Stampa lo stato interno dell'entità environment.
+	\item \lstinline |printCars(PID_ENV)|
+
+	Stampa il dizionario delle macchine, vale a dire tutte le associazioni Nome - Pid nel caso delle macchine.
+	\item \lstinline |printUsers(PID_ENV)|
+
+	Stampa il dizionario degli utenti, vale a dire tutte le associazioni Nome - Pid nel caso degli utenti.
+	\item \lstinline |spawnCars(PID_ENV, N)|
+
+	Crea un numero N di entità macchina in posizione casuale all'interno della mappa.
+	\item \lstinline |spawnUsers(PID_ENV, N)|
+
+	Crea un numero N di entità utente in posizione casuale all'interno della mappa con una destinazione casuale.
+	\item \lstinline |spawnCar(PID_ENV, StartingPos)|
+
+	Crea una macchina in una determinata posizione della mappa.
+	\item \lstinline |spawnUser(PID_ENV, From, To)|	
+
+	Crea un utente con una determinata richiesta di trasporto. Egli verrà creato nel nodo ``From''.
+\end{itemize}
+
+\section{Test eseguiti}\label{test_eseguiti}
+Per poter valutare se il sistema soddisfa i requisti proposti nella parte \ref{requisiti_funzionali}, si è deciso di effettuare diversi test. La mappa utilizzata è quella presente nella parte di presentazione \ref{componenti_grafo_citta}.
+
+\subsection{Test - Un cliente una macchina}
+Il primo di essi consiste nella semplice generazione di un cliente e di una macchina casuale. Di seguito i risultati ottenuti:
+
+\begin{lstlisting}
+4> environment:spawnCars(PID_ENV, 1).
+{spawn,cars,1}
+5> ["Car"] {"c1"} - Car ready in position ["b"]
+5> environment:spawnUsers(PID_ENV, 1).
+{spawn,users,1}
+6> ["User"] {"u1"} - I'm a new user, i'm going from ["c"] to ["h"]
+6> ["Car"] {"c1"} - Car Stops for client: ["c","h"] | Total Time for client: 34
+6> ["User"] {"u1"} - Taxi ["c1"] is serving me with 14 time to wait
+6> ["User"] {"u1"} - Taxi ["c1"] is arrived in my position!
+6> ["Car"] {"c1"} - Arrived in user target position ["h"]
+6> ["User"] {"u1"} - I'm arrived in my target position ["h"]
+6> ["User"] {"u1"} - "I made my trip, goodbye."
+\end{lstlisting}
+
+\subsection{Test - Più clienti una macchina}
+Il secondo caso analizzato è il caso di più utenti che richiedono ad un unico taxi di essere serviti. Dopo aver creato un taxi vengono istanziati tre clienti. Nell'appendice al punto \ref{tre_utenti_una_macchina_test} è presente il log di come il sistema ha gestito il test. 
+
+Ci sono diverse cose da notare in esso ripercorrendo il log:
+\begin{itemize}
+	\item Il messaggio di begin election dell'utente ``u1'' è il primo giunto al taxi poiché gli altri due hanno stampato il messaggio di errore relativo al caso in cui la macchina a cui viene chiesto il servizio è già nello stato di running election.
+	\item Dopo la comunicazione da parte della macchina all'utente ``u1'' dei propri tempi di percorrenza, l'utente ``u3'' ha esaurito la propria attesa casuale per il nuovo tentativo di richiesta del servizio e, dopo aver inviato la richiesta, riceve la risposta con i tempi. 
+	\item L'utente ``u2'', essendo l'ultimo ad effettuare la richiesta, non viene soddisfatto e resta nello stato di waiting election. La macchina non risponderà in modo positivo finché non possiederà abbastanza batteria.
+	\item Dopo aver trasportato sia ``u1'' che ``u3'', la macchina continua a fare i calcoli per soddisfare 
+\end{itemize}
 
 
-\section{Test eseguiti}
+
 
 \section{Controllo requisiti}
