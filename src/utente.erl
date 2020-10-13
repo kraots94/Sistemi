@@ -95,7 +95,8 @@ handle_common(cast, {dieSoft}, OldState, State) ->
 handle_common(cast, {crash} , _OldState, State) ->
 	{next_state, waitingService, State};
 
-handle_common(cast, {changeDest, _NewTarget}, _OldState, _State) ->
+handle_common(cast, {changeDest, _NewTarget}, _OldState, State) ->
+	print_user_message(State#userState.name, "I can not change my target position"),
 	keep_state_and_data.
 
 idle(enter, _OldState, _State) -> keep_state_and_data;

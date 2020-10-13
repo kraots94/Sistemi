@@ -39,7 +39,7 @@ callback_mode() -> [state_functions, state_enter].
 				carsInvited,
 				childrenPartecipate,
 				totalCosts,
-				car_moving_queue_data,
+				car_moving_queue_data
 				}).
 
 %% ====================================================================
@@ -163,10 +163,10 @@ idle({call,From}, {sendMovingQueue}, S) ->
 	macchina_moving:updateQueue(PidMovingCar, QueueData, append),
 	%resest stat
 	S1 =  S#electionState{car_moving_queue_data = none},
-	{keep_state, S1, [{reply,From,finished}]}.	
+	{keep_state, S1, [{reply,From,finished}]};	
 
 idle(cast, {invite_result, _Data}, S) -> 
-	{next_state, idle, S}.
+	{next_state, idle, S};
 
 idle(cast, {costs_results, _Data}, S) -> 
 	{next_state, idle, S}.
@@ -315,7 +315,7 @@ waiting_final_results(cast, {winning_results, Data}, S) ->
 	{next_state, idle, S2};
 
 waiting_final_results(cast, {invite_result, _Data}, S) -> 
-	{next_state, waiting_final_results, S}.
+	{next_state, waiting_final_results, S};
 waiting_final_results(cast, {costs_results, _Data}, S) -> 
 	{next_state, waiting_final_results, S}.
 
@@ -327,7 +327,7 @@ resetState(S) ->
 	S#electionState {
 					pidAppUser = none,
 					parent = none,
-					carsInvited = []= 0,
+					carsInvited = [],
 					childrenPartecipate = [],
 					currentRequest = {},
 					flag_initiator = false,
