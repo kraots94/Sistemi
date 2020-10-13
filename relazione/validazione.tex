@@ -312,39 +312,69 @@ Di seguito le variabili utilizzate localmente per un'unica elezione:
 \end{itemize}
 
 \subsection{Algoritmo di Elezione}
-Riprendendo l'algoritmo definito al punto \ref{algoritmo_elezione}, di seguito ne viene analizzata l'implementazione in ogni passo.
-\begin{enumerate}
+Riprendendo l'algoritmo definito al punto \ref{algoritmo_elezione}, di seguito ne viene analizzata l'implementazione di ogni passo.
+
+\begin{itemize}
 	\item Il nodo inizatore riceve dall'automa ascoltatore il messaggio che contiene le informazioni necessarie per l'elezione. 
 
 	\lstinline|{beginElection, dataElectionBegin}|
 
 	Esso quindi calcola i propri costi come spiegato al punto \ref{implementazione_calcolo_costi} e dopo aver richiesto al proprio modulo gps quali siano le entità vicine, aggiorna il proprio stato. Nel caso in cui la lista delle macchine vicine non sia vuota, le invita e si sposta nello stato ``initiator\_final\_state''. Nel caso invece in cui ci siano delle macchine da invitare, prepara il record ``dataElectionPartecipate'' impostando le variabili e il ttl come descritto nella variabile globale ``max\_hops\_election'', lo invia alle macchine da invitare con l'apposito messaggio e si sposta in ``running\_election''.
 
-	\lstinline| {partecipateElection, Data} |
+	\lstinline|{partecipateElection, Data}|
 	\item I nodi che ricevono l'invito di partecipazione possono essere di due tipi: nello stato ``idle'' e in un altro stato dell'elezione. Nel primo caso rispondono al nodo che li ha invitati con il messaggio 
 
 	\lstinline |{invite_result, {Self_Pid, i_can_join}}|
 	
 	per indicare che partecipano attivamente all'elezione. Calcolano i propri costi secondo il metodo \ref{implementazione_calcolo_costi} e controllano il ttl contenuto nell'invito. Nel caso in cui sia maggiore di zero chiedono al modulo gps i propri vicini e inviano loro il messaggio di invito con ttl diminuito di un'unità. Nel caso sia uguale a zero non estendono l'invito di partecipazione. Successivamente si spostano nello stato ``running\_election'' in attesa delle risposte dei nodi invitati. Nel caso invece il nodo sia in uno stato non di ``idle'' è l'ascoltatore ad inviare al nodo richiedente il messaggio
 
-	\lstinline |{invite_result, {self(), i_can_not_join}}|
+	\lstinline |{invite_result, {Self_Pid, i_can_not_join}}|
 
 	ad indicare la non partecipazione.
-	\item Il nodo che riceve il pacchetto di starting election con TTL pari a zero, dopo avere inviato l'ack al genitore, non inoltra ulteriormente l'inizio dell'elezione ai vicini.
-	\item Ogni nodo, dopo aver ricevuto l'ack da parte dei figli alla partecipazione dell'elezione, calcola i propri costi e si mette in attesa che i propri figli, se presenti, gli mandino i costi calcolati. Alla ricezione di tutti i costi dei figli esso crea un pacchetto unico concatenando i costi ricevuti al proprio. Successivamente inoltre il pacchetto risultate al padre. Per la struttura di esso si faccia riferimenti a \ref{pacchetto_calcolato}.
-	\item Dopo aver inviato al padre i dati relativi ai costi, ogni nodo si mette in attesa di conoscere chi è il leader.
-	\item Quando il nodo iniziatore riceve tutti i dati calcola il leader in base alle proprietà descritte nella parte \ref{funzioni_di_costo_macchine}. Nel caso in cui non sia presente alcun vincitore, l'identificativo del miglior taxi viene impostato a un valore di errore.
-	\item L'iniziatore invia il messaggio contenente il leader in multicasting a tutti i partecipanti all'elezione. Si faccia rifermento alla parte \ref{pacchetto_vincitore} per la descrizione del pacchetto.
-	\item Tutti i nodi ricevono la notifica del leader e in base al risultato compiono le azioni più opportune. In ogni caso escono dallo stato di elezione eliminando tutte le informazioni calcolate.
-	\item In base al vincitore si hanno due casistiche:
-		\begin{itemize}
-			\item Vincitore presente: il nodo corrispondente aggiorna la propria coda dei nodi da visitare e comunica al modulo di ricezione del cliente, tramite le celle di comunicazione descritte nell'introduzione al punto \ref{problematiche_distribuite}, di essere pronto a servirlo e se egli è in coda oppure no.
-			\item Vincitore assente: il nodo iniziatore invia il pacchetto contenente l'id con errore anche all'applicazione dell'utente.
-		\end{itemize}
-\end{enumerate}
+
+	Nel caso non sia necessario l'invito di altre macchine all'elezione, dallo stato idle ci si sposta nello stato ``waiting\_final\_results'' in attesa della comunicazione del vincitore dal parte del nodo iniziatore.
+	\item Nello stato ``running\_election'' ogni automa gestisce le due liste precedentemente definite ``carsInvited'' e ``childrenPartecipate''. 
+	
+	Ogni volta che un nodo in questo stato riceve un messaggio del tipo 
+	
+	\lstinline |{invite_result, {Self_Pid, Result}}|
+	
+	cerca il pid ``Self\_Pid'' dalla lista ``carsInvited'' e se lo trova ed il valore della variabile ``Result'' è pari a ``i\_can\_join'' crea un record del tipo ``carPartecipate'' con il campo ``sent\_results'' a ``not\_sended\_results''. Nel caso in cui esso non venga trovato vuol dire che il nodo ha già mandato i propri risultati e quindi è già stato rimosso dalla lista degli invitati.
+
+	Ogni volta che un nodo in questo stato riceve un messaggio del tipo 
+
+	\lstinline |{costs_results, Data}|
+
+	Controlla se il nodo è ancora presente nella lista degli invitati. In caso affermativo lo rimuove, crea il record ``carPartecipate'' con i dati ricevuti e impostando il flag ``sent\_results'' a ``ok'' aggiungendolo alla lista dei partecipanti attivi definita prima. Nel caso in cui non sia presente nella lista degli invitati, lo cerca nella seconda lista e ne aggiorna le proprietà utilizzando come identificativo il pid del nodo.
+
+	In entrambi i casi alla fine viene chiamata la procedura dedicata al calcolo della fine ``running\_election'' che se, la lista degli invitati è vuota e tutti i partecipanti hanno inviato i propri dati, invia i dati al nodo genitore e sposta l'automa nello stato di attesa / calcolo dei risultati dell'elezione.
+	
+	Per ridurre i calcoli eseguiti da un unico nodo, si è optato per inoltrare al genitore solamente i dati del nodo migliore del proprio sottoalbero. I dati scambiati contenenti le informazio di un particolare nodo sono presenti nei record di tipo ``electionCostData'' come già definito.
+
+	\item Il nodo iniziatore, a differenza dei nodi partecipanti, appena riceve tutte le risposte dai propri figli si sposta nello stato speciale ``initiator final state'' nel quale, dopo l'applicazione della funzione di selezione del miglior dato, crea i risultati dell'elezione. In base ai calcoli effettuati crea il record del vincitore e inoltra il messaggio a tutti i nodi partecipanti all'elezione.
+	
+	\item Ogni nodo partecipante inoltra il pacchetto winner ricevuto a tutti i nodi presenti nella lista ``childrenPartecipate''. Questo perché sono essi coloro che hanno effettivamente partecipato all'elezione, non è detto siano tutti quelli invitati.
+
+	\item Oltre all'inoltro del messaggio vincitore, ogni nodo controlla se è lui stesso il vincitore e, in caso positivo, prepara i record in modo compatibile con quelli dell'automa moving come spiegato al punto REF\_TAPPE\_MOVING.
+
+	\item Infine inoltra i risultati al proprio ascoltatore e torna nello stato dell'elezione ``idle'' dopo aver reimpostato le proprie variabili legate alle elezioni.
+\end{itemize}
 
 \subsection{Calcolo dei costi per l'elezione}\label{implementazione_calcolo_costi}
-dhiujgaherogufl
+Per calcolare i costi di una determinata macchina si sono utilizzate le formule descritte al punto \ref{funzioni_di_costo_macchine}. Dopo aver richiesto i dati attuali all'automa moving della macchina tramite la funzione "getDataElection", viene calcolato il nodo della mappa dove è presente una colonnina di ricarica più vicino al punto di arrivo della richiesta in esame.
+In totale si calcola il costo di tre percorsi: dalla posizione della macchina dopo l'eventuale trasporto in corso fino al punto di prelievo del cliente richiedente; il tragitto del cliente; il percorso tra punto obiettivo del cliente e nodo dove è presente la colonnina.
+Si procede quindi con il calcolo dei percorsi aggiungendo via via i costi calcolati e calcolando se la batteria rimanente è sufficiente. Nel caso in cui durante il calcolo di uno di essi la batteria risulti insufficiente si considera che la macchina non possa essere vincitrice.
+
+La procedura ``calculateSelfCost'' restituisce due tipi di risultati:
+\begin{lstlisting}
+	{-1, -1, i_can_not_win, {}}
+\end{lstlisting}
+quando viene calcolato la macchina non possa vincere l'elezione.
+
+\begin{lstlisting}
+	{CC, CRDT, i_can_win, QueueCar}
+\end{lstlisting}
+quando viene calcolato la macchina può vincere l'elezione. La variabile QueueCar viene salvata nello stato della macchina assegnandola alla ``queueToManage'' e utilizzata dopo come già spiegato.
 
 \subsection{Gestione dei timer}
 Lo scopo è di gestire il caso in cui un nodo non risponda alle richieste dell'elezione...

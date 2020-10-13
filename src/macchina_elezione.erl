@@ -344,9 +344,9 @@ manage_self_cost(S, CurrentRequest) ->
 	{Current_Cost_To_Last_Target, 
 		Current_Last_Target, 
 		Current_Battery_Level,
-		CanPartecipate} = macchina_moving:getDataElection(S#electionState.pidMovingCar),
+		CarNotInCrash} = macchina_moving:getDataElection(S#electionState.pidMovingCar),
 	if 
-		CanPartecipate == ok ->
+		CarNotInCrash == ok ->
 			City_Graph = S#electionState.cityMap#city.city_graph,
 			City_Nodes = S#electionState.cityMap#city.nodes,
 			City_Cols = S#electionState.cityMap#city.column_positions,
