@@ -66,9 +66,9 @@ le macchine, come mostrato negli schemi progettuali, presentano più automi che 
 
 \subsection{Automa ascoltatore} \label{automaAscoltatore}
 
-L'automa ascoltatore, o listener, è il padre della gerarchia che rappresenta i vari automi del mezzo. Quando l'environment genera un nuovo taxi si preoccupa soltanto di inizializzare un automa di questo tipo, il quale automaticamente creerà tutti i restanti automi sottostanti mantenendo un riferimento a ognuno di essi nella propria memoria. Oltre ad essi, l'ascoltatore si impegna a creare anche il modulo gps usato dall'auto e il "server tick", indicando ad esso di inserire fra gli abbonati tutti gli automi del mezzo, così da garantire una temporizzazione sincronizzata. 
+L'automa ascoltatore, o listener, è il padre della gerarchia che rappresenta i vari automi del mezzo. Quando l'environment genera un nuovo taxi si preoccupa soltanto di inizializzare un automa di questo tipo, il quale automaticamente creerà tutti i restanti automi sottostanti mantenendo un riferimento a ognuno di essi nella propria memoria. Oltre ad essi, l'ascoltatore si impegna a creare anche il modulo gps usato dall'auto e il "server tick", indicando ad esso di inserire fra gli abbonati tutti gli automi del mezzo, così da garantire una temporizzazione sincronizzata. Se l'environment è interessato a provocare qualche evento che intacca i taxi, comunica soltanto con questo automa, il quale poi comunicherà con gli opportuni automi sottostanti.
 
-\subsubsection{la lista di utenti in coda} \label{usersInQueue}
+\subsubsection{Lista di utenti in coda} \label{usersInQueue}
 
 Per semplificare la gestione di incidenti, cambi di destinazione, cambiamenti alla topologia cittadina, si è pensato di mantenere nell'ascoltatore una lista di tutti gli utenti in coda per il taxi. In particolare, è stato definito uno speciale record che rappresenta una "comanda" del taxi, ossia una istanza di richiesta del servizio da parte di un utente.
 Questo record è definito nel sorgente di questo automa e si chiama "userInQueue", esso presenta questi 3 campi:
@@ -87,7 +87,7 @@ Nel caso in cui accadano gli eventi sopra citati, tale lista viene consultata in
 	\item cambio di topologia: per ogni elemento della lista, viene calcolato se è possibile garantire quella comanda considerando il cambiamento appena avvenuto nei percorsi, notificando le relative app in base all'esito. Questo aspetto è stato trattato in \ref{aggiornamentoMappa}.
 \end{itemize}
 
-\subsubsection{legame con automa elezione} \label{listenerElection}
+\subsubsection{Legame con automa elezione} \label{listenerElection}
 Questo automa lavora a stretto contatto con l'automa dell'elezione, essi concorrono a garantire all'utente richiedente il servizio un giusto candidato. Quando l'ascoltatore riceve dall'utente la richiesta, oppure la partecipazione all'elezioni da altri taxi, inoltra all'automa elezione quest'ultima e attende il processamento dell'algoritmo distribuito. Al termine dell'esecuzione di questo algoritmo, l'ascoltatore riceve uno specifico evento contenente l'ouptut, in esso è presente il riferimento al taxi vincitore e se questo combacia con se stesso significa che il taxi si dovrà spostare verso nuovi nodi. Questo comporta un aggiornamento della lista dei punti da visitare, aspetto che verrà affrontato nelle prossime sezioni quando si parlerà dell'automa gestione movimento.
 
 \subsection{Automa batteria} \label{automaBatteria}
@@ -110,7 +110,7 @@ le tappe sono state modellate creando un record chiamato, per l'appunto, "tappa"
 \end{enumerate}
 Sono stati definiti opportuni metodi che elaborano l'output dell'algoritmo del calcolo dei percorsi minimi e creano le tappe formattate in questo modo, pronte per essere date in pasto a questo automa.
 
-\subsubsection{tipi di nodi} \label{tipiTappe}
+\subsubsection{Tipi di nodi} \label{tipiTappe}
 
 assumiamo che un utente abbia sottomesso al servizio una richiesta di questo tipo: spostamento dal nodo "a" al nodo "d".
 i tipi di nodi delle tappe sono stati distinti con questi 4 atomi:
@@ -122,11 +122,11 @@ i tipi di nodi delle tappe sono stati distinti con questi 4 atomi:
 	\item column = indica il nodo contenente la colonnina di ricarica, verso il quale andare eventualmente a caricare dopo aver servito l'utente.
 \end{enumerate}
 
-\subsubsection{consumo delle tappe} \label{consumo tappe}
+\subsubsection{Consumo delle tappe} \label{consumo tappe}
 Questo automa raccoglie i record tappe in una lista nella propria memoria, dopo un numero fissato di tick "consuma" la  tappa inserita in testa, elaborandone il contenuto per sapere come comportarsi, alcuni esempi: il tipo della tappa indica se è necessario comunicare all'utente aggiornamenti sulla sua richiesta oppure se è stata raggiunta la colonnina di ricarica, il valore 't' indica il tempo rimanente al raggiungimento del prossimo nodo.
-Le possibili combinazioni di comportamenti in base al contenuto della tappa sono molte, una lista esausitva di tutti questi non è lo scopo di questo documento e sono stati riportati solo alcuni esempi per favorire la comprensione dell'automa.
+Le possibili combinazioni di comportamenti in base al contenuto della tappa sono molte, una lista esaustiva di tutti questi non è lo scopo di questo documento e sono stati riportati solo alcuni esempi per favorire la comprensione dell'automa.
 
-\subsubsection{ricarica del mezzo} \label{tappe colonnina}
+\subsubsection{Ricarica del mezzo} \label{tappe colonnina}
 Come detto in \ref{tipiTappe}, uno dei tipi di tappa è quello del nodo con la colonnina di ricarica, pertanto l'automa deve inserire tra le sue mansioni anche lo spostamento verso le colonnine e la ricarica del mezzo.
 
 Questo automa riceve dall'automa ascoltatore 2 liste di tappe: quelle da consumare per soddisfare la richiesta del cliente e quelle da consumare per raggiungere la colonnina di ricarica. Alla ricezione di queste l'automa procede al consumo della prima lista, ma salva la seconda in un attributo specifico della memoria non sapendo se consumerà anche queste tappe. Se, durante lo spostamento, la batteria scenderà sotto un certo livello, l'automa batteria invierà a questo la notifica secondo quanto detto in \ref{automaBatteria} e l'automa si accingerà al consumo della seconda lista. 
@@ -135,7 +135,7 @@ In tale modo si garantisce che venga seguito il percorso verso la colonnina solo
 Al raggiungimento del nodo 'column' l'automa si sposta nello stato di ricarica, nel quale a ogni intervallo costante di tick aumenta la propria batteria. Questo processo continua fino alla ricezione della notifica di fermo da parte dell'automa batteria, con la quale avviene il ritorno allo stato idle.
 Similmente, se l'automa batteria decide di avviare la ricarica solare, l'automa compie le stesse transizioni.
 
-\subsubsection{dati necessari all'elezione}
+\subsubsection{Dati necessari all'elezione}
 I dati necessari all'algoritmo di elezione riguardano principalmente il processamento di elementi presenti nella memoria di questo automa, si pensi per esempio al livello di batteria rimanente oppure al nodo destinazione verso cui il mezzo si sta dirigendo per soddisfare l'ultimo cliente in coda.
 Per tale motivo si è valutato utile inserire nell'API di questo automa un metodo che restituisca tutti questi dati necessari all'automa dell'elezione, il quale lo chiamerà quando necessario per l'esecuzione dell'algoritmo. Il metodo è stato chiamato "getDataElection" e restituisce valori diversi a seconda dello stato del taxi, viene qui riportato quello eseguito del caso in cui questo automa si trovi in idle :
 
@@ -147,6 +147,30 @@ idle({call,From}, {getDataElection}, State) ->
 	Packet = {Cost_To_last_Target, Current_Target, Battery_level ,ok},
 	{keep_state, State, [{reply,From,Packet}]};
 \end{lstlisting}
+
+\section{Automi Utente} \label{automiUtenti}
+Gli automi degli utenti sono più semplici di quelli dei taxi, si suddividono in automa utente e applicazione utente. 
+
+\subsection{Automa utente}
+L'automa utente, similmente a quello ascoltatore per i taxi, genera il suo automa applicazione utente con il quale comunica per usare il servizio e ricevere notifiche su di esso. L'environment, quando genera un nuovo utente, si preoccupa di inizializzare un automa di questo tipo e l'app verrà generata indipendentemente. 
+Non c'è molto da dire su questo automa, l'environment comunica con questo automa per immettere nuove richieste al sistema o cambiare la destinazione di un utente e l'applicazione inoltra ogni aggiornamento sulla gestione della richiesta al rispettivo automa utente.
+
+\subsection{Automa applicazione}
+L'automa applicazione utente genera, al momento della inizializzazione, il proprio modulo gps per poter conoscere il taxi più vicino a cui inviare la richiesta. 
+
+
+\subsubsection{Timer}
+Questo automa è uno dei pochi che usano i timer del behavior piuttosto che il server tick per la temporizzazione. Il timer usato è di tipo "state\_timout" (uno specifico timer del behavior). 
+Questo timer viene lanciato quando l'app invia al taxi più vicino la richiesta di spostamento e si sposta nello stato "waiting\_election", nella quale aspetta una risposta. Se questa risposta non viene ricevuta nei tempi impostati dal timer, quest scatta e l'app decide di reiterare la richiesta. 
+
+\subsubsection{Attese random}
+ci sono 4 cirocstanze in cui l'app decide di aspettare un tempo random e reiterare la richiesta dell'utente al taxi più vicino:
+\begin{enumerate}
+	\item l'applicazione non ha trovato nessun taxi nei paraggi per inviare la richiesta, ossia il modulo gps non ha rilevato nessuna macchina nella mappa.
+	\item c'è stato un incidente del mezzo nel quale viaggiava l'utente.
+	\item il taxi a cui è stata inviata la richiesta è occupato nell'esecuzione di un'altra elezione.
+	\item il pacchetto contenente l'output dell'elezione ricevuto dal taxi indica che non è presente nessun vincitore.
+\end{enumerate}
 
 
 
