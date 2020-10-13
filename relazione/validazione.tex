@@ -270,13 +270,81 @@ La funzione ``getNearestCar'' richiede al Gps server le entità presenti ordinat
 
 La funzione ``getNearCars'' esegue come la precedente la richiesta al server indicando la propria posizione e il proprio livello di segnale. La risposta del server, dopo aver rimosso da essa il pid relativo all'entità di cui il modulo fa parte, viene inoltrata all'entità che ha eseguto questa funzione.
 
-\section{Automi macchina}
-
-\section{Entità presenti}
-
-\section{Fornitori di servizi}
-
 \section{Automa Elezione}
+Il principale problema affrontato in questo progetto è stato quello di eleggere quale sia la migliore macchina per soddisfare la richiesta dell'utente. Come già accennatto precedentemente al punto REF\_AUTOMI\_IMPLEMENTAZIONE, ogni macchina possiede un'istanza di questo automa.
 
-\section{Interazione tra i diversi moduli}
+\subsection{Record utilizzati}\label{record_elezione}
+Per l'elezione vengono utilizzati diversi record, che per lo più rispecchiano i pacchetti definiti al punto \ref{descrizione_pacchetto}.
 
+\begin{itemize}
+	\item user\_request: formato dalla coppia ``from''  e ``to'' indica il punto di partenza e arrivo dell'utente.
+	\item dataElectionBegin: creato dall'automa ascoltatore, indica all'elezione di iniziare i calcoli per l'elezione. Al suo interno contine la richiesta dell'utente ed il pid dell'applicazione dell'utente.
+	\item dataElectionPartecipate: creato dall'automa elezione, rispecchia la struttura spiegata precedentemente. Contiene: riferimento alla macchina ``padre'' per la successiva comunicazione dei risultati; user request come definita prima; ttl per determinare se inoltrare ulteriormente l'invito.
+	\item electionCostData: vengono creati da ogni macchina e contengono il proprio pid per l'eventuale comunicazione del vincitore assieme al CC e CRDT come definiti al punto \ref{funzioni_di_costo_macchine}.
+	\item carPartecipate: formato da tre campi, ha lo scopo di mantenere le informazioni dei nodi invitati a partecipare a una determinata elezione. Contiene il pid della macchina invitata, una lista dei costi ad essa associata ed una variabile ``sent results'' che indica se la determinata macchina ha già inviato oppure no i propri calcoli per l'elezione.
+	\item election\_result\_to\_car: risultati per la macchina, contengono il pid del vincitore, il pid dell'app dell'utente per la creazione delle relative tappe per l'automa moving e la richiesta in modo che sia più facile popolare la lista ``users in queue'' dell'automa ascoltatore. Maggiori informazioni al punto REF\_USERS\_IN\_QUEUE.
+	\item election\_result\_to\_user: risultati per gli utenti, vengono creati dall'automa ascoltatore risultato vincitore dell'elezione. Contengono il pid e nome del taxi vincitore assieme al tempo di attesa per l'arrivo nella posizione dell'utente.
+\end{itemize}
+
+\subsection{Varaibli di istanza dell'automa}\label{stato_elezione_automa}
+Ogni istanza dell'automa possiede alcune variabili costanti e altre che variano per ogni elezione. Queste sono le variabili comuni a tutte le elezioni:
+\begin{itemize}
+	\item pidCar: pid dell'ascoltatore della macchina, utilizzata per inviare i messaggi agli altri automi.
+	\item nameCar: nome della macchina, utilizzata per i messaggi di stato.
+	\item pidMovingCar: pid dell'automa moving, a cui vengono richiesti i dati dell'elezione come discusso al punto REF\_DATI\_ELEZIONE.
+	\item pidGps: pid della propria scheda gps, utilizzata per sapere quali siano le macchine vicine.
+	\item cityMap: mappa della città, come descritta al punto \ref{citta_e_algoritmi}.
+\end{itemize}
+
+Di seguito le variabili utilizzate localmente per un'unica elezione:
+\begin{itemize}
+	\item flag\_initiator: indica se è questa la macchina iniziatrice dell'elezione, vale a dire quella che dovrà calcolare chi sia il miglior taxi.
+	\item pidAppUser: nel caso del nodo iniziatore, si tiene il riferimento all'utente che ha richiesto il trasporto per la successiva comunicazione.
+	\item currentRequest: copia della richiesta dell'utente, utilizzata per la generazione del record ``election\_result\_to\_car''
+	\item my\_election\_cost: costi calcolati per la macchina che possiede l'elezione. Nel caso essa risulti candidabile equivalgono a una lista contenente i ``electionCostData'' definiti precedentemente, altrimenti una lista vuota.
+	\item queueToManage: è una tupla formata da tre campi, i quali sono la coppia costo totale - percorso relativi ai diversi path che la macchina deve compiere per soddisfare un cliente. Sono i dati ``grezzi'' ottenuti dall'applicazione degli algoritmi sui grafi, da elaborare per l'automa moving.
+	\item dataToSendPartecipate: è il record ``dataElectionPartecipate'' utilizzato come invito alla partecipazione per gli altri automi elezione.
+	\item parent: pid dell'automa che svolge il ruolo di padre durante l'elezione. 
+	\item carsInvited: lista dei pid delle macchine invitate alla partecipazione dell'elezione da parte di un determinato modo
+	\item childrenPartecipate: elenco di record ``carPartecipate'' che consente di tener traccia dei nodi che partecipano effettivamente all'elezione.
+	\item totalCosts: lista dei costi dei nodi figli di un determinato nodo e di quello del nodo corrente.
+	\item car\_moving\_queue\_data: elenco dei record creati a partire dalla ``queueToManage'' per l'automa moving.
+\end{itemize}
+
+\subsection{Algoritmo di Elezione}
+Riprendendo l'algoritmo definito al punto \ref{algoritmo_elezione}, di seguito ne viene analizzata l'implementazione in ogni passo.
+\begin{enumerate}
+	\item Il nodo inizatore riceve dall'automa ascoltatore il messaggio che contiene le informazioni necessarie per l'elezione. 
+
+	\lstinline|{beginElection, dataElectionBegin}|
+
+	Esso quindi calcola i propri costi come spiegato al punto \ref{implementazione_calcolo_costi} e dopo aver richiesto al proprio modulo gps quali siano le entità vicine, aggiorna il proprio stato. Nel caso in cui la lista delle macchine vicine non sia vuota, le invita e si sposta nello stato ``initiator\_final\_state''. Nel caso invece in cui ci siano delle macchine da invitare, prepara il record ``dataElectionPartecipate'' impostando le variabili e il ttl come descritto nella variabile globale ``max\_hops\_election'', lo invia alle macchine da invitare con l'apposito messaggio e si sposta in ``running\_election''.
+
+	\lstinline| {partecipateElection, Data} |
+	\item I nodi che ricevono l'invito di partecipazione possono essere di due tipi: nello stato ``idle'' e in un altro stato dell'elezione. Nel primo caso rispondono al nodo che li ha invitati con il messaggio 
+
+	\lstinline |{invite_result, {Self_Pid, i_can_join}}|
+	
+	per indicare che partecipano attivamente all'elezione. Calcolano i propri costi secondo il metodo \ref{implementazione_calcolo_costi} e controllano il ttl contenuto nell'invito. Nel caso in cui sia maggiore di zero chiedono al modulo gps i propri vicini e inviano loro il messaggio di invito con ttl diminuito di un'unità. Nel caso sia uguale a zero non estendono l'invito di partecipazione. Successivamente si spostano nello stato ``running\_election'' in attesa delle risposte dei nodi invitati. Nel caso invece il nodo sia in uno stato non di ``idle'' è l'ascoltatore ad inviare al nodo richiedente il messaggio
+
+	\lstinline |{invite_result, {self(), i_can_not_join}}|
+
+	ad indicare la non partecipazione.
+	\item Il nodo che riceve il pacchetto di starting election con TTL pari a zero, dopo avere inviato l'ack al genitore, non inoltra ulteriormente l'inizio dell'elezione ai vicini.
+	\item Ogni nodo, dopo aver ricevuto l'ack da parte dei figli alla partecipazione dell'elezione, calcola i propri costi e si mette in attesa che i propri figli, se presenti, gli mandino i costi calcolati. Alla ricezione di tutti i costi dei figli esso crea un pacchetto unico concatenando i costi ricevuti al proprio. Successivamente inoltre il pacchetto risultate al padre. Per la struttura di esso si faccia riferimenti a \ref{pacchetto_calcolato}.
+	\item Dopo aver inviato al padre i dati relativi ai costi, ogni nodo si mette in attesa di conoscere chi è il leader.
+	\item Quando il nodo iniziatore riceve tutti i dati calcola il leader in base alle proprietà descritte nella parte \ref{funzioni_di_costo_macchine}. Nel caso in cui non sia presente alcun vincitore, l'identificativo del miglior taxi viene impostato a un valore di errore.
+	\item L'iniziatore invia il messaggio contenente il leader in multicasting a tutti i partecipanti all'elezione. Si faccia rifermento alla parte \ref{pacchetto_vincitore} per la descrizione del pacchetto.
+	\item Tutti i nodi ricevono la notifica del leader e in base al risultato compiono le azioni più opportune. In ogni caso escono dallo stato di elezione eliminando tutte le informazioni calcolate.
+	\item In base al vincitore si hanno due casistiche:
+		\begin{itemize}
+			\item Vincitore presente: il nodo corrispondente aggiorna la propria coda dei nodi da visitare e comunica al modulo di ricezione del cliente, tramite le celle di comunicazione descritte nell'introduzione al punto \ref{problematiche_distribuite}, di essere pronto a servirlo e se egli è in coda oppure no.
+			\item Vincitore assente: il nodo iniziatore invia il pacchetto contenente l'id con errore anche all'applicazione dell'utente.
+		\end{itemize}
+\end{enumerate}
+
+\subsection{Calcolo dei costi per l'elezione}\label{implementazione_calcolo_costi}
+dhiujgaherogufl
+
+\subsection{Gestione dei timer}
+Lo scopo è di gestire il caso in cui un nodo non risponda alle richieste dell'elezione...

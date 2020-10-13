@@ -28,21 +28,19 @@ callback_mode() -> [state_functions, state_enter].
 				nameCar,
 				pidMovingCar,
 				pidGps,
-				pidAppUser,
-				parent,
-				carsInvited,
-				total_cars_invited,
-				childrenPartecipate,
-				total_children_partecipate,
-				childrenCosts,
 				cityMap,
-				queueToManage,
-				car_moving_queue_data,
+				pidAppUser,
 				currentRequest,
 				flag_initiator,
 				my_election_cost,
+				queueToManage,
 				dataToSendPartecipate,
-				totalCosts}).
+				parent,
+				carsInvited,
+				childrenPartecipate,
+				totalCosts,
+				car_moving_queue_data,
+				}).
 
 %% ====================================================================
 %% API functions
@@ -57,10 +55,7 @@ start(PidMacchina, NomeMacchina, PidMovingCar, Pid_Gps_Car, City_Map) ->
 							pidGps = Pid_Gps_Car,
 							parent = none,
 							carsInvited = [],
-							total_cars_invited = 0,
 							childrenPartecipate = [],
-							total_children_partecipate = 0,
-							childrenCosts = [],
 							cityMap = City_Map,
 							queueToManage = [],
 							car_moving_queue_data = none,
@@ -169,6 +164,12 @@ idle({call,From}, {sendMovingQueue}, S) ->
 	%resest stat
 	S1 =  S#electionState{car_moving_queue_data = none},
 	{keep_state, S1, [{reply,From,finished}]}.	
+
+idle(cast, {invite_result, _Data}, S) -> 
+	{next_state, idle, S}.
+
+idle(cast, {costs_results, _Data}, S) -> 
+	{next_state, idle, S}.
 
 %% ====================================================================
 %% Running Election States functions
@@ -291,12 +292,11 @@ initiator_final_state(enter, _OldState ,S) ->
 			}
 	end,
 	S1 = manage_winner_data(Winner_Data, S),
-%	timer:sleep(1000000),
 	sendToListener({election_results, [Winner_Data]}, S1),
 	{next_state, initiator_final_state, S1};
 
 initiator_final_state(info, {_From, tick}, _Stato) ->
-	keep_state_and_data; %per ora non fare nulla
+	keep_state_and_data;
 
 initiator_final_state(cast, {exit_final_state_initator}, S) -> 
     S1 = resetState(S),
@@ -316,6 +316,8 @@ waiting_final_results(cast, {winning_results, Data}, S) ->
 
 waiting_final_results(cast, {invite_result, _Data}, S) -> 
 	{next_state, waiting_final_results, S}.
+waiting_final_results(cast, {costs_results, _Data}, S) -> 
+	{next_state, waiting_final_results, S}.
 
 %% ====================================================================
 %% Internal functions
@@ -325,11 +327,8 @@ resetState(S) ->
 	S#electionState {
 					pidAppUser = none,
 					parent = none,
-					carsInvited = [],
-					total_cars_invited = 0,
+					carsInvited = []= 0,
 					childrenPartecipate = [],
-					total_children_partecipate = 0,
-					childrenCosts = [],
 					currentRequest = {},
 					flag_initiator = false,
 					my_election_cost = [],
@@ -487,21 +486,21 @@ calculateSelfCost(Points, Battery_Avaiable, CityData, Self_Name) ->
 	Out_Results = if  
 		RemainingCharge_P2 < 0 -> 	
 			print_debug_message(Self_Name, "I have no battery for User Position", none),
-			{-1, -1, i_can_not_win, []};		
+			{-1, -1, i_can_not_win, {}};		
 		true -> 					
 			{Cost_P2_P3, Queue_P2_P3} = calculate_path(CityData, {P2, P3}),
 			RemainingCharge_P3 =  RemainingCharge_P2 - Cost_P2_P3,
 			if  
 				RemainingCharge_P3 < 0 -> 	
 					print_debug_message(Self_Name, "I have no battery for Target Position", none),
-					{-1, -1, i_can_not_win, []};
+					{-1, -1, i_can_not_win, {}};
 				true -> 					
 					{Cost_P3_P4, Queue_P3_P4} = calculate_path(CityData, {P3, P4}),
 					RemainingCharge_P4 = RemainingCharge_P3 -Cost_P3_P4,
 					if  
 						RemainingCharge_P4 < 0 -> 
 							print_debug_message(Self_Name, "I have no battery for Column Position", none),
-							{-1, -1, i_can_not_win, []};
+							{-1, -1, i_can_not_win, {}};
 						true ->	
 							CC = Cost_P1_P2,
 							CRDT = Battery_Avaiable - Cost_P1_P2 - Cost_P2_P3,
