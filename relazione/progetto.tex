@@ -270,7 +270,7 @@ I problemi possibili ma assenti per via dell'implementazione del sistema sono i 
 \end{itemize}
 
 \subsubsection{Aggiornamento della mappa}
-Viene discussa nella sezione Aggiornamento Mappa \ref{aggiornamento_mappa}.
+Viene discussa nella sezione Aggiornamento Mappa \ref{aggiornamentoMappa}.
 
 \subsubsection{Rimozione di una macchina}
 Sebbene il sistema venga costruito in modo che una vettura possa essere rimossa solamente se si trova nello stato ``idle'', è bene gestire i casi in cui l'eliminazione avvenga in ogni possibile stato, compresa l'elezione. Per risolvere il problema di attesa della risposta da un taxi ormai rimosso, ogni nodo invia dei messaggi di tipo ``hello'' per controllare lo stato della vettura di cui sta aspettando il calcolo dei costi. In tal modo se non ricevono risposta entro un tempo ragionevole lo considerano rimosso e continuano l'algoritmo di elezione.
@@ -315,7 +315,7 @@ Si assume che i messaggi interni alla macchina, quindi scambiati tra gli automi,
 	\item Messaggi scambiati dagli automi internamente alla macchina per il passaggio dei valori degli attributi. \ref{fig:messaggi_macchina_get_attribute}
 	\item Messaggi scambiati tra gli automi nel caso in cui il livello della batteria scende sotto il minimo durante il viaggio della macchina. L'automa della batteria abilita il percorso verso la colonnina di ricarica. \ref{fig:messaggi_macchina_batteria}
 	\item Messaggi scambiati tra gli automi nel caso in cui il livello della batteria resti costante per un tempo fissato. In tal caso si assume che la batteria venga ricaricata dai pannelli solari della macchina. \ref{fig:messaggi_macchina_pannelli_solari}
-	\item Messaggi scambiati durante l'aggiornamento della mappa come già spiegato nella relativa parte \ref{aggiornamento_mappa}. \ref{fig:messaggi_macchina_update_map}
+	\item Messaggi scambiati durante l'aggiornamento della mappa come già spiegato nella relativa parte \ref{aggiornamentoMappa}. \ref{fig:messaggi_macchina_update_map}
 	\item Nel caso l'utente voglia cambiare destinazione, possono avvenire diversi scambi messaggi. \ref{fig:messaggi_utente_cambio_destinazione}
 	\item Messaggi nel caso in cui avvenga un incidente. L'ambiente controlla che una macchia sia in movimento. \ref{fig:messaggi_macchina_incidente}
 	\item L'ambiente sceglie un taxi tra quelli rotti e lo ripara. \ref{fig:messaggi_macchina_fixcar}

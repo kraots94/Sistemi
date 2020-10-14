@@ -12,7 +12,7 @@
 						print_car_message/3]).
 -define(DEBUGPRINT_MOVING, false). %flag che indica abilitazione printing dei messsaggi di Debug
 -define(TICKS_TO_CHARGE, 3). %numero di tick da consumare per caricare la batteria 
--define(TICKS_TO_MOVING, 1). %numero di tick da consumare per effettuare uno spostamento
+-define(TICKS_TO_MOVING, 2). %numero di tick da consumare per effettuare uno spostamento
 -export([start/1, crash/1, areYouStationary/1, areYouDoingSolarCharge/1, 
 		getBatteryLevel/1, getPosition/1, getDataElection/1, getTimeToUser/1,
 		enablePathCharge/1, activateSolarCharge/1, updateQueue/3, areYouKillable/1,
